@@ -5,12 +5,12 @@ Golang version of mendel's accountant....
 package main
 
 import (
-	// "bytes"
-	// "encoding/json"
 	"fmt"
 	"flag"
 	"log"
 	"os"
+	// "bytes"
+	// "encoding/json"
 	// "path"
 	// "path/filepath"
 	// "io"
@@ -22,10 +22,11 @@ import (
 
 	// "github.com/davecgh/go-spew/spew"
 
-	// "bitbucket.org/geneticentropy/bucket-brigade/..."
+	"bitbucket.org/geneticentropy/mendel-go/config"
+	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
-// const FOOTER = "# vim: set ts=4 sw=4 expandtab:"
+const DEFAULT_INPUT_FILE = "./mendel-defaults.ini"
 
 func usage(exitCode int) {
 	usageStr1 := `Usage:
@@ -45,17 +46,20 @@ Examples:
 `
 
 	if exitCode > 0 {
-		fmt.Fprintf(os.Stderr, usageStr1)		// send it to stderr
+		fmt.Fprintln(os.Stderr, usageStr1)		// send it to stderr
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, usageStr2)		// send it to stderr
+		fmt.Fprintln(os.Stderr, usageStr2)		// send it to stderr
 	} else {
-		fmt.Printf(usageStr1)		// send it to stdout
+		fmt.Println(usageStr1)		// send it to stdout
 		flag.PrintDefaults()		//todo: do not yet know how to get this to print to stdout
-		fmt.Printf(usageStr2)		// send it to stdout
+		fmt.Println(usageStr2)		// send it to stdout
 	}
 	os.Exit(exitCode)
 }
 
+func init() {
+	log.SetOutput(os.Stdout)
+}
 
 func main() {
 	// Get and check cmd line options
@@ -66,24 +70,30 @@ func main() {
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
 	flag.Usage = func() { usage(0) }
 	flag.Parse()
+	// can use this to get values anywhere in the program: flag.Lookup("name").Value.String()
 	// spew.Dump(flag.Lookup("f").Value.String())
 	// os.Exit(0)
 	// if name == "" && !isStdinFile() { usage(0) }
-	if !useDefaults && inputFile == "" && inputFileToCreate == "" { usage(0) }
+
+	cfg := config.Config{}
 	if inputFileToCreate != "" {
-		if inputFile != "" || useDefaults { log.Printf("Error: if you specify -c you can not specify either -f or -d"); usage(1) }
+		if inputFile != "" || useDefaults { log.Println("Error: if you specify -c you can not specify either -f or -d"); usage(1) }
+		if err := cfg.ReadFromFile(DEFAULT_INPUT_FILE); err != nil { log.Fatalln(err) }
 		log.Printf("Creating input file %v with defaults...", inputFileToCreate)
+
 	} else if useDefaults {
-		if inputFile != "" || inputFileToCreate != "" { log.Printf("Error: if you specify -d you can not specify either -f or -c"); usage(1) }
-		log.Printf("Running with defaults...")
-	} else {
-		// they specified the -f flag
-		log.Printf("Running with input file %v...", inputFile)
+		if inputFile != "" || inputFileToCreate != "" { log.Println("Error: if you specify -d you can not specify either -f or -c"); usage(1) }
+		if err := cfg.ReadFromFile(DEFAULT_INPUT_FILE); err != nil { log.Fatalln(err) }
+		utils.Verbose(9, "name: %v\n", config.Cfg.Name)
 
-	}
-	// can use this to get values anywhere in the program: flag.Lookup("name").Value.String()
+	} else if inputFile != ""{
+		// We already verified inputFileToCreate or useDefaults was not specified with this
+		if err := cfg.ReadFromFile(inputFile); err != nil { log.Fatalln(err) }
+		utils.Verbose(9, "name: %v\n", config.Cfg.Name)
 
-	fmt.Println("Running mendel...")
+	} else { usage(0) }
 
-	// log.Fatalf("something really bad went wrong: %v", err)
+
+	log.Println("Running mendel...")
+
 }
