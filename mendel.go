@@ -12,6 +12,7 @@ import (
 
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
+	"math"
 )
 
 const DEFAULT_INPUT_FILE = "./mendel-defaults.ini"
@@ -46,12 +47,22 @@ Examples:
 }
 
 // Init initializes variables, objects, and settings for either an initial run or a restart.
-func init() {
-	log.SetOutput(os.Stdout)
+func initialize() {
+
+	//todo: support parallel
+	//todo: open intermediate files if necessary
+
+	// Adjust certain config values
+	config.Cfg.Selection.Heritability = math.Max(1.e-20, config.Cfg.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
+	if config.Cfg.Mutations.Fraction_neutral == 0 { config.Cfg.Computation.Track_neutrals = false }   // no neutrals to track
+	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 }
+	if config.Cfg.Mutations.Allow_back_mutn { config.Cfg.Computation.Tracking_threshold = 0 }  // If back mutations are allowed, set the tracking threshold to zero so that all mutations are tracked
 }
 
 // Main handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 func main() {
+	log.SetOutput(os.Stdout) 	// needs to be done very early
+
 	// Get and check cmd line options
 	var inputFile, inputFileToCreate string
 	var useDefaults bool
@@ -65,7 +76,6 @@ func main() {
 	// os.Exit(0)
 	// if name == "" && !isStdinFile() { usage(0) }
 
-	cfg := config.Config{}
 	if inputFileToCreate != "" {
 		if inputFile != "" || useDefaults { log.Println("Error: if you specify -c you can not specify either -f or -d"); usage(1) }
 		if err := utils.CopyFile(DEFAULT_INPUT_FILE, inputFileToCreate); err != nil { log.Fatalln(err) }
@@ -73,17 +83,17 @@ func main() {
 
 	} else if useDefaults {
 		if inputFile != "" || inputFileToCreate != "" { log.Println("Error: if you specify -d you can not specify either -f or -c"); usage(1) }
-		if err := cfg.ReadFromFile(DEFAULT_INPUT_FILE); err != nil { log.Fatalln(err) }
+		if err := config.ReadFromFile(DEFAULT_INPUT_FILE); err != nil { log.Fatalln(err) }
 		utils.Verbose(9, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
 	} else if inputFile != ""{
 		// We already verified inputFileToCreate or useDefaults was not specified with this
-		if err := cfg.ReadFromFile(inputFile); err != nil { log.Fatalln(err) }
+		if err := config.ReadFromFile(inputFile); err != nil { log.Fatalln(err) }
 		utils.Verbose(9, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
 	} else { usage(0) }
 
 
 	log.Println("Running mendel...")
-
+	initialize()
 }

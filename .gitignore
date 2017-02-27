@@ -1,4 +1,10 @@
-mendel
-.idea/
+# Build artifacts
+mendel-go
+vendor/
+
+# Test files
 test/input
 test/output
+
+# Intellij files
+.idea/

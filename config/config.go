@@ -15,56 +15,56 @@ import (
 type Config struct {
 	Basic struct {
 		Case_id string
-		Mutn_rate float32
-		Frac_fav_mutn float32
-		Reproductive_rate float32
+		Mutn_rate float64
+		Frac_fav_mutn float64
+		Reproductive_rate float64
 		Pop_size int
 		Num_generations int
 	}
 	Mutations struct {
 		Fitness_distrib_type int
-		Fraction_neutral float32
-		Genome_size float32
-		High_impact_mutn_fraction float32
-		High_impact_mutn_threshold float32
+		Fraction_neutral float64
+		Genome_size float64
+		High_impact_mutn_fraction float64
+		High_impact_mutn_threshold float64
 		Num_initial_fav_mutn int
-		Max_fav_fitness_gain float32
-		Uniform_fitness_effect_del float32
-		Uniform_fitness_effect_fav float32
-		Fraction_recessive float32
-		Recessive_hetero_expression float32
-		Dominant_hetero_expression float32
-		Multiplicative_weighting float32
+		Max_fav_fitness_gain float64
+		Uniform_fitness_effect_del float64
+		Uniform_fitness_effect_fav float64
+		Fraction_recessive float64
+		Recessive_hetero_expression float64
+		Dominant_hetero_expression float64
+		Multiplicative_weighting float64
 		Synergistic_epistasis bool
-		Se_nonlinked_scaling float32
-		Se_linked_scaling float32
+		Se_nonlinked_scaling float64
+		Se_linked_scaling float64
 		Upload_mutations bool
 		Allow_back_mutn bool
 		Polygenic_beneficials bool
 		Polygenic_init string
 		Polygenic_target string
-		Polygenic_effect float32
+		Polygenic_effect float64
 	}
 	Selection struct {
-		Fraction_random_death float32
-		Heritability float32
-		Non_scaling_noise float32
+		Fraction_random_death float64
+		Heritability float64
+		Non_scaling_noise float64
 		Fitness_dependent_fertility bool
 		Selection_scheme int
-		Partial_truncation_value float32
+		Partial_truncation_value float64
 	}
 	Population struct {
 		Recombination_model int
-		Fraction_self_fertilization float32
+		Fraction_self_fertilization float64
 		Num_contrasting_alleles int
 		Max_total_fitness_increase int
-		Initial_alleles_pop_frac float32
+		Initial_alleles_pop_frac float64
 		Initial_alleles_amp_factor int
 		Dynamic_linkage bool
 		Haploid_chromosome_number int
 		Num_linkage_subunits int
 		Pop_growth_model int
-		Pop_growth_rate float32
+		Pop_growth_rate float64
 		Carrying_capacity int
 		Bottleneck_yes bool
 		Bottleneck_generation int
@@ -79,9 +79,9 @@ type Config struct {
 		Migration_model int
 		Tribal_competition bool
 		Tribal_fission bool
-		Tc_scaling_factor float32
-		Group_heritability float32
-		Social_bonus_factor float32
+		Tc_scaling_factor float64
+		Group_heritability float64
+		Social_bonus_factor float64
 	}
 	Computation struct {
 		Tracking_threshold float64
@@ -107,15 +107,13 @@ type Config struct {
 var Cfg *Config
 
 // ReadFromFile reads the specified input file and parses all of the values into the Config struct.
-func (c *Config) ReadFromFile(filename string) error {
+// This is also the factory method for the Config class and will store the created instance in this packages Cfg var.
+func ReadFromFile(filename string) error {
 	log.Printf("Reading %v...\n", filename) 	// can not use verbosity here because we have not read the config file yet
-	//f, err := os.Open(filename)
-	//if err != nil { return err }
-	//defer f.Close()
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil { return err }
-	if err := toml.Unmarshal(buf, c); err != nil { return err }
-	Cfg = c 		// set the singleton config
+	Cfg = &Config{} 		// create and set the singleton config
+	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
 	return nil
 }
 

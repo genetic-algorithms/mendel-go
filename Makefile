@@ -10,18 +10,16 @@ SHELL = /bin/bash -e
 	# FOO ?= bar2
 # endif
 
-default: mendel runmendel
+default: build run
 
-%: %.go
-	go build $<
-	# -./$@
+build:
+	glide install
+	go build
 
-runmendel:
-	./mendel
+run:
+	./mendel-go
 
 clean:
-	rm -f mendel
+	go clean
 
-.SECONDARY:
-
-.PHONY: default clean
+.PHONY: default build run clean

@@ -1,0 +1,10 @@
+hash: 9ad5c692a9ba5544b5447fce92a593cce5bd36b5e9530743d6a390e7bfc8e07c
+updated: 2017-02-27T03:01:06.662281445-05:00
+imports:
+- name: github.com/naoina/go-stringutil
+  version: 6b638e95a32d0c1131db0e7fe83775cbea4a0d0b
+- name: github.com/naoina/toml
+  version: 751171607256bb66e64c9f0220c00662420c38e9
+  subpackages:
+  - ast
+testImports: []

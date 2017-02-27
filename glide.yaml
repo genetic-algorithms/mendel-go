@@ -1,0 +1,3 @@
+package: bitbucket.org/geneticentropy/mendel-go
+import:
+- package: github.com/naoina/toml
