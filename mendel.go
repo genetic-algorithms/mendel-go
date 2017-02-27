@@ -57,6 +57,8 @@ func initialize() {
 	if config.Cfg.Mutations.Fraction_neutral == 0 { config.Cfg.Computation.Track_neutrals = false }   // no neutrals to track
 	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 }
 	if config.Cfg.Mutations.Allow_back_mutn { config.Cfg.Computation.Tracking_threshold = 0 }  // If back mutations are allowed, set the tracking threshold to zero so that all mutations are tracked
+
+	//todo: complete this function
 }
 
 // Main handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
