@@ -1,10 +1,10 @@
 package dna
 
-// LinkageBlocks represents the linkage blocks in the genome.
-type LinkageBlocks struct {
+// LinkageBlock represents 1 linkage block in the genome.
+type LinkageBlock struct {
 
 }
 
-func LinkageBlocksFactory() *LinkageBlocks {
-	return &LinkageBlocks{}
+func LinkageBlockFactory() *LinkageBlock {
+	return &LinkageBlock{}
 }
