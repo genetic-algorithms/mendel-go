@@ -4,3 +4,7 @@ package dna
 type Species struct {
 
 }
+
+func SpeciesFactory() *Species {
+	return &Species{}
+}

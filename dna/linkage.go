@@ -4,3 +4,7 @@ package dna
 type LinkageBlocks struct {
 
 }
+
+func LinkageBlocksFactory() *LinkageBlocks {
+	return &LinkageBlocks{}
+}

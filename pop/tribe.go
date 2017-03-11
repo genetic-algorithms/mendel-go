@@ -4,3 +4,7 @@ package pop
 type Tribe struct {
 
 }
+
+func TribeFactory() *Tribe {
+	return &Tribe{}
+}

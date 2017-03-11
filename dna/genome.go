@@ -4,3 +4,7 @@ package dna
 type Genome struct {
 
 }
+
+func GenomeFactory() *Genome {
+	return &Genome{}
+}

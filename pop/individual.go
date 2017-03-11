@@ -6,3 +6,7 @@ package pop
 type Individual struct {
 
 }
+
+func IndividualFactory() *Individual{
+	return &Individual{}
+}

@@ -4,3 +4,7 @@ package dna
 type Allele struct {
 
 }
+
+func AlleleFactory() *Allele {
+	return &Allele{}
+}

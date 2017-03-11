@@ -4,3 +4,7 @@ package dna
 type Mutation struct {
 
 }
+
+func Mutation() *Mutation {
+	return &Mutation{}
+}

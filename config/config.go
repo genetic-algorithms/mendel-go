@@ -2,12 +2,8 @@
 package config
 
 import (
-	//"fmt"
-	//"os"
-	//"path/filepath"
 	"github.com/naoina/toml" 		// implementation of TOML we are using to read input files
 	"io/ioutil"
-	//"bitbucket.org/geneticentropy/mendel-go/utils"
 	"log"
 )
 

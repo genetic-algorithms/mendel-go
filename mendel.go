@@ -3,8 +3,6 @@
 package main
 
 import (
-	"fmt"
-	"flag"
 	"log"
 	"os"
 
@@ -13,41 +11,12 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"math"
+	"bitbucket.org/geneticentropy/mendel-go/pop"
 )
 
-const DEFAULT_INPUT_FILE = "./mendel-defaults.ini"
-
-func usage(exitCode int) {
-	usageStr1 := `Usage:
-  mendel {-c | -f} [filename]
-  mendel -d
-
-Performs a mendel run...
-
-Options:
-`
-
-	usageStr2 := `
-Examples:
-  mendel -f /home/bob/mendel.in    # run with this input file
-  mendel -d     # run with all default parameters from `+DEFAULT_INPUT_FILE+`
-  mendel -c /home/bob/mendel.in    # create an input file primed with defaults, then you can edit it
-`
-
-	//if exitCode > 0 {
-		fmt.Fprintln(os.Stderr, usageStr1)		// send it to stderr
-		flag.PrintDefaults()
-		fmt.Fprintln(os.Stderr, usageStr2)		// send it to stderr
-	//} else {
-	//	fmt.Println(usageStr1)		// send it to stdout
-	//	flag.PrintDefaults()		//todo: do not yet know how to get this to print to stdout
-	//	fmt.Println(usageStr2)		// send it to stdout
-	//}
-	os.Exit(exitCode)
-}
-
-// Init initializes variables, objects, and settings for either an initial run or a restart.
+// Initialize initializes variables, objects, and settings for either an initial run or a restart.
 func initialize() {
+	utils.Verbose(9, "Initializing...\n")
 
 	//todo: support parallel
 	//todo: open intermediate files if necessary
@@ -58,44 +27,46 @@ func initialize() {
 	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 }
 	if config.Cfg.Mutations.Allow_back_mutn { config.Cfg.Computation.Tracking_threshold = 0 }  // If back mutations are allowed, set the tracking threshold to zero so that all mutations are tracked
 
+	// Read restart file, if specified
+	config.ReadRestartFile("")
+
 	//todo: complete this function
+}
+
+// Shutdown does all the stuff necessary at the end of the run.
+func shutdown() {
+	utils.Verbose(9, "Shutting down...\n")
 }
 
 // Main handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 func main() {
 	log.SetOutput(os.Stdout) 	// needs to be done very early
 
-	// Get and check cmd line options
-	var inputFile, inputFileToCreate string
-	var useDefaults bool
-	flag.StringVar(&inputFile, "f", "", "Run mendel with this input file")
-	flag.StringVar(&inputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
-	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
-	flag.Usage = func() { usage(0) }
-	flag.Parse()
-	// can use this to get values anywhere in the program: flag.Lookup("name").Value.String()
-	// spew.Dump(flag.Lookup("f").Value.String())
-	// os.Exit(0)
-	// if name == "" && !isStdinFile() { usage(0) }
+	config.ReadCmdArgs()    // Get/check cmd line options and load specified input file - flags are accessible in config.CmdArgs, config values in config.Cfg
 
-	if inputFileToCreate != "" {
-		if inputFile != "" || useDefaults { log.Println("Error: if you specify -c you can not specify either -f or -d"); usage(1) }
-		if err := utils.CopyFile(DEFAULT_INPUT_FILE, inputFileToCreate); err != nil { log.Fatalln(err) }
+	// Handle the different input file choices
+	if config.CmdArgs.InputFileToCreate != "" {
+		if err := utils.CopyFile(config.DEFAULT_INPUT_FILE, config.CmdArgs.InputFileToCreate); err != nil { log.Fatalln(err) }
 		os.Exit(0)
 
-	} else if useDefaults {
-		if inputFile != "" || inputFileToCreate != "" { log.Println("Error: if you specify -d you can not specify either -f or -c"); usage(1) }
-		if err := config.ReadFromFile(DEFAULT_INPUT_FILE); err != nil { log.Fatalln(err) }
+	} else if config.CmdArgs.InputFile != ""{
+		if err := config.ReadFromFile(config.CmdArgs.InputFile); err != nil { log.Fatalln(err) }
 		utils.Verbose(9, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
-	} else if inputFile != ""{
-		// We already verified inputFileToCreate or useDefaults was not specified with this
-		if err := config.ReadFromFile(inputFile); err != nil { log.Fatalln(err) }
-		utils.Verbose(9, "Case_id: %v\n", config.Cfg.Basic.Case_id)
+	} else { config.Usage(0) }
 
-	} else { usage(0) }
-
-
+	// Initialize
 	log.Println("Running mendel...")
 	initialize()
+	population := pop.PopulationFactory()
+
+	// Main generation loop
+	for gen := config.Restart.Gen_0+1; gen <= config.Restart.Gen_0+config.Cfg.Basic.Num_generations; gen++ {
+		utils.Verbose(9, "Generation %d\n", gen)
+		population.Mate()
+		population.Select()
+	}
+
+	// Finish up
+	shutdown()
 }
