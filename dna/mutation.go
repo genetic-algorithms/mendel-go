@@ -5,6 +5,6 @@ type Mutation struct {
 
 }
 
-func Mutation() *Mutation {
+func MutationFactory() *Mutation {
 	return &Mutation{}
 }

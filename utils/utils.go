@@ -11,7 +11,7 @@ import (
 )
 
 func Verbose(level int, msg string, args ...interface{}) {
-	if level >= config.Cfg.Computation.Verbosity { log.Printf("Verbose "+fmt.Sprint(level)+": "+msg, args...) }
+	if level >= config.Cfg.Computation.Verbosity { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
 }
 
 func CopyFile(fromFile, toFile string) error {
