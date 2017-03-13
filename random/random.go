@@ -9,25 +9,6 @@ import (
 
 // Algorithm taken from Wikipedia
 // (https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables).
-// There will be rounding errors for lambda > 700
-func PoissonNaive(uniform_random *rand.Rand, lambda float64) uint32 {
-	var L float64 = math.Exp(-lambda)
-	var k uint32 = 0
-	var p float64 = 1
-
-	for p > L {
-		k += 1
-		u := uniform_random.Float64()
-		p *= u
-
-		if p <= L { break }
-	}
-
-	return k - 1
-}
-
-// Algorithm taken from Wikipedia
-// (https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables).
 // This differs from PoissonNaive in avoiding rounding errors for lambda > 700
 func Poisson(uniform_random *rand.Rand, lambda float64) uint32 {
 	var STEP float64 = 500

@@ -8,15 +8,7 @@ import (
 )
 
 
-func TestPoissonNaive(t *testing.T) {
-	testPoissonFunc(t, PoissonNaive)
-}
-
 func TestPoisson(t *testing.T) {
-	testPoissonFunc(t, Poisson)
-}
-
-func testPoissonFunc(t *testing.T, f func(uniform_random *rand.Rand, lambda float64) uint32) {
 	kCounts := make([]uint32, 100)
 	var iterations uint32 = 10E3
 	var epsilon float64 = 0.006
