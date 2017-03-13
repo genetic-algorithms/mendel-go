@@ -3,7 +3,7 @@ SHELL = /bin/bash -e
 # DOCKER_TAG ?= bld
 # OS := $(shell uname)
 # ifeq ($(OS),Darwin)
-	# Mac OS X 
+	# Mac OS X
 	# FOO ?= bar1
 # else
 	# Assume Linux (could test by test if OS is Linux)
@@ -18,6 +18,9 @@ build:
 
 run:
 	./mendel-go
+
+test:
+	go test ./random
 
 clean:
 	go clean
