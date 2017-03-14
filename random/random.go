@@ -2,7 +2,9 @@ package random
 
 
 import (
+	crand "crypto/rand"
 	"math"
+	"math/big"
 	"math/rand"
 )
 
@@ -36,4 +38,15 @@ func Poisson(uniformRandom *rand.Rand, lambda float64) uint32 {
 	}
 
 	return k - 1
+}
+
+// Get a random int64 from /dev/urandom to use as a seed
+func GetSeed() int64 {
+	nBig, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+
+	if err != nil {
+		panic(err)
+	}
+
+	return nBig.Int64()
 }
