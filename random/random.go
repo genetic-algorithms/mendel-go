@@ -9,8 +9,8 @@ import (
 
 // Algorithm taken from Wikipedia
 // (https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables).
-// This differs from PoissonNaive in avoiding rounding errors for lambda > 700
-func Poisson(uniform_random *rand.Rand, lambda float64) uint32 {
+// This differs from a naive implementation in avoiding rounding errors for lambda > 700
+func Poisson(uniformRandom *rand.Rand, lambda float64) uint32 {
 	var STEP float64 = 500
 	lambdaLeft := lambda
 	var k uint32 = 0
@@ -18,7 +18,7 @@ func Poisson(uniform_random *rand.Rand, lambda float64) uint32 {
 
 	for {
 		k += 1
-		u := uniform_random.Float64()
+		u := uniformRandom.Float64()
 		p *= u
 
 		if p < math.E && lambdaLeft > 0 {
@@ -36,4 +36,13 @@ func Poisson(uniform_random *rand.Rand, lambda float64) uint32 {
 	}
 
 	return k - 1
+}
+
+// Fisher-Yates shuffle
+// (https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm)
+func Shuffle(uniformRandom *rand.Rand, xs []int) {
+	for i := len(xs) - 1; i > 0; i-- {
+		j := uniformRandom.Intn(i + 1);
+		xs[j], xs[i] = xs[i], xs[j]
+	}
 }
