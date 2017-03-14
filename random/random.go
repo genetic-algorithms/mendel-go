@@ -37,12 +37,3 @@ func Poisson(uniformRandom *rand.Rand, lambda float64) uint32 {
 
 	return k - 1
 }
-
-// Fisher-Yates shuffle
-// (https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm)
-func Shuffle(uniformRandom *rand.Rand, xs []int) {
-	for i := len(xs) - 1; i > 0; i-- {
-		j := uniformRandom.Intn(i + 1);
-		xs[j], xs[i] = xs[i], xs[j]
-	}
-}

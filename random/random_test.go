@@ -2,7 +2,6 @@ package random
 
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -37,15 +36,4 @@ func TestPoisson(t *testing.T) {
 func poissonProbability(lambda float64, k uint32) float64 {
 	g, _ := math.Lgamma(float64(k + 1))
 	return math.Exp(float64(k) * math.Log(lambda) - lambda - g)
-}
-
-func TestShuffle(t *testing.T) {
-	uniformRandom := rand.New(rand.NewSource(4))
-	xs := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-
-	fmt.Println(xs)
-
-	Shuffle(uniformRandom, xs)
-
-	fmt.Println(xs)
 }
