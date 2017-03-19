@@ -56,6 +56,16 @@ type Shuffleable interface {
 	Len() int
 }
 
+type IntSlice []int
+
+func (xs IntSlice) Swap(i, j int) {
+	xs[i], xs[j] = xs[j], xs[i]
+}
+
+func (xs IntSlice) Len() int {
+	return len(xs)
+}
+
 // Fisher-Yates shuffle
 // (https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm)
 func Shuffle(uniformRandom *rand.Rand, xs Shuffleable) {

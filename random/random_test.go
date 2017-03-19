@@ -43,16 +43,6 @@ func poissonProbability(lambda float64, k uint32) float64 {
 	return math.Exp(float64(k) * math.Log(lambda) - lambda - g)
 }
 
-type intSlice []int
-
-func (self intSlice) Swap(i, j int) {
-	self[i], self[j] = self[j], self[i]
-}
-
-func (self intSlice) Len() int {
-	return len(self)
-}
-
 // Runs many iterations of shuffling a `Slice` of `int`s and computes the
 // average value found at each index. This average value should match the
 // average of all the values in the slice. As the number of iterations
@@ -65,7 +55,7 @@ func TestShuffle(t *testing.T) {
 	var epsilon float64 = 0.06
 	var expectedValue float64 = 4
 	uniformRandom := rand.New(rand.NewSource(1))
-	xs := intSlice{0, 1, 2, 3, 4, 5, 6, 7, 8}
+	xs := IntSlice{0, 1, 2, 3, 4, 5, 6, 7, 8}
 
 	for i := 0; i < iterations; i++ {
 		Shuffle(uniformRandom, xs)
