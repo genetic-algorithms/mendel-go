@@ -5,6 +5,7 @@ import (
 	"github.com/naoina/toml" 		// implementation of TOML we are using to read input files
 	"io/ioutil"
 	"log"
+	"errors"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -110,6 +111,12 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+	return Cfg.validate()
+}
+
+// Validate checks the config values to make sure they are valid.
+func (c *Config) validate() error {
+	if c.Basic.Pop_size % 2 != 0 { return errors.New("Error: basic.pop_size must be an even number") }
 	return nil
 }
 

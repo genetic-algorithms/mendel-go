@@ -22,3 +22,14 @@ func CopyFile(fromFile, toFile string) error {
 	return nil
 }
 
+func Min(a, b int) int {
+	if a < b { return a }
+	return b
+}
+
+func Max(a, b int) int {
+	if a > b { return a }
+	return b
+}
+
+func NotImplementedYet(what string) { log.Fatalf("Not implemented yet: %v", what) }

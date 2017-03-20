@@ -34,8 +34,9 @@ func initialize() {
 }
 
 // Shutdown does all the stuff necessary at the end of the run.
-func shutdown() {
+func shutdown(population *pop.Population) {
 	utils.Verbose(9, "Shutting down...\n")
+	population.Report()
 }
 
 // Main handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
@@ -58,15 +59,15 @@ func main() {
 	// Initialize
 	log.Println("Running mendel...")
 	initialize()
-	population := pop.PopulationFactory()
+	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 
 	// Main generation loop
 	for gen := config.Restart.Gen_0+1; gen <= config.Restart.Gen_0+config.Cfg.Basic.Num_generations; gen++ {
 		utils.Verbose(9, "Generation %d\n", gen)
-		population.Mate()
-		population.Select()
+		population = population.Mate()
+		population = population.Select()
 	}
 
 	// Finish up
-	shutdown()
+	shutdown(population)
 }

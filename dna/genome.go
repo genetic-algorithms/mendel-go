@@ -3,6 +3,7 @@ package dna
 import "bitbucket.org/geneticentropy/mendel-go/config"
 
 // Genome represents an individual's genome, but really just tracks the diffs from the common genome (mutations and alleles).
+//todo: currently not used.
 type Genome struct {
 	Chromos []*Chromosome
 	Linkages []*LinkageBlock
