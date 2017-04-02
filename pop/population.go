@@ -91,7 +91,7 @@ func (p *Population) Mate() *Population {
 
 // Select removes the least fit individuals in the population
 func (p *Population) Select() {
-	utils.Verbose(3, "Select: eliminating %d individuals to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
+	utils.Verbose(4, "Select: eliminating %d individuals to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fitness individuals as dead
 	indexes := p.sortIndexByFitness()

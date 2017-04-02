@@ -26,9 +26,9 @@ type Mutation struct {
 // MutationFactory creates a random mutation factoring the various relevant rates for this population.
 func MutationFactory() (m *Mutation) {
 	m = &Mutation{}
-	rnd := random.Rnd.Float64() 	// use for several of the decisions below
 
 	// Determine if this mutation is deleterious, neutral, or favorable
+	rnd := random.Rnd.Float64()
 	if rnd < config.Cfg.Mutations.Frac_fav_mutn {
 		m.mType = FAVORABLE
 	} else if rnd < config.Cfg.Mutations.Frac_fav_mutn + config.Cfg.Mutations.Fraction_neutral {
@@ -37,17 +37,19 @@ func MutationFactory() (m *Mutation) {
 		m.mType = DELETERIOUS
 	}
 
-	// Determine if this mutation is dominant or recessive
-	m.dominant = (config.Cfg.Mutations.Fraction_recessive < rnd)
-
 	// Calculate fitness factor. Todo: this should be the correct mutation effect distribution
+	rnd = random.Rnd.Float64()
 	if m.mType == DELETERIOUS {
-		m.fitnessFactor = float32(rnd * -1.0)
+		m.fitnessFactor = float32(0.0 - rnd)
 	} else if m.mType == FAVORABLE {
 		m.fitnessFactor = float32(rnd)
 	}
 
+	// Determine if this mutation is dominant or recessive
+	m.dominant = (config.Cfg.Mutations.Fraction_recessive < random.Rnd.Float64())
+
 	// Determine if this mutated allele is expressed or not (whether if affects the fitness)
+	rnd = random.Rnd.Float64()
 	if (m.dominant) {
 		m.expressed = (rnd < config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
