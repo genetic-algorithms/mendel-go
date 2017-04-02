@@ -1,5 +1,13 @@
 // Package  main is main program of the golang version of mendel's accountant.
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
+
+/* Order of todos:
+- the num mutations should be a poisson distribution with the mean being Mutn_rate
+- apply correct random distribution to choosing the mutation fitness factor
+- combine fitness factors appropriately
+- figure out how chromosomes are used
+- run with more linkage blocks
+ */
 package main
 
 import (
@@ -12,11 +20,13 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"math"
 	"bitbucket.org/geneticentropy/mendel-go/pop"
+	"bitbucket.org/geneticentropy/mendel-go/random"
+	"math/rand"
 )
 
 // Initialize initializes variables, objects, and settings for either an initial run or a restart.
 func initialize() {
-	utils.Verbose(9, "Initializing...\n")
+	utils.Verbose(5, "Initializing...\n")
 
 	//todo: support parallel
 	//todo: open intermediate files if necessary
@@ -30,12 +40,19 @@ func initialize() {
 	// Read restart file, if specified
 	config.ReadRestartFile("")
 
+	if config.Cfg.Computation.Random_number_seed != 0 {
+		random.Rnd = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed))
+	} else {
+		random.Rnd = rand.New(rand.NewSource(random.GetSeed()))
+	}
+
 	//todo: complete this function
 }
 
 // Shutdown does all the stuff necessary at the end of the run.
-func shutdown() {
-	utils.Verbose(9, "Shutting down...\n")
+func shutdown(population *pop.Population) {
+	utils.Verbose(2, "Shutting down...\n")
+	population.Report(true)
 }
 
 // Main handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
@@ -51,22 +68,24 @@ func main() {
 
 	} else if config.CmdArgs.InputFile != ""{
 		if err := config.ReadFromFile(config.CmdArgs.InputFile); err != nil { log.Fatalln(err) }
-		utils.Verbose(9, "Case_id: %v\n", config.Cfg.Basic.Case_id)
+		utils.Verbose(3, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
 	} else { config.Usage(0) }
 
 	// Initialize
-	log.Println("Running mendel...")
+	log.Println("Running mendel simulation...")
 	initialize()
-	population := pop.PopulationFactory()
+	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
+	population.Initialize()
 
-	// Main generation loop
+	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.
 	for gen := config.Restart.Gen_0+1; gen <= config.Restart.Gen_0+config.Cfg.Basic.Num_generations; gen++ {
-		utils.Verbose(9, "Generation %d\n", gen)
-		population.Mate()
+		utils.Verbose(1, "Generation %d\n", gen)
+		population = population.Mate()
 		population.Select()
+		population.Report(false)
 	}
 
 	// Finish up
-	shutdown()
+	shutdown(population)
 }

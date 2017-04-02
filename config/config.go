@@ -5,21 +5,22 @@ import (
 	"github.com/naoina/toml" 		// implementation of TOML we are using to read input files
 	"io/ioutil"
 	"log"
+	"errors"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
 type Config struct {
 	Basic struct {
 		Case_id string
-		Mutn_rate float64
-		Frac_fav_mutn float64
 		Reproductive_rate float64
 		Pop_size int
 		Num_generations int
 	}
 	Mutations struct {
-		Fitness_distrib_type int
+		Mutn_rate float64
+		Frac_fav_mutn float64
 		Fraction_neutral float64
+		Fitness_distrib_type int
 		Genome_size float64
 		High_impact_mutn_fraction float64
 		High_impact_mutn_threshold float64
@@ -85,8 +86,8 @@ type Config struct {
 		Max_del_mutn_per_indiv int
 		Max_neu_mutn_per_indiv int
 		Max_fav_mutn_per_indiv int
-		Random_number_seed int
-		Reseed_rng bool
+		Random_number_seed int64
+		Reseed_rng bool			// not used. If Random_number_seed==0 we use a truly random seed
 		Track_neutrals bool
 		Write_dump bool
 		Write_vcf bool
@@ -110,6 +111,12 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+	return Cfg.validate()
+}
+
+// Validate checks the config values to make sure they are valid.
+func (c *Config) validate() error {
+	if c.Basic.Pop_size % 2 != 0 { return errors.New("Error: basic.pop_size must be an even number") }
 	return nil
 }
 

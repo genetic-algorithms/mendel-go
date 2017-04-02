@@ -11,7 +11,12 @@ import (
 )
 
 func Verbose(level int, msg string, args ...interface{}) {
-	if level >= config.Cfg.Computation.Verbosity { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
+	if config.Cfg.Computation.Verbosity >= level { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
+}
+
+// IsVerbose tests whether the level given is within the verbose level being output
+func IsVerbose(level int) bool {
+	return config.Cfg.Computation.Verbosity >= level
 }
 
 func CopyFile(fromFile, toFile string) error {
@@ -22,3 +27,14 @@ func CopyFile(fromFile, toFile string) error {
 	return nil
 }
 
+func Min(a, b int) int {
+	if a < b { return a }
+	return b
+}
+
+func Max(a, b int) int {
+	if a > b { return a }
+	return b
+}
+
+func NotImplementedYet(what string) { log.Fatalf("Not implemented yet: %v", what) }
