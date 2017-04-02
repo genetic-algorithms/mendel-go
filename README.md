@@ -6,8 +6,9 @@ This is the golang version of Mendel's Accountant, a genetic mutation tracking s
 
 - Install go, set GOROOT and GOPATH
 - Install glide
+- Install make
 
-# Build and run usage
+# Build and run
 
 ```
 make

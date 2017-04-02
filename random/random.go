@@ -8,6 +8,24 @@ import (
 	"math/rand"
 )
 
+// This will get set in main.initialize().
+//todo: do not yet know how to manage the list of these, 1 for each worker thread
+var Rnd *rand.Rand
+
+
+// Round randomly rounds an int either up or down, weighting the odds according to how far away from the integer it is.
+// If the float is a perfect int, it always chooses that.
+func Round(num float64) int {
+	intNum := int(num)
+	wholeNum := float64(intNum)
+	if num == wholeNum { return intNum }
+	if Rnd.Float64() > num - wholeNum {
+		return intNum
+	} else {
+		return intNum + 1
+	}
+}
+
 
 // Algorithm taken from Wikipedia
 // (https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables).
@@ -40,6 +58,7 @@ func Poisson(uniformRandom *rand.Rand, lambda float64) uint32 {
 	return k - 1
 }
 
+
 // Get a random int64 from /dev/urandom to use as a seed
 func GetSeed() int64 {
 	nBig, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -50,6 +69,7 @@ func GetSeed() int64 {
 
 	return nBig.Int64()
 }
+
 
 type Shuffleable interface {
 	Swap(i, j int)

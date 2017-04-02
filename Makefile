@@ -7,7 +7,7 @@ build:
 	go build
 
 run:
-	./mendel-go
+	time ./mendel-go -f test/input/mendel-case1.ini
 
 test:
 	glide --quiet install
