@@ -3,7 +3,6 @@ package pop
 import (
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"bitbucket.org/geneticentropy/mendel-go/config"
-	"bitbucket.org/geneticentropy/mendel-go/random"
 	"log"
 	"sort"
 	"math/rand"
@@ -72,10 +71,8 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	newGenerationSize := int((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
 	newP := PopulationFactory(newGenerationSize)
 
-	// To prepare for mating, create a slice of indices into the parent population and shuffle them
-	parentIndices := make(random.IntSlice, p.GetCurrentSize())
-	for i := range parentIndices { parentIndices[i] = i }
-	random.Shuffle(uniformRandom, parentIndices)
+	// To prepare for mating, create a shuffled slice of indices into the parent population
+	parentIndices := uniformRandom.Perm(p.GetCurrentSize())
 	utils.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
