@@ -1,8 +1,8 @@
 package dna
 
 import (
-	"bitbucket.org/geneticentropy/mendel-go/random"
 	"bitbucket.org/geneticentropy/mendel-go/config"
+	"math/rand"
 )
 
 type MutationType uint8
@@ -24,11 +24,11 @@ type Mutation struct {
 
 
 // MutationFactory creates a random mutation factoring the various relevant rates for this population.
-func MutationFactory() (m *Mutation) {
+func MutationFactory(uniformRandom *rand.Rand) (m *Mutation) {
 	m = &Mutation{}
 
 	// Determine if this mutation is deleterious, neutral, or favorable
-	rnd := random.Rnd.Float64()
+	rnd := uniformRandom.Float64()
 	if rnd < config.Cfg.Mutations.Frac_fav_mutn {
 		m.mType = FAVORABLE
 	} else if rnd < config.Cfg.Mutations.Frac_fav_mutn + config.Cfg.Mutations.Fraction_neutral {
@@ -38,7 +38,7 @@ func MutationFactory() (m *Mutation) {
 	}
 
 	// Calculate fitness factor. Todo: this should be the correct mutation effect distribution
-	rnd = random.Rnd.Float64()
+	rnd = uniformRandom.Float64()
 	if m.mType == DELETERIOUS {
 		m.fitnessFactor = float32(0.0 - rnd)
 	} else if m.mType == FAVORABLE {
@@ -46,10 +46,10 @@ func MutationFactory() (m *Mutation) {
 	}
 
 	// Determine if this mutation is dominant or recessive
-	m.dominant = (config.Cfg.Mutations.Fraction_recessive < random.Rnd.Float64())
+	m.dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
 
 	// Determine if this mutated allele is expressed or not (whether if affects the fitness)
-	rnd = random.Rnd.Float64()
+	rnd = uniformRandom.Float64()
 	if (m.dominant) {
 		m.expressed = (rnd < config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {

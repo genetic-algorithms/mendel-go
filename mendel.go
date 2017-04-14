@@ -40,12 +40,6 @@ func initialize() {
 	// Read restart file, if specified
 	config.ReadRestartFile("")
 
-	if config.Cfg.Computation.Random_number_seed != 0 {
-		random.Rnd = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed))
-	} else {
-		random.Rnd = rand.New(rand.NewSource(random.GetSeed()))
-	}
-
 	//todo: complete this function
 }
 
@@ -75,13 +69,22 @@ func main() {
 	// Initialize
 	log.Println("Running mendel simulation...")
 	initialize()
+
+	// Initialize random number generator
+	var uniformRandom *rand.Rand
+	if config.Cfg.Computation.Random_number_seed != 0 {
+		uniformRandom = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed))
+	} else {
+		uniformRandom = rand.New(rand.NewSource(random.GetSeed()))
+	}
+
 	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 	population.Initialize()
 
 	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.
 	for gen := config.Restart.Gen_0+1; gen <= config.Restart.Gen_0+config.Cfg.Basic.Num_generations; gen++ {
 		utils.Verbose(1, "Generation %d\n", gen)
-		population = population.Mate()
+		population = population.Mate(uniformRandom)
 		population.Select()
 		population.Report(false)
 	}

@@ -6,6 +6,7 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"bitbucket.org/geneticentropy/mendel-go/random"
 	"log"
+	"math/rand"
 )
 
 
@@ -41,12 +42,12 @@ func IndividualFactory(pop *Population) *Individual{
 
 
 // Mate combines this person with the specified person to create an offspring.
-func (ind *Individual) Mate(otherInd *Individual, indivIndex int) []*Individual {
+func (ind *Individual) Mate(otherInd *Individual, indivIndex int, uniformRandom *rand.Rand) []*Individual {
 	if RecombinationType(config.Cfg.Population.Recombination_model) == CLONAL { utils.NotImplementedYet("Do not support CLONAL recombination yet") }
-	actual_offspring := ind.GetNumOffspring(indivIndex)
+	actual_offspring := ind.GetNumOffspring(indivIndex, uniformRandom)
 	offspr := make([]*Individual, actual_offspring)
 	for child:=0; child<actual_offspring; child++ {
-		offspr[child] = ind.OneOffspring(otherInd)
+		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
 	}
 	return offspr
 }
@@ -54,7 +55,7 @@ func (ind *Individual) Mate(otherInd *Individual, indivIndex int) []*Individual 
 
 // Offspring returns 1 offspring of this person and the specified person.
 // We assume ind is the dad and otherInd is the mom.
-func (ind *Individual) OneOffspring(otherInd *Individual) *Individual {
+func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Rand) *Individual {
 	offspr := IndividualFactory(ind.Pop)
 	//todo: support...
 	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
@@ -69,12 +70,12 @@ func (ind *Individual) OneOffspring(otherInd *Individual) *Individual {
 	//todo: this loop is ignoring chromosomes
 	for lb:=0; lb<config.Cfg.Population.Num_linkage_subunits; lb++ {
 		// randomly choose which parent to get the LB from
-		if random.Rnd.Intn(2) == 0 {
+		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromDad[lb].Copy()
 		} else {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromMom[lb].Copy()
 		}
-		if random.Rnd.Intn(2) == 0 {
+		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromDad[lb].Copy()
 		} else {
 			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromMom[lb].Copy()
@@ -82,16 +83,16 @@ func (ind *Individual) OneOffspring(otherInd *Individual) *Individual {
 	}
 
 	// Apply new mutations
-	numMutations := random.Round(config.Cfg.Mutations.Mutn_rate) 	//todo: the num mutations should be a poisson distribution with the mean being Mutn_rate
+	numMutations := random.Round(uniformRandom, config.Cfg.Mutations.Mutn_rate) 	//todo: the num mutations should be a poisson distribution with the mean being Mutn_rate
 	for m:=1; m<=numMutations; m++ {
-		lb := random.Rnd.Intn(config.Cfg.Population.Num_linkage_subunits)	// choose a random LB index
+		lb := uniformRandom.Intn(config.Cfg.Population.Num_linkage_subunits)	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: MutationFactory() chooses deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant rates
-		if random.Rnd.Intn(2) == 0 {
-			offspr.LinkagesFromDad[lb].Append(dna.MutationFactory())
+		if uniformRandom.Intn(2) == 0 {
+			offspr.LinkagesFromDad[lb].Append(dna.MutationFactory(uniformRandom))
 		} else {
-			offspr.LinkagesFromMom[lb].Append(dna.MutationFactory())
+			offspr.LinkagesFromMom[lb].Append(dna.MutationFactory(uniformRandom))
 		}
 	}
 	//d, n, f := offspr.GetNumMutations()
@@ -104,10 +105,10 @@ func (ind *Individual) OneOffspring(otherInd *Individual) *Individual {
 
 
 // GetNumOffspring returns a random number of offspring for this person
-func (ind *Individual) GetNumOffspring(indivIndex int) int {
+func (ind *Individual) GetNumOffspring(indivIndex int, uniformRandom *rand.Rand) int {
 	//todo: i do not understand some of this logic, it is from lines 64-73 of mating.f90
 	actual_offspring := int(ind.Pop.Num_offspring)		// truncate num offspring to integer
-	if ind.Pop.Num_offspring - float64(int(ind.Pop.Num_offspring)) > random.Rnd.Float64() { actual_offspring++ }	// randomly round it up or down
+	if ind.Pop.Num_offspring - float64(int(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up or down
 	if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) }
 	actual_offspring = utils.Min(int(ind.Pop.Num_offspring) + 1, actual_offspring)
 	return actual_offspring

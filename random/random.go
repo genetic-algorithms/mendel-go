@@ -8,18 +8,14 @@ import (
 	"math/rand"
 )
 
-// This will get set in main.initialize().
-//todo: do not yet know how to manage the list of these, 1 for each worker thread
-var Rnd *rand.Rand
-
 
 // Round randomly rounds an int either up or down, weighting the odds according to how far away from the integer it is.
 // If the float is a perfect int, it always chooses that.
-func Round(num float64) int {
+func Round(uniformRandom *rand.Rand, num float64) int {
 	intNum := int(num)
 	wholeNum := float64(intNum)
 	if num == wholeNum { return intNum }
-	if Rnd.Float64() > num - wholeNum {
+	if uniformRandom.Float64() > num - wholeNum {
 		return intNum
 	} else {
 		return intNum + 1
