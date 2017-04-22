@@ -37,13 +37,7 @@ func MutationFactory() (m *Mutation) {
 		m.mType = DELETERIOUS
 	}
 
-	// Calculate fitness factor. Todo: this should be the correct mutation effect distribution
-	rnd = random.Rnd.Float64()
-	if m.mType == DELETERIOUS {
-		m.fitnessFactor = float32(0.0 - rnd)
-	} else if m.mType == FAVORABLE {
-		m.fitnessFactor = float32(rnd)
-	}
+	m.fitnessFactor = CalcFitnessFactor(m.mType)
 
 	// Determine if this mutation is dominant or recessive
 	m.dominant = (config.Cfg.Mutations.Fraction_recessive < random.Rnd.Float64())
@@ -58,6 +52,27 @@ func MutationFactory() (m *Mutation) {
 	return
 }
 
+// CalcFitnessFactor determines the fitness factor using the method specfied in the input file.
+// Note: this is not a method of the Mutation object, because that is immutable.
+func CalcFitnessFactor(mType MutationType) (fitnessFactor float32) {
+	switch {
+	// Handle fixed mutation effect
+	case mType == DELETERIOUS && config.Cfg.Mutations.Uniform_fitness_effect_del != 0.0:
+		fitnessFactor = config.Cfg.Mutations.Uniform_fitness_effect_del
+	case mType == FAVORABLE && config.Cfg.Mutations.Uniform_fitness_effect_fav != 0.0:
+		fitnessFactor = config.Cfg.Mutations.Uniform_fitness_effect_fav
+	default:
+		//todo: use the correct mutation effect calculations. See init.f90 lines 300-311
+		rnd := random.Rnd.Float64()
+		if mType == DELETERIOUS {
+			fitnessFactor = float32(0.0 - rnd)
+		} else if mType == FAVORABLE {
+			fitnessFactor = float32(rnd)
+		}
+		// else neutral is 0
+	}
+	return
+}
 
 func (m *Mutation) GetMType() MutationType { return m.mType }
 func (m *Mutation) GetDominant() bool { return m.dominant }

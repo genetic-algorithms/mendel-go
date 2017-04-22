@@ -2,8 +2,13 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- the num mutations should be a poisson distribution with the mean being Mutn_rate
-- apply correct random distribution to choosing the mutation fitness factor
+- add global function ptr struct, based in input params
+- support fixed mutation effect
+- combine mutation effects according to Multiplicative_weighting
+- review and merge jon's random number generator PR
+- output a simple file such as the .hst file with generation number, number of del., neu., fav. mutations, and pop size
+- (jon) apply correct Weibull fitness factor distribution to mutation - see wes' comments in slack
+- (jon) the num mutations should be a poisson distribution with the mean being Mutn_rate
 - combine fitness factors appropriately
 - figure out how chromosomes are used
 - run with more linkage blocks

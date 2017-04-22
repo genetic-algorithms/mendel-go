@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"errors"
+	"os"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -96,6 +97,7 @@ type Config struct {
 		Plot_allele_gens int
 		Verbosity int
 		Data_file_path string
+		Files_to_output string
 	}
 }
 
@@ -111,6 +113,7 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+	FileMgrFactory(Cfg.Computation.Files_to_output)
 	return Cfg.validate()
 }
 
@@ -129,3 +132,16 @@ func (c *Config) WriteToFile(filename string) error {
 	return nil
 }
 */
+
+
+// FileMgr is a simple object to manage all of the data files mendel writes.
+type FileMgr struct {
+	fileNames map[string]os.File 		// key is filename, value is file descriptor (nil if not opened yet)
+}
+
+// FMgr is the singleton instance of FileMgr, created by FileMgrFactory.
+var FMgr *FileMgr
+
+func FileMgrFactory(files_to_output string) {
+	FMgr = &FileMgr{}
+}
