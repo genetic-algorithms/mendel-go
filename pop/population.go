@@ -3,9 +3,9 @@ package pop
 import (
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"bitbucket.org/geneticentropy/mendel-go/config"
-	"bitbucket.org/geneticentropy/mendel-go/random"
 	"log"
 	"sort"
+	"math/rand"
 )
 
 type RecombinationType uint8
@@ -63,7 +63,7 @@ func (p *Population) Append(indivs ...*Individual) {
 //   - for each LB position, choose 1 LB from dad and 1 from mom
 //   - add new mutations to random LBs
 //   - add offspring to new population
-func (p *Population) Mate() *Population {
+func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	utils.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
@@ -71,17 +71,15 @@ func (p *Population) Mate() *Population {
 	newGenerationSize := int((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
 	newP := PopulationFactory(newGenerationSize)
 
-	// To prepare for mating, create a slice of indices into the parent population and shuffle them
-	parentIndices := make(random.IntSlice, p.GetCurrentSize())
-	for i := range parentIndices { parentIndices[i] = i }
-	random.Shuffle(random.Rnd, parentIndices)
+	// To prepare for mating, create a shuffled slice of indices into the parent population
+	parentIndices := uniformRandom.Perm(p.GetCurrentSize())
 	utils.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i:=0; i< p.GetCurrentSize(); i=i+2 {
 		dadI := parentIndices[i]
 		momI := parentIndices[i+1]
-		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], i)
+		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], i, uniformRandom)
 		newP.Append(newIndivs...)
 	}
 
