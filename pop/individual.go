@@ -98,7 +98,7 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
 	offspr.Fitness = Alg.CalcIndivFitness(offspr) 		// store resulting fitness
-	//if offspr.Fitness <= 0.0 { offspr.Dead = true } 	//todo: we want to do this, but have to adjust Population.Select() process so we don't kill off too many
+	if offspr.Fitness <= 0.0 { offspr.Dead = true }
 
 	return offspr
 }
@@ -196,7 +196,7 @@ func (ind *Individual) GetNumMutations() (deleterious, neutral, favorable int) {
 }
 
 // Report prints out statistics of this individual. If final==true is prints more details.
-func (ind *Individual) Report(final bool) {
+func (ind *Individual) Report(_ bool) {
 	deleterious, neutral, favorable := ind.GetNumMutations()
 	log.Printf("  Ind: deleterious %d, neutral: %d, favorable: %d, fitness: %v", deleterious, neutral, favorable, ind.Fitness)
 }

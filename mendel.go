@@ -2,7 +2,7 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- support marking individuals dead when fitness goes to 0 or below
+- stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
 - (jon) apply correct Weibull fitness factor distribution to mutation - see wes' comments in slack
 - (jon) the num mutations should be a poisson distribution with the mean being Mutn_rate
@@ -30,7 +30,6 @@ func initialize() *rand.Rand {
 	config.Verbose(5, "Initializing...\n")
 
 	//todo: support parallel
-	//todo: open intermediate files if necessary
 
 	// Adjust certain config values
 	config.Cfg.Selection.Heritability = math.Max(1.e-20, config.Cfg.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
@@ -59,9 +58,8 @@ func initialize() *rand.Rand {
 }
 
 // Shutdown does all the stuff necessary at the end of the run.
-func shutdown(population *pop.Population) {
-	config.Verbose(2, "Shutting down...\n")
-	population.Report(-1, true)
+func shutdown() {
+	config.Verbose(5, "Shutting down...\n")
 	config.FMgr.CloseFiles()
 }
 
@@ -83,19 +81,19 @@ func main() {
 	} else { config.Usage(0) }
 
 	// Initialize
-	log.Println("Running mendel simulation...")
 	uniformRandom := initialize()
-
 	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 	population.Initialize()
+	population.ReportInitial(config.Restart.Gen_0, config.Cfg.Basic.Num_generations)
 
 	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.
-	for gen := config.Restart.Gen_0+1; gen <= config.Restart.Gen_0+config.Cfg.Basic.Num_generations; gen++ {
+	for gen := config.Restart.Gen_0+1; gen <= config.Cfg.Basic.Num_generations; gen++ {
 		population = population.Mate(uniformRandom)
 		population.Select()
-		population.Report(gen, false)
+		population.ReportEachGen(gen)
 	}
 
 	// Finish up
-	shutdown(population)
+	population.ReportFinal(config.Cfg.Basic.Num_generations)
+	shutdown()
 }
