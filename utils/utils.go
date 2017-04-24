@@ -1,23 +1,9 @@
 package utils
 
 import (
-	"fmt"
 	"log"
-	//"os"
-	//"path/filepath"
-	//"io/ioutil"
-	"bitbucket.org/geneticentropy/mendel-go/config"
 	"io/ioutil"
 )
-
-func Verbose(level int, msg string, args ...interface{}) {
-	if config.Cfg.Computation.Verbosity >= level { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
-}
-
-// IsVerbose tests whether the level given is within the verbose level being output
-func IsVerbose(level int) bool {
-	return config.Cfg.Computation.Verbosity >= level
-}
 
 func CopyFile(fromFile, toFile string) error {
 	log.Printf("Copying %v to %v...\n", fromFile, toFile) 	// can not use verbosity here because we have not read the config file yet

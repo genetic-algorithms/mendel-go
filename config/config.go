@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"errors"
-	"os"
+	"fmt"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -113,7 +113,8 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
-	FileMgrFactory(Cfg.Computation.Files_to_output)
+
+	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 	return Cfg.validate()
 }
 
@@ -133,15 +134,12 @@ func (c *Config) WriteToFile(filename string) error {
 }
 */
 
-
-// FileMgr is a simple object to manage all of the data files mendel writes.
-type FileMgr struct {
-	fileNames map[string]os.File 		// key is filename, value is file descriptor (nil if not opened yet)
+// These are here, instead of of in pkg utils, to avoid circular imports
+func Verbose(level int, msg string, args ...interface{}) {
+	if Cfg.Computation.Verbosity >= level { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
 }
 
-// FMgr is the singleton instance of FileMgr, created by FileMgrFactory.
-var FMgr *FileMgr
-
-func FileMgrFactory(files_to_output string) {
-	FMgr = &FileMgr{}
+// IsVerbose tests whether the level given is within the verbose level being output
+func IsVerbose(level int) bool {
+	return Cfg.Computation.Verbosity >= level
 }

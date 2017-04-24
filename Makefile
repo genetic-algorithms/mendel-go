@@ -1,13 +1,17 @@
 SHELL = /bin/bash -e
+BINARY = mendel-go
 
-default: build run
+default: run
 
-build:
+$(BINARY): mendel.go */*.go
 	glide --quiet install
 	go build
 
-run:
-	time ./mendel-go -f test/input/mendel-case1.ini
+run: $(BINARY)
+	time ./$(BINARY) -f test/input/mendel-case1.ini
+
+run-defaults: $(BINARY)
+	time ./$(BINARY) -d
 
 test:
 	glide --quiet install
@@ -16,4 +20,4 @@ test:
 clean:
 	go clean
 
-.PHONY: default build run test clean
+.PHONY: default run test clean
