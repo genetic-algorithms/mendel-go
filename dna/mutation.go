@@ -3,6 +3,7 @@ package dna
 import (
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"math/rand"
+	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
 type MutationType uint8
@@ -37,13 +38,7 @@ func MutationFactory(uniformRandom *rand.Rand) (m *Mutation) {
 		m.mType = DELETERIOUS
 	}
 
-	// Calculate fitness factor. Todo: this should be the correct mutation effect distribution
-	rnd = uniformRandom.Float64()
-	if m.mType == DELETERIOUS {
-		m.fitnessFactor = float32(0.0 - rnd)
-	} else if m.mType == FAVORABLE {
-		m.fitnessFactor = float32(rnd)
-	}
+	m.fitnessFactor = CalcFitnessFactor(*m, uniformRandom)
 
 	// Determine if this mutation is dominant or recessive
 	m.dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
@@ -59,13 +54,50 @@ func MutationFactory(uniformRandom *rand.Rand) (m *Mutation) {
 }
 
 
+// Member access methods
 func (m *Mutation) GetMType() MutationType { return m.mType }
 func (m *Mutation) GetDominant() bool { return m.dominant }
 func (m *Mutation) GetExpressed() bool { return m.expressed }
 func (m *Mutation) GetFitnessFactor() float32 { return m.fitnessFactor }
 
 
-/*
+// CalcFitnessFactor determines the fitness factor this mutation contributes to the overall individual fitness, using the method specified in the input file.
+// Note: this is not a method of the Mutation object, because that is immutable.
+func CalcFitnessFactor(m Mutation, uniformRandom *rand.Rand) (fitnessFactor float32) {
+	switch {
+	case m.mType == DELETERIOUS:
+		fitnessFactor = Alg.CalcDelMutationFitness(m, uniformRandom)
+	case m.mType == FAVORABLE:
+		fitnessFactor = Alg.CalcFavMutationFitness(m, uniformRandom)
+	default:
+		// else neutral is 0
+	}
+	return
+}
+
+
+// These are the different algorithms for assigning a fitness factor to a mutation. Pointers to 2 of them are chosen at initialization time.
+type CalcMutationFitnessType func(m Mutation, uniformRandom *rand.Rand) float32
+func CalcFixedDelMutationFitness(_ Mutation, _ *rand.Rand) float32 { return float32(0.0 - config.Cfg.Mutations.Uniform_fitness_effect_del) }
+func CalcFixedFavMutationFitness(_ Mutation, _ *rand.Rand) float32 { return float32(config.Cfg.Mutations.Uniform_fitness_effect_fav) }
+
+// Calculate a random fitness between -0.1 and 0 (deleterious) or 0 and 0.1 (favorable)
+func CalcUniformDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {return float32(0.0 - (uniformRandom.Float64() / 10) ) }
+func CalcUniformFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 { return float32(uniformRandom.Float64() / 10) }
+
+//todo: jon use the Weibull distribution in these. See init.f90 lines 300-311
+func CalcWeibullDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
+	utils.NotImplementedYet("CalcWeibullDelMutationFitness not implemented yet")
+	return 0.0
+}
+
+func CalcWeibullFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
+	utils.NotImplementedYet("CalcWeibullFavMutationFitness not implemented yet")
+	return 0.0
+}
+
+
+/* waiting to see if we need distinct subclasses for the different types of mutation...
 // DeleteriousMutation represents 1 deleterious mutation in 1 individual.
 type DeleteriousMutation struct {
 	Mutation 		// this anonymous reference includes the base class's struct here

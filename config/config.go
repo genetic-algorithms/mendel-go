@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"errors"
+	"fmt"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -96,6 +97,7 @@ type Config struct {
 		Plot_allele_gens int
 		Verbosity int
 		Data_file_path string
+		Files_to_output string
 	}
 }
 
@@ -111,6 +113,8 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+
+	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 	return Cfg.validate()
 }
 
@@ -129,3 +133,13 @@ func (c *Config) WriteToFile(filename string) error {
 	return nil
 }
 */
+
+// These are here, instead of of in pkg utils, to avoid circular imports
+func Verbose(level int, msg string, args ...interface{}) {
+	if Cfg.Computation.Verbosity >= level { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
+}
+
+// IsVerbose tests whether the level given is within the verbose level being output
+func IsVerbose(level int) bool {
+	return Cfg.Computation.Verbosity >= level
+}

@@ -40,14 +40,15 @@ func (lb *LinkageBlock) Append(mutn ...*Mutation) {
 }
 
 
+/* Not using this, so we can apply the fitness factor aggregation at the individual level...
 func (lb *LinkageBlock) GetFitness() (fitness float32) {
-	//todo: the current implementation just sums all of the fitness factors
 	fitness = 0.0
 	for _, m := range lb.Mutn {
 		if (m.GetExpressed()) { fitness += m.GetFitnessFactor() }
 	}
 	return
 }
+*/
 
 
 // GetNumMutations returns the number of deleterious, neutral, favorable mutations, respectively

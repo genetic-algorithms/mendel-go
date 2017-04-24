@@ -1,9 +1,9 @@
 # Build artifacts
-mendel-go
+/mendel-go
 vendor/
 
 # Test files
-test/output
+/test/output/
 
 # Intellij files
 .idea/
