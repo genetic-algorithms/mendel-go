@@ -79,7 +79,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
-	for i:=0; i< p.GetCurrentSize(); i=i+2 {
+	for i:=0; i<p.GetCurrentSize()-1; i=i+2 {
 		dadI := parentIndices[i]
 		momI := parentIndices[i+1]
 		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], uniformRandom)
@@ -92,11 +92,11 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 // Select removes the least fit individuals in the population
 func (p *Population) Select() {
-	config.Verbose(4, "Select: eliminating %d individuals to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
+	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	indexes := p.sortIndexByFitness()
-	numEliminate := len(indexes) - p.Size		//todo: handle the case in which more are already dead due to deleterious mutations than you want to select out
+	numEliminate := len(indexes) - p.Size		// if numEliminate is negative, then the following for loop will just do nothing, which is ok
 	for i:=0; i<numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true } 	// sorted by fitness in ascending order, so mark the 1st ones dead
 
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements
@@ -118,9 +118,15 @@ func (p *Population) Select() {
 
 
 // GetAverageFitness returns the average of all the individuals fitness levels
-func (p *Population) GetAverageFitness() (fitness float32) {
-	for _, ind := range p.Indivs { fitness += ind.Fitness }
-	fitness = fitness / float32(p.GetCurrentSize())
+func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float32) {
+	minFitness = 99.0
+	maxFitness = -99.0
+	for _, ind := range p.Indivs {
+		averageFitness += ind.Fitness
+		if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
+		if ind.Fitness < minFitness { minFitness = ind.Fitness }
+	}
+	averageFitness = averageFitness / float32(p.GetCurrentSize())
 	return
 }
 
@@ -143,46 +149,65 @@ func (p *Population) GetAverageNumMutations() (deleterious, neutral, favorable f
 
 
 // Report prints out statistics of this population. If final==true is prints more details.
-func (p *Population) Report(genNum int, final bool) {
+func (p *Population) ReportInitial(genNum, maxGenNum int) {
+	config.Verbose(3, "Starting mendel simulation with a population size of %d at generation %d and continuing to generation %d", p.GetCurrentSize(), genNum, maxGenNum)
+
+	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
+		// Write header for this file
+		fmt.Fprintln(histWriter, "# Generation  Population-size  Average-deleterious Average-neutral  Average-favorable  Average-fitness  Min-fitness  Max-fitness")
+	}
+}
+
+
+// Report prints out statistics of this population. If final==true is prints more details.
+func (p *Population) ReportEachGen(genNum int) {
 	//todo: for reporting we go thru all individuals and LB multiple times. Make this more efficient
-	perGenVerboseLevel := 3			// level at which we will print population level info
-	perGenIndivVerboseLevel := 7	// level at which we will print individual level info
+	perGenVerboseLevel := 3            // level at which we will print population level info
+	perGenIndivVerboseLevel := 7    // level at which we will print individual level info
 	popSize := p.GetCurrentSize()
 
-	if final {
-		if !config.IsVerbose(perGenVerboseLevel) {
-			log.Println("Final report:")
-			log.Printf("Population size: %v, Individuals' average fitness: %v", p.GetCurrentSize(), p.GetAverageFitness())
-			d, n, f := p.GetAverageNumMutations()
-			log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
-		}
-		if !config.IsVerbose(perGenIndivVerboseLevel) && config.IsVerbose(4) {
-			log.Println(" Individual Detail:")
-			for _, i := range p.Indivs { i.Report(final) }
-		}
+	// Not final
+	var d, n, f float64 	// if we get these values once, hold on to them
+	var aveFit, minFit, maxFit float32
+	if config.IsVerbose(perGenVerboseLevel) {
+		aveFit, minFit, maxFit = p.GetFitnessStats()
+		log.Printf("Generation: %d, Population size: %v, Individuals' average fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, aveFit, minFit, maxFit)
+		d, n, f = p.GetAverageNumMutations()
+		log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
+	}
+	if config.IsVerbose(perGenIndivVerboseLevel) {
+		log.Println(" Individual Detail:")
+		for _, ind := range p.Indivs { ind.Report(false) }
+	}
 
-	} else {
-		// Not final
-		var d, n, f float64 	// if we get these values once, hold on to them
-		var fitness float32
-		if config.IsVerbose(perGenVerboseLevel) {
-			fitness = p.GetAverageFitness()
-			log.Printf("Generation: %d, Population size: %v, Individuals' average fitness: %v", genNum, popSize, fitness)
-			d, n, f = p.GetAverageNumMutations()
-			log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
-		}
-		if config.IsVerbose(perGenIndivVerboseLevel) {
-			log.Println(" Individual Detail:")
-			for _, ind := range p.Indivs { ind.Report(final) }
-		}
+	//if histWriter := config.FMgr.GetFileWriter(config.HISTORY_FILENAME); histWriter != nil {
+	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
+		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
+		if d==0.0 && n==0.0 && f==0.0 { d, n, f = p.GetAverageNumMutations() }
+		if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v\n", genNum, popSize, d, n, f, aveFit, minFit, maxFit)
+		//histWriter.Flush()
+	}
+}
 
-		//if histWriter := config.FMgr.GetFileWriter(config.HISTORY_FILENAME); histWriter != nil {
-		if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
-			config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-			if d==0.0 && n==0.0 && f==0.0 { d, n, f = p.GetAverageNumMutations() }
-			if fitness == 0.0 { fitness = p.GetAverageFitness() }
-			fmt.Fprintf(histWriter, "Generation: %d, Population size: %d, Average mutations: deleterious: %v, neutral: %v, favorable %v, Average fitness: %v\n", genNum, popSize, d, n, f, fitness)
-			//histWriter.Flush()
+
+// Report prints out statistics of this population. If final==true is prints more details.
+func (p *Population) ReportFinal(genNum int) {
+	perGenVerboseLevel := 3            // level at which we will print population level info
+	perGenIndivVerboseLevel := 7    // level at which we will print individual level info
+	popSize := p.GetCurrentSize()
+
+	if !config.IsVerbose(perGenVerboseLevel) {
+		log.Println("Final report:")
+		aveFit, minFit, maxFit := p.GetFitnessStats()
+		log.Printf("After %d generations: Population size: %v, Individuals' average fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, aveFit, minFit, maxFit)
+		d, n, f := p.GetAverageNumMutations()
+		log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
+	}
+	if !config.IsVerbose(perGenIndivVerboseLevel) && config.IsVerbose(4) {
+		log.Println(" Individual Detail:")
+		for _, i := range p.Indivs {
+			i.Report(true)
 		}
 	}
 }
