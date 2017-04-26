@@ -6,6 +6,7 @@
 - cache averages in pop and ind objects for reuse
 - figure out why average fitness starts to climb after a while
 - change int to uint32 where appropriate
+- can i use interfaces for the non-class model functions?
 - make num offspring proportional to fitness?
 - what is genome_size used for?
 - add tracking id for each mutation?
