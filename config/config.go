@@ -13,12 +13,12 @@ import (
 type Config struct {
 	Basic struct {
 		Case_id string
-		Reproductive_rate float64
 		Pop_size int
 		Num_generations int
 	}
 	Mutations struct {
 		Mutn_rate float64
+		Mutn_rate_model string 		// toml does not know how to handle user-defined types like MutationRateModelType
 		Frac_fav_mutn float64
 		Fraction_neutral float64
 		Fitness_distrib_type int
@@ -29,6 +29,7 @@ type Config struct {
 		Max_fav_fitness_gain float64
 		Uniform_fitness_effect_del float64
 		Uniform_fitness_effect_fav float64
+		Fitness_effect_model string
 		Fraction_recessive float64
 		Recessive_hetero_expression float64
 		Dominant_hetero_expression float64
@@ -52,6 +53,8 @@ type Config struct {
 		Partial_truncation_value float64
 	}
 	Population struct {
+		Reproductive_rate float64
+		Num_offspring_model string
 		Recombination_model int
 		Fraction_self_fertilization float64
 		Num_contrasting_alleles int

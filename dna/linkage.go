@@ -51,18 +51,21 @@ func (lb *LinkageBlock) GetFitness() (fitness float32) {
 */
 
 
-// GetNumMutations returns the number of deleterious, neutral, favorable mutations, respectively
-func (lb *LinkageBlock) GetNumMutations() (deleterious, neutral, favorable int) {
-	//todo: we maybe should store the different mutation types separately so we do not have to count them like this
+// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
+func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float32) {
 	for _, m := range lb.Mutn {
 		switch m.GetMType() {
 		case DELETERIOUS:
 			deleterious++
+			avDelFit += m.GetFitnessFactor()
 		case NEUTRAL:
 			neutral++
 		case FAVORABLE:
 			favorable++
+			avFavFit += m.GetFitnessFactor()
 		}
 	}
+	if deleterious > 0 { avDelFit = avDelFit / float32(deleterious) } 		// else avDelFit is already 0.0
+	if favorable > 0 { avFavFit = avFavFit / float32(favorable) } 		// else avFavFit is already 0.0
 	return
 }
