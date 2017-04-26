@@ -2,6 +2,10 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
+- figure out why average fitness starts to climb after a while
+- make num offspring proportional to fitness?
+- add tracking id for each mutation?
+- review all of mendel fortran help.html
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
 - (jon) apply correct Weibull fitness factor distribution to mutation - see wes' comments in slack

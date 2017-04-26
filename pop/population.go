@@ -35,7 +35,7 @@ func PopulationFactory(initialSize int) *Population {
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
-	p.Num_offspring = 2.0 * config.Cfg.Basic.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
+	p.Num_offspring = 2.0 * config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
 
 	return p
 }
@@ -117,7 +117,7 @@ func (p *Population) Select() {
 }
 
 
-// GetAverageFitness returns the average of all the individuals fitness levels
+// GetFitnessStats returns the average of all the individuals fitness levels
 func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float32) {
 	minFitness = 99.0
 	maxFitness = -99.0
@@ -131,19 +131,28 @@ func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness f
 }
 
 
-// GetAverageNumMutations returns the average number of deleterious, neutral, favorable mutations in the individuals
-func (p *Population) GetAverageNumMutations() (deleterious, neutral, favorable float64) {
+// GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
+func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float32) {
+	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
+	config.Verbose(9, "pop: entering GetMutationStats()")
 	var delet, neut, fav int
 	for _, ind := range p.Indivs {
-		d, n, f := ind.GetNumMutations()
+		d, n, f, avD, avF := ind.GetMutationStats()
+		config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
 		neut += n
 		fav += f
+		avDelFit += float32(d) * avD
+		avFavFit += float32(f) * avF
 	}
-	size := float64(p.GetCurrentSize())
-	deleterious = float64(delet) / size
-	neutral = float64(neut) / size
-	favorable = float64(fav) / size
+	size := float32(p.GetCurrentSize())
+	if size > 0 {
+		deleterious = float32(delet) / size
+		neutral = float32(neut) / size
+		favorable = float32(fav) / size
+	}
+	if delet > 0 { avDelFit = avDelFit / float32(delet) }
+	if fav > 0 { avFavFit = avFavFit / float32(fav) }
 	return
 }
 
@@ -154,7 +163,7 @@ func (p *Population) ReportInitial(genNum, maxGenNum int) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(histWriter, "# Generation  Population-size  Average-deleterious Average-neutral  Average-favorable  Average-fitness  Min-fitness  Max-fitness")
+		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit Avg-neut-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness")
 	}
 }
 
@@ -167,13 +176,14 @@ func (p *Population) ReportEachGen(genNum int) {
 	popSize := p.GetCurrentSize()
 
 	// Not final
-	var d, n, f float64 	// if we get these values once, hold on to them
+	var d, n, f, avDelFit, avFavFit float32 	// if we get these values once, hold on to them
 	var aveFit, minFit, maxFit float32
 	if config.IsVerbose(perGenVerboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
-		log.Printf("Generation: %d, Population size: %v, Individuals' average fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, aveFit, minFit, maxFit)
-		d, n, f = p.GetAverageNumMutations()
-		log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
+		config.Verbose(9, "pop: calling GetMutationStats()")
+		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
+		log.Printf("Gen: %d, Pop size: %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, d+n+f, aveFit, minFit, maxFit)
+		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 	}
 	if config.IsVerbose(perGenIndivVerboseLevel) {
 		log.Println(" Individual Detail:")
@@ -183,9 +193,9 @@ func (p *Population) ReportEachGen(genNum int) {
 	//if histWriter := config.FMgr.GetFileWriter(config.HISTORY_FILENAME); histWriter != nil {
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-		if d==0.0 && n==0.0 && f==0.0 { d, n, f = p.GetAverageNumMutations() }
+		if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
 		if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v\n", genNum, popSize, d, n, f, aveFit, minFit, maxFit)
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit)
 		//histWriter.Flush()
 	}
 }
@@ -200,9 +210,9 @@ func (p *Population) ReportFinal(genNum int) {
 	if !config.IsVerbose(perGenVerboseLevel) {
 		log.Println("Final report:")
 		aveFit, minFit, maxFit := p.GetFitnessStats()
-		log.Printf("After %d generations: Population size: %v, Individuals' average fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, aveFit, minFit, maxFit)
-		d, n, f := p.GetAverageNumMutations()
-		log.Printf(" Individuals' average number of deleterious mutations: %v, neutral mutations: %v, favorable mutations: %v", d, n, f)
+		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
+		log.Printf("After %d generations: Pop size: %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, d+n+f, aveFit, minFit, maxFit)
+		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 	}
 	if !config.IsVerbose(perGenIndivVerboseLevel) && config.IsVerbose(4) {
 		log.Println(" Individual Detail:")

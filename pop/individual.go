@@ -116,28 +116,41 @@ func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
 }
 
 
+// Randomly rounds the desired number of offspring to the integer below or above, proportional to how close it is to each (so the resulting average should be Num_offspring)
+func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
+	return random.Round(uniformRandom, ind.Pop.Num_offspring)
+}
+
+
 // An algorithm taken from the fortran mendel for calculating the number of offspring
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
 	//todo: i do not understand some of this logic, it is from lines 64-73 of mating.f90
 	actual_offspring := int(ind.Pop.Num_offspring)		// truncate num offspring to integer
-	if ind.Pop.Num_offspring - float64(int(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up or down
+	if ind.Pop.Num_offspring - float64(int(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) } 	// assuming this was some special case specific to the fortran implementation
-	actual_offspring = utils.Min(int(ind.Pop.Num_offspring) + 1, actual_offspring)
+	actual_offspring = utils.Min(int(ind.Pop.Num_offspring) + 1, actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be int(ind.Pop.Num_offspring)+1 or int(ind.Pop.Num_offspring)
 	return actual_offspring
+}
+
+
+// Randomly choose a number of offspring that is, on average, proportional to the individual's fitness
+func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
+	utils.NotImplementedYet("CalcFitnessNumOffspring not implemented yet")
+	return random.Round(uniformRandom, ind.Pop.Num_offspring)
 }
 
 
 // Algorithms for determining the number of additional mutations a specific offspring should be given
 type CalcNumMutationsType func(uniformRandom *rand.Rand) int
 
-// Randomly round Mutn_rate to the int below or above, proportional to how close it is to each (so the resulting average should be Mutn_rate
+// Randomly round Mutn_rate to the int below or above, proportional to how close it is to each (so the resulting average should be Mutn_rate)
 func CalcSemiFixedNumMutations (uniformRandom *rand.Rand) int {
 	numMutations := random.Round(uniformRandom, config.Cfg.Mutations.Mutn_rate)
 	return numMutations
 }
 
 // Use a poisson distribution to choose a number of mutations, with the mean of number of mutations for all individuals being Mutn_rate
-func CalcPoissonNumMutations (uniformRandom *rand.Rand) int {
+func CalcPoissonNumMutations (_ *rand.Rand) int {
 	//todo: jon, the num mutations should be a poisson distribution with the mean being Mutn_rate
 	numMutations := 10
 	utils.NotImplementedYet("CalcPoissonNumMutations not implemented yet")
@@ -178,25 +191,32 @@ func MultIndivFitness(_ *Individual) (fitness float32) {
 }
 
 
-// GetNumMutations returns the number of deleterious, neutral, favorable mutations, respectively
-func (ind *Individual) GetNumMutations() (deleterious, neutral, favorable int) {
+// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
+func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float32) {
+	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _,lb := range ind.LinkagesFromDad {
-		delet, neut, fav := lb.GetNumMutations()
+		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
+		avDelFit += (float32(delet) * avD)
+		avFavFit += (float32(fav) * avF)
 	}
 	for _,lb := range ind.LinkagesFromMom {
-		delet, neut, fav := lb.GetNumMutations()
+		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
+		avDelFit += (float32(delet) * avD)
+		avFavFit += (float32(fav) * avF)
 	}
+	if deleterious > 0 { avDelFit = avDelFit / float32(deleterious) }
+	if favorable > 0 { avFavFit = avFavFit / float32(favorable) }
 	return
 }
 
 // Report prints out statistics of this individual. If final==true is prints more details.
 func (ind *Individual) Report(_ bool) {
-	deleterious, neutral, favorable := ind.GetNumMutations()
-	log.Printf("  Ind: deleterious %d, neutral: %d, favorable: %d, fitness: %v", deleterious, neutral, favorable, ind.Fitness)
+	deleterious, neutral, favorable, avDelFit, avFavFit := ind.GetMutationStats()
+	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.Fitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
 }
