@@ -3,6 +3,13 @@ package dna
 import (
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"strings"
+	"log"
+)
+
+type MutationFitnessModelType string
+const (
+	UNIFORM_FITNESS_EFFECT MutationFitnessModelType = "uniform"
+	WEIBULL_FITNESS_EFFECT MutationFitnessModelType = "weibull"
 )
 
 
@@ -25,20 +32,32 @@ func SetAlgorithms(c *config.Config) {
 		Alg.CalcDelMutationFitness = CalcFixedDelMutationFitness
 		algNames = append(algNames, "CalcFixedDelMutationFitness")
 	} else {
-		Alg.CalcDelMutationFitness = CalcUniformDelMutationFitness
-		algNames = append(algNames, "CalcUniformDelMutationFitness")
-		//Alg.CalcDelMutationFitness = CalcWeibullDelMutationFitness
-		//algNames = append(algNames, "CalcWeibullDelMutationFitness")
+		switch {
+		case strings.ToLower(c.Mutations.Fitness_effect_model) == string(UNIFORM_FITNESS_EFFECT):
+			Alg.CalcDelMutationFitness = CalcUniformDelMutationFitness
+			algNames = append(algNames, "CalcUniformDelMutationFitness")
+		case strings.ToLower(c.Mutations.Fitness_effect_model) == string(WEIBULL_FITNESS_EFFECT):
+			Alg.CalcDelMutationFitness = CalcWeibullDelMutationFitness
+			algNames = append(algNames, "CalcWeibullDelMutationFitness")
+		default:
+			log.Fatalf("Error: unrecognized value for fitness_effect_model: %v", c.Mutations.Fitness_effect_model)
+		}
 	}
 
 	if c.Mutations.Uniform_fitness_effect_fav != 0.0 {
 		Alg.CalcFavMutationFitness = CalcFixedFavMutationFitness
 		algNames = append(algNames, "CalcFixedFavMutationFitness")
 	} else {
-		Alg.CalcFavMutationFitness = CalcUniformFavMutationFitness
-		algNames = append(algNames, "CalcUniformFavMutationFitness")
-		//Alg.CalcFavMutationFitness = CalcWeibullFavMutationFitness
-		//algNames = append(algNames, "CalcWeibullFavMutationFitness")
+		switch {
+		case strings.ToLower(c.Mutations.Fitness_effect_model) == string(UNIFORM_FITNESS_EFFECT):
+			Alg.CalcFavMutationFitness = CalcUniformFavMutationFitness
+			algNames = append(algNames, "CalcUniformFavMutationFitness")
+		case strings.ToLower(c.Mutations.Fitness_effect_model) == string(WEIBULL_FITNESS_EFFECT):
+			Alg.CalcFavMutationFitness = CalcWeibullFavMutationFitness
+			algNames = append(algNames, "CalcWeibullFavMutationFitness")
+		default:
+			log.Fatalf("Error: unrecognized value for fitness_effect_model: %v", c.Mutations.Fitness_effect_model)
+		}
 	}
 
 	config.Verbose(3, "Running with these dna algorithms: %v", strings.Join(algNames, ", "))
