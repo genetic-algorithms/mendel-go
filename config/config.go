@@ -29,6 +29,7 @@ type Config struct {
 		Max_fav_fitness_gain float64
 		Uniform_fitness_effect_del float64
 		Uniform_fitness_effect_fav float64
+		Fitness_effect_model string
 		Fraction_recessive float64
 		Recessive_hetero_expression float64
 		Dominant_hetero_expression float64

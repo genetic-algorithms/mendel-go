@@ -150,11 +150,8 @@ func CalcSemiFixedNumMutations (uniformRandom *rand.Rand) int {
 }
 
 // Use a poisson distribution to choose a number of mutations, with the mean of number of mutations for all individuals being Mutn_rate
-func CalcPoissonNumMutations (_ *rand.Rand) int {
-	//todo: jon, the num mutations should be a poisson distribution with the mean being Mutn_rate
-	numMutations := 10
-	utils.NotImplementedYet("CalcPoissonNumMutations not implemented yet")
-	return numMutations
+func CalcPoissonNumMutations (uniformRandom *rand.Rand) int {
+	return int(random.Poisson(uniformRandom, config.Cfg.Mutations.Mutn_rate))
 }
 
 
