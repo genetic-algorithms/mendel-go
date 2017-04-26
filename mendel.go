@@ -9,7 +9,6 @@
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
 - (jon) apply correct Weibull fitness factor distribution to mutation - see wes' comments in slack
-- (jon) the num mutations should be a poisson distribution with the mean being Mutn_rate
 - run with more linkage blocks
  */
 package main
