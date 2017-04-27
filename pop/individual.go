@@ -13,7 +13,7 @@ import (
 // Individual represents 1 organism in the population, tracking its mutations and alleles.
 type Individual struct {
 	Pop *Population
-	Fitness float32
+	Fitness float64
 	Dead bool 		// if true, selection has identified it for elimination
 	// we are not currently modeling chromosomes, only a big array of LBs
 	LinkagesFromDad []*dna.LinkageBlock
@@ -156,11 +156,11 @@ func CalcPoissonNumMutations (uniformRandom *rand.Rand) int {
 
 
 // Algorithms for aggregating all of the individual's mutation fitness factors into a single pheno fitness value
-type CalcIndivFitnessType func(ind *Individual) float32
+type CalcIndivFitnessType func(ind *Individual) float64
 
 // SumIndivFitness adds together the fitness factors of all of the mutations. An individual's fitness starts at 1 and then deleterious
 // mutations subtract from that and favorable mutations add to it. A total fitness of 0 means the individual is dead.
-func SumIndivFitness(ind *Individual) (fitness float32) {
+func SumIndivFitness(ind *Individual) (fitness float64) {
 	// Sum all the LB fitness numbers
 	fitness = 1.0
 	for _, lb := range ind.LinkagesFromDad {
@@ -180,7 +180,7 @@ func SumIndivFitness(ind *Individual) (fitness float32) {
 
 // MultIndivFitness aggregates the fitness factors of all of the mutations using a combination of additive and mutliplicative,
 // based on config.Cfg.Mutations.Multiplicative_weighting
-func MultIndivFitness(_ *Individual) (fitness float32) {
+func MultIndivFitness(_ *Individual) (fitness float64) {
 	fitness = 1.0
 	//todo: do not know the exact forumla to use for this yet
 	utils.NotImplementedYet("Multiplicative_weighting not implemented yet")
@@ -189,26 +189,26 @@ func MultIndivFitness(_ *Individual) (fitness float32) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float32) {
+func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float64) {
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _,lb := range ind.LinkagesFromDad {
 		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float32(delet) * avD)
-		avFavFit += (float32(fav) * avF)
+		avDelFit += (float64(delet) * avD)
+		avFavFit += (float64(fav) * avF)
 	}
 	for _,lb := range ind.LinkagesFromMom {
 		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float32(delet) * avD)
-		avFavFit += (float32(fav) * avF)
+		avDelFit += (float64(delet) * avD)
+		avFavFit += (float64(fav) * avF)
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float32(deleterious) }
-	if favorable > 0 { avFavFit = avFavFit / float32(favorable) }
+	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
+	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
 	return
 }
 

@@ -118,7 +118,7 @@ func (p *Population) Select() {
 
 
 // GetFitnessStats returns the average of all the individuals fitness levels
-func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float32) {
+func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float64) {
 	minFitness = 99.0
 	maxFitness = -99.0
 	for _, ind := range p.Indivs {
@@ -126,13 +126,13 @@ func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness f
 		if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
 		if ind.Fitness < minFitness { minFitness = ind.Fitness }
 	}
-	averageFitness = averageFitness / float32(p.GetCurrentSize())
+	averageFitness = averageFitness / float64(p.GetCurrentSize())
 	return
 }
 
 
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float32) {
+func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float64) {
 	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	config.Verbose(9, "pop: entering GetMutationStats()")
 	var delet, neut, fav int
@@ -142,17 +142,17 @@ func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDel
 		delet += d
 		neut += n
 		fav += f
-		avDelFit += float32(d) * avD
-		avFavFit += float32(f) * avF
+		avDelFit += float64(d) * avD
+		avFavFit += float64(f) * avF
 	}
-	size := float32(p.GetCurrentSize())
+	size := float64(p.GetCurrentSize())
 	if size > 0 {
-		deleterious = float32(delet) / size
-		neutral = float32(neut) / size
-		favorable = float32(fav) / size
+		deleterious = float64(delet) / size
+		neutral = float64(neut) / size
+		favorable = float64(fav) / size
 	}
-	if delet > 0 { avDelFit = avDelFit / float32(delet) }
-	if fav > 0 { avFavFit = avFavFit / float32(fav) }
+	if delet > 0 { avDelFit = avDelFit / float64(delet) }
+	if fav > 0 { avFavFit = avFavFit / float64(fav) }
 	return
 }
 
@@ -176,8 +176,8 @@ func (p *Population) ReportEachGen(genNum int) {
 	popSize := p.GetCurrentSize()
 
 	// Not final
-	var d, n, f, avDelFit, avFavFit float32 	// if we get these values once, hold on to them
-	var aveFit, minFit, maxFit float32
+	var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
+	var aveFit, minFit, maxFit float64
 	if config.IsVerbose(perGenVerboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
 		config.Verbose(9, "pop: calling GetMutationStats()")
@@ -226,7 +226,7 @@ func (p *Population) ReportFinal(genNum int) {
 // Used as the elements to be sorted for selection
 type IndivFit struct {
 	Index int
-	Fitness float32
+	Fitness float64
 }
 type ByFitness []IndivFit
 func (a ByFitness) Len() int           { return len(a) }
@@ -247,7 +247,7 @@ func (p *Population) sortIndexByFitness() []IndivFit {
 
 	// Output the fitnesses to check them
 	if config.IsVerbose(9) {
-		fitSlice := make([]float32, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
+		fitSlice := make([]float64, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
 		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].Fitness }
 		config.Verbose(9, "fitSlice: %v", fitSlice)
 	}
