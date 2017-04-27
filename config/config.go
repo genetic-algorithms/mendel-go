@@ -13,8 +13,8 @@ import (
 type Config struct {
 	Basic struct {
 		Case_id string
-		Pop_size int
-		Num_generations int
+		Pop_size uint32
+		Num_generations uint32
 	}
 	Mutations struct {
 		Mutn_rate float64
@@ -25,7 +25,7 @@ type Config struct {
 		Genome_size float64
 		High_impact_mutn_fraction float64
 		High_impact_mutn_threshold float64
-		Num_initial_fav_mutn int
+		Num_initial_fav_mutn uint32
 		Max_fav_fitness_gain float64
 		Uniform_fitness_effect_del float64
 		Uniform_fitness_effect_fav float64
@@ -55,28 +55,28 @@ type Config struct {
 	Population struct {
 		Reproductive_rate float64
 		Num_offspring_model string
-		Recombination_model int
+		Recombination_model uint32
 		Fraction_self_fertilization float64
-		Num_contrasting_alleles int
-		Max_total_fitness_increase int
+		Num_contrasting_alleles uint32
+		Max_total_fitness_increase uint32
 		Initial_alleles_pop_frac float64
 		Initial_alleles_amp_factor int
 		Dynamic_linkage bool
-		Haploid_chromosome_number int
-		Num_linkage_subunits int
+		Haploid_chromosome_number uint32
+		Num_linkage_subunits uint32
 		Pop_growth_model int
 		Pop_growth_rate float64
 		Carrying_capacity int
 		Bottleneck_yes bool
-		Bottleneck_generation int
-		Bottleneck_pop_size int
-		Num_bottleneck_generations int
+		Bottleneck_generation uint32
+		Bottleneck_pop_size uint32
+		Num_bottleneck_generations uint32
 	}
 	Substructure struct {
 		Is_parallel bool
 		Homogenous_tribes bool
-		Num_indiv_exchanged int
-		Migration_generations int
+		Num_indiv_exchanged uint32
+		Migration_generations uint32
 		Migration_model int
 		Tribal_competition bool
 		Tribal_fission bool
@@ -87,18 +87,18 @@ type Config struct {
 	Computation struct {
 		Tracking_threshold float64
 		Extinction_threshold float64
-		Max_del_mutn_per_indiv int
-		Max_neu_mutn_per_indiv int
-		Max_fav_mutn_per_indiv int
+		Max_del_mutn_per_indiv uint32
+		Max_neu_mutn_per_indiv uint32
+		Max_fav_mutn_per_indiv uint32
 		Random_number_seed int64
 		Reseed_rng bool			// not used. If Random_number_seed==0 we use a truly random seed
 		Track_neutrals bool
 		Write_dump bool
 		Write_vcf bool
 		Restart_case bool
-		Restart_dump_number int
-		Plot_allele_gens int
-		Verbosity int
+		Restart_dump_number uint32
+		Plot_allele_gens uint32
+		Verbosity uint32
 		Data_file_path string
 		Files_to_output string
 	}
@@ -138,11 +138,11 @@ func (c *Config) WriteToFile(filename string) error {
 */
 
 // These are here, instead of of in pkg utils, to avoid circular imports
-func Verbose(level int, msg string, args ...interface{}) {
+func Verbose(level uint32, msg string, args ...interface{}) {
 	if Cfg.Computation.Verbosity >= level { log.Printf("V"+fmt.Sprint(level)+" "+msg, args...) }
 }
 
 // IsVerbose tests whether the level given is within the verbose level being output
-func IsVerbose(level int) bool {
+func IsVerbose(level uint32) bool {
 	return Cfg.Computation.Verbosity >= level
 }

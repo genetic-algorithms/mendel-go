@@ -28,8 +28,8 @@ func (lb *LinkageBlock) Copy() *LinkageBlock {
 
 
 // GetMutnCount returns the number of mutations currently on this LB
-func (lb *LinkageBlock) GetMutnCount() int {
-	return len(lb.Mutn)
+func (lb *LinkageBlock) GetMutnCount() uint32 {
+	return uint32(len(lb.Mutn))
 }
 
 
@@ -52,7 +52,7 @@ func (lb *LinkageBlock) GetFitness() (fitness float64) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float64) {
+func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	for _, m := range lb.Mutn {
 		switch m.GetMType() {
 		case DELETERIOUS:

@@ -3,7 +3,7 @@ package config
 import "log"
 
 type RestartValues struct {
-	Gen_0 int
+	Gen_0 uint32
 }
 
 var Restart *RestartValues

@@ -13,12 +13,22 @@ func CopyFile(fromFile, toFile string) error {
 	return nil
 }
 
-func Min(a, b int) int {
+func MinInt(a, b int) int {
 	if a < b { return a }
 	return b
 }
 
-func Max(a, b int) int {
+func MaxInt(a, b int) int {
+	if a > b { return a }
+	return b
+}
+
+func MinUint32(a, b uint32) uint32 {
+	if a < b { return a }
+	return b
+}
+
+func MaxUint32(a, b uint32) uint32 {
 	if a > b { return a }
 	return b
 }

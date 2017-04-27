@@ -49,13 +49,14 @@ func poissonProbability(lambda float64, k uint32) float64 {
 // increases our accuracy will increase and therefore we could decrease epsilon.
 // But we have kept the number of iterations reasonably low to ensure the
 // tests run quickly.
+/* math.rand.Perm() is used instead of this...
 func TestShuffle(t *testing.T) {
 	counts := make([]int, 9)
 	var iterations int = 10E3
 	var epsilon float64 = 0.06
 	var expectedValue float64 = 4
 	uniformRandom := rand.New(rand.NewSource(1))
-	xs := IntSlice{0, 1, 2, 3, 4, 5, 6, 7, 8}
+	xs := Uint32Slice{0, 1, 2, 3, 4, 5, 6, 7, 8}
 
 	for i := 0; i < iterations; i++ {
 		Shuffle(uniformRandom, xs)
@@ -74,3 +75,4 @@ func TestShuffle(t *testing.T) {
 		}
 	}
 }
+*/

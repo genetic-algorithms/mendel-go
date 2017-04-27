@@ -67,26 +67,28 @@ func GetSeed() int64 {
 }
 
 
+/* math.rand.Perm() is used instead of this...
 type Shuffleable interface {
-	Swap(i, j int)
-	Len() int
+	Swap(i, j uint32)
+	Len() uint32
 }
 
-type IntSlice []int
+type Uint32Slice []uint32
 
-func (xs IntSlice) Swap(i, j int) {
+func (xs Uint32Slice) Swap(i, j uint32) {
 	xs[i], xs[j] = xs[j], xs[i]
 }
 
-func (xs IntSlice) Len() int {
-	return len(xs)
+func (xs Uint32Slice) Len() uint32 {
+	return uint32(len(xs))
 }
 
 // Fisher-Yates shuffle
 // (https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm)
 func Shuffle(uniformRandom *rand.Rand, xs Shuffleable) {
 	for i := xs.Len() - 1; i > 0; i-- {
-		j := uniformRandom.Intn(i + 1);
+		j := uint32(uniformRandom.Intn(int(i + 1)))
 		xs.Swap(i, j)
 	}
 }
+*/
