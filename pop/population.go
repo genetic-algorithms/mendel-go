@@ -22,13 +22,14 @@ type Population struct {
 	//		sex ratio for the population. Only allow opposite sex individuals to mate.
 	Indivs []*Individual
 
-	Size int 		// the specified size of this population. 0 if no specific size.
-	Num_offspring float64 		// calculated from config values Fraction_random_death and Reproductive_rate
+	Size uint32 		// the specified size of this population. 0 if no specific size.
+	Num_offspring float64 		// Average number of offspring each individual should have. Calculated from config values Fraction_random_death and Reproductive_rate
+	ActualAvgOffspring float64 		// The average number of offspring each individual from last generation actually had in this generation
 }
 
 
 // PopulationFactory creates a new population (either the initial pop, or the next generation).
-func PopulationFactory(initialSize int) *Population {
+func PopulationFactory(initialSize uint32) *Population {
 	p := &Population{
 		Indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Size: config.Cfg.Basic.Pop_size,
@@ -44,12 +45,12 @@ func PopulationFactory(initialSize int) *Population {
 // Initialize creates individuals (with no mutations) for the 1st generation
 func (p *Population) Initialize() {
 	//todo: there is probably a faster way to initialize these arrays
-	for i:=1; i<=p.Size; i++ { p.Append(IndividualFactory(p)) }
+	for i:=uint32(1); i<=p.Size; i++ { p.Append(IndividualFactory(p)) }
 }
 
 
 // Size returns the current number of individuals in this population
-func (p *Population) GetCurrentSize() int { return len(p.Indivs) }
+func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
 
 
 // Append adds a person to this population
@@ -71,20 +72,23 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
 	// size a little, because we will add individuals with p.Append() anyway.
-	newGenerationSize := int((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
+	newGenerationSize := uint32((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
 	newP := PopulationFactory(newGenerationSize)
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
-	parentIndices := uniformRandom.Perm(p.GetCurrentSize())
+	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
 	config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
-	for i:=0; i<p.GetCurrentSize()-1; i=i+2 {
+	for i:=uint32(0); i<p.GetCurrentSize()-1; i=i+2 {
 		dadI := parentIndices[i]
 		momI := parentIndices[i+1]
 		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], uniformRandom)
 		newP.Append(newIndivs...)
 	}
+
+	// Save off the average num offspring for stats, before we select out individuals
+	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
 
 	return newP
 }
@@ -96,8 +100,8 @@ func (p *Population) Select() {
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	indexes := p.sortIndexByFitness()
-	numEliminate := len(indexes) - p.Size		// if numEliminate is negative, then the following for loop will just do nothing, which is ok
-	for i:=0; i<numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true } 	// sorted by fitness in ascending order, so mark the 1st ones dead
+	numEliminate := uint32(len(indexes)) - p.Size		// if numEliminate is negative, then the following for loop will just do nothing, which is ok
+	for i:=uint32(0); i<numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true } 	// sorted by fitness in ascending order, so mark the 1st ones dead
 
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements
 	nextIndex := 0
@@ -118,7 +122,7 @@ func (p *Population) Select() {
 
 
 // GetFitnessStats returns the average of all the individuals fitness levels
-func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float32) {
+func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float64) {
 	minFitness = 99.0
 	maxFitness = -99.0
 	for _, ind := range p.Indivs {
@@ -126,39 +130,39 @@ func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness f
 		if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
 		if ind.Fitness < minFitness { minFitness = ind.Fitness }
 	}
-	averageFitness = averageFitness / float32(p.GetCurrentSize())
+	averageFitness = averageFitness / float64(p.GetCurrentSize())
 	return
 }
 
 
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float32) {
+func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float64) {
 	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	config.Verbose(9, "pop: entering GetMutationStats()")
-	var delet, neut, fav int
+	var delet, neut, fav uint32
 	for _, ind := range p.Indivs {
 		d, n, f, avD, avF := ind.GetMutationStats()
 		config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
 		neut += n
 		fav += f
-		avDelFit += float32(d) * avD
-		avFavFit += float32(f) * avF
+		avDelFit += float64(d) * avD
+		avFavFit += float64(f) * avF
 	}
-	size := float32(p.GetCurrentSize())
+	size := float64(p.GetCurrentSize())
 	if size > 0 {
-		deleterious = float32(delet) / size
-		neutral = float32(neut) / size
-		favorable = float32(fav) / size
+		deleterious = float64(delet) / size
+		neutral = float64(neut) / size
+		favorable = float64(fav) / size
 	}
-	if delet > 0 { avDelFit = avDelFit / float32(delet) }
-	if fav > 0 { avFavFit = avFavFit / float32(fav) }
+	if delet > 0 { avDelFit = avDelFit / float64(delet) }
+	if fav > 0 { avFavFit = avFavFit / float64(fav) }
 	return
 }
 
 
 // Report prints out statistics of this population. If final==true is prints more details.
-func (p *Population) ReportInitial(genNum, maxGenNum int) {
+func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 	config.Verbose(3, "Starting mendel simulation with a population size of %d at generation %d and continuing to generation %d", p.GetCurrentSize(), genNum, maxGenNum)
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
@@ -169,20 +173,20 @@ func (p *Population) ReportInitial(genNum, maxGenNum int) {
 
 
 // Report prints out statistics of this population. If final==true is prints more details.
-func (p *Population) ReportEachGen(genNum int) {
+func (p *Population) ReportEachGen(genNum uint32) {
 	//todo: for reporting we go thru all individuals and LB multiple times. Make this more efficient
-	perGenVerboseLevel := 3            // level at which we will print population level info
-	perGenIndivVerboseLevel := 7    // level at which we will print individual level info
+	perGenVerboseLevel := uint32(3)            // level at which we will print population level info
+	perGenIndivVerboseLevel := uint32(7)    // level at which we will print individual level info
 	popSize := p.GetCurrentSize()
 
 	// Not final
-	var d, n, f, avDelFit, avFavFit float32 	// if we get these values once, hold on to them
-	var aveFit, minFit, maxFit float32
+	var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
+	var aveFit, minFit, maxFit float64
 	if config.IsVerbose(perGenVerboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
 		config.Verbose(9, "pop: calling GetMutationStats()")
 		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
-		log.Printf("Gen: %d, Pop size: %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, d+n+f, aveFit, minFit, maxFit)
+		log.Printf("Gen: %d, Pop size: %v, Average num offspring %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit)
 		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 	}
 	if config.IsVerbose(perGenIndivVerboseLevel) {
@@ -202,16 +206,16 @@ func (p *Population) ReportEachGen(genNum int) {
 
 
 // Report prints out statistics of this population. If final==true is prints more details.
-func (p *Population) ReportFinal(genNum int) {
-	perGenVerboseLevel := 3            // level at which we will print population level info
-	perGenIndivVerboseLevel := 7    // level at which we will print individual level info
+func (p *Population) ReportFinal(genNum uint32) {
+	perGenVerboseLevel := uint32(3)            // level at which we will print population level info
+	perGenIndivVerboseLevel := uint32(7)    // level at which we will print individual level info
 	popSize := p.GetCurrentSize()
 
 	if !config.IsVerbose(perGenVerboseLevel) {
 		log.Println("Final report:")
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		log.Printf("After %d generations: Pop size: %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, d+n+f, aveFit, minFit, maxFit)
+		log.Printf("After %d generations: Pop size: %v, Average num offspring %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit)
 		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 	}
 	if !config.IsVerbose(perGenIndivVerboseLevel) && config.IsVerbose(4) {
@@ -225,8 +229,8 @@ func (p *Population) ReportFinal(genNum int) {
 
 // Used as the elements to be sorted for selection
 type IndivFit struct {
-	Index int
-	Fitness float32
+	Index uint32
+	Fitness float64
 }
 type ByFitness []IndivFit
 func (a ByFitness) Len() int           { return len(a) }
@@ -239,7 +243,7 @@ func (p *Population) sortIndexByFitness() []IndivFit {
 	// Initialize the index array
 	indexes := make([]IndivFit, p.GetCurrentSize())
 	for i := range indexes {
-		indexes[i].Index = i
+		indexes[i].Index = uint32(i)
 		indexes[i].Fitness = p.Indivs[i].Fitness
 	}
 
@@ -247,7 +251,7 @@ func (p *Population) sortIndexByFitness() []IndivFit {
 
 	// Output the fitnesses to check them
 	if config.IsVerbose(9) {
-		fitSlice := make([]float32, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
+		fitSlice := make([]float64, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
 		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].Fitness }
 		config.Verbose(9, "fitSlice: %v", fitSlice)
 	}

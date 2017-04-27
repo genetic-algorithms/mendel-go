@@ -13,7 +13,7 @@ import (
 // Individual represents 1 organism in the population, tracking its mutations and alleles.
 type Individual struct {
 	Pop *Population
-	Fitness float32
+	Fitness float64
 	Dead bool 		// if true, selection has identified it for elimination
 	// we are not currently modeling chromosomes, only a big array of LBs
 	LinkagesFromDad []*dna.LinkageBlock
@@ -46,7 +46,7 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 	actual_offspring := Alg.CalcNumOffspring(ind, uniformRandom)
 	config.Verbose(8, " actual_offspring=%d", actual_offspring)
 	offspr := make([]*Individual, actual_offspring)
-	for child:=0; child<actual_offspring; child++ {
+	for child:=uint32(0); child<actual_offspring; child++ {
 		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
 	}
 	return offspr
@@ -67,7 +67,7 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	// Inherit linkage blocks
 	//chr_length := config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number 		// num LBs in each chromosome
 	//for chr:=1; chr<=config.Cfg.Population.Haploid_chromosome_number; chr++ {
-	for lb:=0; lb<config.Cfg.Population.Num_linkage_subunits; lb++ {
+	for lb:=uint32(0); lb<config.Cfg.Population.Num_linkage_subunits; lb++ {
 		// randomly choose which parent to get the LB from
 		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromDad[lb].Copy()
@@ -83,8 +83,8 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 
 	// Apply new mutations
 	numMutations := Alg.CalcNumMutations(uniformRandom)
-	for m:=1; m<=numMutations; m++ {
-		lb := uniformRandom.Intn(config.Cfg.Population.Num_linkage_subunits)	// choose a random LB index
+	for m:=uint32(1); m<=numMutations; m++ {
+		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: MutationFactory() chooses deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant rates
@@ -105,62 +105,62 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 
 
 // Various algorithms for determining the random number of offspring for an individual
-type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) int
+type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) uint32
 
 // A uniform algorithm for calculating the number of offspring that gives an even distribution between 1 and 2*Num_offspring-1
-func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
+func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// If Num_offspring is 4.5, we want a range from 1-8
 	maxRange := (2 * ind.Pop.Num_offspring) - 2 		// subtract 2 to get a buffer of 1 at each end
 	numOffspring := uniformRandom.Float64() * maxRange 		// some float between 0 and maxRange
-	return random.Round(uniformRandom, numOffspring + 1) 	// shift it so it is between 1 and maxRange+1, then get to an int
+	return uint32(random.Round(uniformRandom, numOffspring + 1)) 	// shift it so it is between 1 and maxRange+1, then get to an uint32
 }
 
 
 // Randomly rounds the desired number of offspring to the integer below or above, proportional to how close it is to each (so the resulting average should be Num_offspring)
-func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
-	return random.Round(uniformRandom, ind.Pop.Num_offspring)
+func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
+	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring))
 }
 
 
 // An algorithm taken from the fortran mendel for calculating the number of offspring
-func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
+func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	//todo: i do not understand some of this logic, it is from lines 64-73 of mating.f90
-	actual_offspring := int(ind.Pop.Num_offspring)		// truncate num offspring to integer
-	if ind.Pop.Num_offspring - float64(int(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
+	actual_offspring := uint32(ind.Pop.Num_offspring)		// truncate num offspring to integer
+	if ind.Pop.Num_offspring - float64(uint32(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) } 	// assuming this was some special case specific to the fortran implementation
-	actual_offspring = utils.Min(int(ind.Pop.Num_offspring) + 1, actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be int(ind.Pop.Num_offspring)+1 or int(ind.Pop.Num_offspring)
+	actual_offspring = utils.MinUint32(uint32(ind.Pop.Num_offspring+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(ind.Pop.Num_offspring)+1 or uint32(ind.Pop.Num_offspring)
 	return actual_offspring
 }
 
 
 // Randomly choose a number of offspring that is, on average, proportional to the individual's fitness
-func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) int {
+func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	utils.NotImplementedYet("CalcFitnessNumOffspring not implemented yet")
-	return random.Round(uniformRandom, ind.Pop.Num_offspring)
+	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring))
 }
 
 
 // Algorithms for determining the number of additional mutations a specific offspring should be given
-type CalcNumMutationsType func(uniformRandom *rand.Rand) int
+type CalcNumMutationsType func(uniformRandom *rand.Rand) uint32
 
-// Randomly round Mutn_rate to the int below or above, proportional to how close it is to each (so the resulting average should be Mutn_rate)
-func CalcSemiFixedNumMutations (uniformRandom *rand.Rand) int {
-	numMutations := random.Round(uniformRandom, config.Cfg.Mutations.Mutn_rate)
+// Randomly round Mutn_rate to the uint32 below or above, proportional to how close it is to each (so the resulting average should be Mutn_rate)
+func CalcSemiFixedNumMutations (uniformRandom *rand.Rand) uint32 {
+	numMutations := uint32(random.Round(uniformRandom, config.Cfg.Mutations.Mutn_rate))
 	return numMutations
 }
 
 // Use a poisson distribution to choose a number of mutations, with the mean of number of mutations for all individuals being Mutn_rate
-func CalcPoissonNumMutations (uniformRandom *rand.Rand) int {
-	return int(random.Poisson(uniformRandom, config.Cfg.Mutations.Mutn_rate))
+func CalcPoissonNumMutations (uniformRandom *rand.Rand) uint32 {
+	return uint32(random.Poisson(uniformRandom, config.Cfg.Mutations.Mutn_rate))
 }
 
 
 // Algorithms for aggregating all of the individual's mutation fitness factors into a single pheno fitness value
-type CalcIndivFitnessType func(ind *Individual) float32
+type CalcIndivFitnessType func(ind *Individual) float64
 
 // SumIndivFitness adds together the fitness factors of all of the mutations. An individual's fitness starts at 1 and then deleterious
 // mutations subtract from that and favorable mutations add to it. A total fitness of 0 means the individual is dead.
-func SumIndivFitness(ind *Individual) (fitness float32) {
+func SumIndivFitness(ind *Individual) (fitness float64) {
 	// Sum all the LB fitness numbers
 	fitness = 1.0
 	for _, lb := range ind.LinkagesFromDad {
@@ -180,7 +180,7 @@ func SumIndivFitness(ind *Individual) (fitness float32) {
 
 // MultIndivFitness aggregates the fitness factors of all of the mutations using a combination of additive and mutliplicative,
 // based on config.Cfg.Mutations.Multiplicative_weighting
-func MultIndivFitness(_ *Individual) (fitness float32) {
+func MultIndivFitness(_ *Individual) (fitness float64) {
 	fitness = 1.0
 	//todo: do not know the exact forumla to use for this yet
 	utils.NotImplementedYet("Multiplicative_weighting not implemented yet")
@@ -189,26 +189,26 @@ func MultIndivFitness(_ *Individual) (fitness float32) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float32) {
+func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _,lb := range ind.LinkagesFromDad {
 		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float32(delet) * avD)
-		avFavFit += (float32(fav) * avF)
+		avDelFit += (float64(delet) * avD)
+		avFavFit += (float64(fav) * avF)
 	}
 	for _,lb := range ind.LinkagesFromMom {
 		delet, neut, fav, avD, avF := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float32(delet) * avD)
-		avFavFit += (float32(fav) * avF)
+		avDelFit += (float64(delet) * avD)
+		avFavFit += (float64(fav) * avF)
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float32(deleterious) }
-	if favorable > 0 { avFavFit = avFavFit / float32(favorable) }
+	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
+	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
 	return
 }
 

@@ -28,8 +28,8 @@ func (lb *LinkageBlock) Copy() *LinkageBlock {
 
 
 // GetMutnCount returns the number of mutations currently on this LB
-func (lb *LinkageBlock) GetMutnCount() int {
-	return len(lb.Mutn)
+func (lb *LinkageBlock) GetMutnCount() uint32 {
+	return uint32(len(lb.Mutn))
 }
 
 
@@ -41,7 +41,7 @@ func (lb *LinkageBlock) Append(mutn ...*Mutation) {
 
 
 /* Not using this, so we can apply the fitness factor aggregation at the individual level...
-func (lb *LinkageBlock) GetFitness() (fitness float32) {
+func (lb *LinkageBlock) GetFitness() (fitness float64) {
 	fitness = 0.0
 	for _, m := range lb.Mutn {
 		if (m.GetExpressed()) { fitness += m.GetFitnessFactor() }
@@ -52,7 +52,7 @@ func (lb *LinkageBlock) GetFitness() (fitness float32) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable int, avDelFit, avFavFit float32) {
+func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	for _, m := range lb.Mutn {
 		switch m.GetMType() {
 		case DELETERIOUS:
@@ -65,7 +65,7 @@ func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable int,
 			avFavFit += m.GetFitnessFactor()
 		}
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float32(deleterious) } 		// else avDelFit is already 0.0
-	if favorable > 0 { avFavFit = avFavFit / float32(favorable) } 		// else avFavFit is already 0.0
+	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) } 		// else avDelFit is already 0.0
+	if favorable > 0 { avFavFit = avFavFit / float64(favorable) } 		// else avFavFit is already 0.0
 	return
 }

@@ -20,7 +20,7 @@ type Mutation struct {
 	mType MutationType
 	dominant bool 		// dominant or recessive mutation
 	expressed bool 		// whether or not this allele is expressed, based on Dominant_hetero_expression and Recessive_hetero_expression
-	fitnessFactor float32 	// this is intentionally not float64 to save space
+	fitnessFactor float64 	// consider making this float32 to save space
 }
 
 
@@ -58,12 +58,12 @@ func MutationFactory(uniformRandom *rand.Rand) (m *Mutation) {
 func (m *Mutation) GetMType() MutationType { return m.mType }
 func (m *Mutation) GetDominant() bool { return m.dominant }
 func (m *Mutation) GetExpressed() bool { return m.expressed }
-func (m *Mutation) GetFitnessFactor() float32 { return m.fitnessFactor }
+func (m *Mutation) GetFitnessFactor() float64 { return m.fitnessFactor }
 
 
 // CalcFitnessFactor determines the fitness factor this mutation contributes to the overall individual fitness, using the method specified in the input file.
 // Note: this is not a method of the Mutation object, because that is immutable.
-func CalcFitnessFactor(m Mutation, uniformRandom *rand.Rand) (fitnessFactor float32) {
+func CalcFitnessFactor(m Mutation, uniformRandom *rand.Rand) (fitnessFactor float64) {
 	switch {
 	case m.mType == DELETERIOUS:
 		fitnessFactor = Alg.CalcDelMutationFitness(m, uniformRandom)
@@ -77,30 +77,30 @@ func CalcFitnessFactor(m Mutation, uniformRandom *rand.Rand) (fitnessFactor floa
 
 
 // These are the different algorithms for assigning a fitness factor to a mutation. Pointers to 2 of them are chosen at initialization time.
-type CalcMutationFitnessType func(m Mutation, uniformRandom *rand.Rand) float32
-func CalcFixedDelMutationFitness(_ Mutation, _ *rand.Rand) float32 { return float32(0.0 - config.Cfg.Mutations.Uniform_fitness_effect_del) }
-func CalcFixedFavMutationFitness(_ Mutation, _ *rand.Rand) float32 { return float32(config.Cfg.Mutations.Uniform_fitness_effect_fav) }
+type CalcMutationFitnessType func(m Mutation, uniformRandom *rand.Rand) float64
+func CalcFixedDelMutationFitness(_ Mutation, _ *rand.Rand) float64 { return 0.0 - config.Cfg.Mutations.Uniform_fitness_effect_del }
+func CalcFixedFavMutationFitness(_ Mutation, _ *rand.Rand) float64 { return config.Cfg.Mutations.Uniform_fitness_effect_fav }
 
 // Calculate a random fitness between -0.1 and 0 (deleterious) or 0 and 0.1 (favorable)
-func CalcUniformDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {return float32(0.0 - (uniformRandom.Float64() / 10) ) }
-func CalcUniformFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 { return float32(uniformRandom.Float64() / 10) }
+func CalcUniformDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 {return 0.0 - (uniformRandom.Float64() / 10) }
+func CalcUniformFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 { return uniformRandom.Float64() / 10 }
 
-// Algorithm according to Wes and the Fortran version
-func CalcWeibullDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
+// Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311
+func CalcWeibullDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 {
 	alpha_del := math.Log(config.Cfg.Mutations.Genome_size)
 	gamma_del := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_del) /
 	             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return float32(-math.Exp(-alpha_del * math.Pow(uniformRandom.Float64(), gamma_del)))
+	return -math.Exp(-alpha_del * math.Pow(uniformRandom.Float64(), gamma_del))
 }
 
 // Algorithm according to Wes and the Fortran version
-func CalcWeibullFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
+func CalcWeibullFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 {
 	alpha_fav := math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
 	gamma_fav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_fav) /
 	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return float32(math.Exp(-alpha_fav * math.Pow(uniformRandom.Float64(), gamma_fav)))
+	return math.Exp(-alpha_fav * math.Pow(uniformRandom.Float64(), gamma_fav))
 }
 
 
