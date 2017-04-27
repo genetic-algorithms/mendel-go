@@ -2,8 +2,8 @@ package dna
 
 import (
 	"bitbucket.org/geneticentropy/mendel-go/config"
+	"math"
 	"math/rand"
-	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
 type MutationType uint8
@@ -85,15 +85,22 @@ func CalcFixedFavMutationFitness(_ Mutation, _ *rand.Rand) float32 { return floa
 func CalcUniformDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {return float32(0.0 - (uniformRandom.Float64() / 10) ) }
 func CalcUniformFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 { return float32(uniformRandom.Float64() / 10) }
 
-//todo: jon use the Weibull distribution in these. See init.f90 lines 300-311
+// Algorithm according to Wes and the Fortran version
 func CalcWeibullDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
-	utils.NotImplementedYet("CalcWeibullDelMutationFitness not implemented yet")
-	return 0.0
+	alpha_del := math.Log(config.Cfg.Mutations.Genome_size)
+	gamma_del := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_del) /
+	             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
+
+	return float32(-math.Exp(-alpha_del * math.Pow(uniformRandom.Float64(), gamma_del)))
 }
 
+// Algorithm according to Wes and the Fortran version
 func CalcWeibullFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float32 {
-	utils.NotImplementedYet("CalcWeibullFavMutationFitness not implemented yet")
-	return 0.0
+	alpha_fav := math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
+	gamma_fav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_fav) /
+	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
+
+	return float32(math.Exp(-alpha_fav * math.Pow(uniformRandom.Float64(), gamma_fav)))
 }
 
 
