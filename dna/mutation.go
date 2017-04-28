@@ -87,20 +87,20 @@ func CalcUniformFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311
 func CalcWeibullDelMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 {
-	alpha_del := math.Log(config.Cfg.Mutations.Genome_size)
-	gamma_del := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_del) /
+	alphaDel := math.Log(config.Cfg.Mutations.Genome_size)
+	gammaDel := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alphaDel) /
 	             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return -math.Exp(-alpha_del * math.Pow(uniformRandom.Float64(), gamma_del))
+	return -math.Exp(-alphaDel * math.Pow(uniformRandom.Float64(), gammaDel))
 }
 
 // Algorithm according to Wes and the Fortran version
 func CalcWeibullFavMutationFitness(_ Mutation, uniformRandom *rand.Rand) float64 {
-	alpha_fav := math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
-	gamma_fav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alpha_fav) /
+	alphaFav := math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
+	gammaFav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alphaFav) /
 	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return math.Exp(-alpha_fav * math.Pow(uniformRandom.Float64(), gamma_fav))
+	return math.Exp(-alphaFav * math.Pow(uniformRandom.Float64(), gammaFav))
 }
 
 
