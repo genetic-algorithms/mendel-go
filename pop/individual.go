@@ -40,11 +40,15 @@ func IndividualFactory(pop *Population) *Individual{
 }
 
 
+// GetNumLinkages returns the number of linkage blocks from each parent (we assume they always have the same number of LBs frome each parent)
+func (ind *Individual) GetNumLinkages() uint32 { return uint32(len(ind.LinkagesFromDad)) }
+
+
 // Mate combines this person with the specified person to create a list of offspring.
 func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*Individual {
-	if RecombinationType(config.Cfg.Population.Recombination_model) == CLONAL { utils.NotImplementedYet("Do not support CLONAL recombination yet") }
-	actual_offspring := Alg.CalcNumOffspring(ind, uniformRandom)
-	config.Verbose(8, " actual_offspring=%d", actual_offspring)
+	if RecombinationType(config.Cfg.Population.Recombination_model) != FULL_SEXUAL { utils.NotImplementedYet("Recombination models other than FULL_SEXUAL are not yet supported") }
+	actual_offspring := Mdl.CalcNumOffspring(ind, uniformRandom)
+	//config.Verbose(9, " actual_offspring=%d", actual_offspring)
 	offspr := make([]*Individual, actual_offspring)
 	for child:=uint32(0); child<actual_offspring; child++ {
 		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
@@ -57,7 +61,7 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 // We assume ind is the dad and otherInd is the mom.
 func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Rand) *Individual {
 	offspr := IndividualFactory(ind.Pop)
-	//todo: support...
+	//todo: support non dynamic linkage...
 	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
 	//iseg_max := 3
 	//if !config.Cfg.Population.Dynamic_linkage {
@@ -67,13 +71,14 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	// Inherit linkage blocks
 	//chr_length := config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number 		// num LBs in each chromosome
 	//for chr:=1; chr<=config.Cfg.Population.Haploid_chromosome_number; chr++ {
-	for lb:=uint32(0); lb<config.Cfg.Population.Num_linkage_subunits; lb++ {
-		// randomly choose which parent to get the LB from
+	for lb:=uint32(0); lb<ind.GetNumLinkages(); lb++ {
+		// randomly choose which grandparents to get the LBs from
 		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromDad[lb].Copy()
 		} else {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromMom[lb].Copy()
 		}
+
 		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromDad[lb].Copy()
 		} else {
@@ -82,9 +87,9 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	}
 
 	// Apply new mutations
-	numMutations := Alg.CalcNumMutations(uniformRandom)
+	numMutations := Mdl.CalcNumMutations(uniformRandom)
 	for m:=uint32(1); m<=numMutations; m++ {
-		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB index
+		lb := uniformRandom.Intn(int(ind.GetNumLinkages()))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: MutationFactory() chooses deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant rates
@@ -97,7 +102,7 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//d, n, f := offspr.GetNumMutations()
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
-	offspr.Fitness = Alg.CalcIndivFitness(offspr) 		// store resulting fitness
+	offspr.Fitness = Mdl.CalcIndivFitness(offspr) 		// store resulting fitness
 	if offspr.Fitness <= 0.0 { offspr.Dead = true }
 
 	return offspr
@@ -135,6 +140,7 @@ func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 
 // Randomly choose a number of offspring that is, on average, proportional to the individual's fitness
 func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
+	// in the fortran version this is controlled by fitness_dependent_fertility
 	utils.NotImplementedYet("CalcFitnessNumOffspring not implemented yet")
 	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring))
 }
@@ -164,16 +170,13 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 	// Sum all the LB fitness numbers
 	fitness = 1.0
 	for _, lb := range ind.LinkagesFromDad {
-		for _, m := range lb.Mutn {
-			// Note: the deleterious mutation fitness factors are already negative
-			if (m.GetExpressed()) { fitness += m.GetFitnessFactor() }
-		}
+		// Note: the deleterious mutation fitness factors are already negative
+		for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
+		for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
 	}
 	for _, lb := range ind.LinkagesFromMom {
-		for _, m := range lb.Mutn {
-			// Note: the deleterious mutation fitness factors are already negative
-			if (m.GetExpressed()) { fitness += m.GetFitnessFactor() }
-		}
+		for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
+		for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
 	}
 	return
 }

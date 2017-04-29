@@ -21,58 +21,59 @@ const (
 )
 
 
-// Algorithms holds pointers to functions that implement the various algorithms chosen by the input file.
-type Algorithms struct {
+// Models holds pointers to functions that implement the various algorithms chosen by the input file.
+type Models struct {
 	CalcNumOffspring CalcNumOffspringType
 	CalcIndivFitness CalcIndivFitnessType
 	CalcNumMutations CalcNumMutationsType
 }
 
-// Alg is the singleton instance of Algorithms that can be accessed throughout the dna package. It gets set in SetAlgorithms().
-var Alg *Algorithms
+// Mdl is the singleton instance of Models that can be accessed throughout the dna package. It gets set in SetModels().
+var Mdl *Models
 
 
-// SetAlgorithms is called by main.initialize() to set the function ptrs for the various algorithms chosen by the input file.
-func SetAlgorithms(c *config.Config) {
-	Alg = &Algorithms{} 		// create and set the singleton object
-	var algNames []string 		// gather the algorithms we use so we can print it out
+// SetModels is called by main.initialize() to set the function ptrs for the various algorithms chosen by the input file.
+func SetModels(c *config.Config) {
+	Mdl = &Models{} 		// create and set the singleton object
+	var mdlNames []string 		// gather the models we use so we can print it out
 
 	// uniform (even distribution), fixed (rounded to nearest int), fortran (what mendel-f90 used), fitness (weighted according to fitness)
 	switch {
 	case strings.ToLower(c.Population.Num_offspring_model) == string(UNIFORM_NUM_OFFSPRING):
-		Alg.CalcNumOffspring = CalcUniformNumOffspring
-		algNames = append(algNames, "CalcUniformNumOffspring")
+		Mdl.CalcNumOffspring = CalcUniformNumOffspring
+		mdlNames = append(mdlNames, "CalcUniformNumOffspring")
 	case strings.ToLower(c.Population.Num_offspring_model) == string(FIXED_NUM_OFFSPRING):
-		Alg.CalcNumOffspring = CalcSemiFixedNumOffspring
-		algNames = append(algNames, "CalcFixedNumOffspring")
+		Mdl.CalcNumOffspring = CalcSemiFixedNumOffspring
+		mdlNames = append(mdlNames, "CalcFixedNumOffspring")
 	case strings.ToLower(c.Population.Num_offspring_model) == string(FORTRAN_NUM_OFFSPRING):
-		Alg.CalcNumOffspring = CalcFortranNumOffspring
-		algNames = append(algNames, "CalcFortranNumOffspring")
+		Mdl.CalcNumOffspring = CalcFortranNumOffspring
+		mdlNames = append(mdlNames, "CalcFortranNumOffspring")
+	//todo: this should be dependent on fitness_dependent_fertility or removed that value
 	case strings.ToLower(c.Population.Num_offspring_model) == string(FITNESS_NUM_OFFSPRING):
-		Alg.CalcNumOffspring = CalcFitnessNumOffspring
-		algNames = append(algNames, "CalcFitnessNumOffspring")
+		Mdl.CalcNumOffspring = CalcFitnessNumOffspring
+		mdlNames = append(mdlNames, "CalcFitnessNumOffspring")
 	default:
 		log.Fatalf("Error: unrecognized value for mum_offspring_model: %v", c.Population.Num_offspring_model)
 	}
 
 	if c.Mutations.Multiplicative_weighting > 0.0 {
-		Alg.CalcIndivFitness = MultIndivFitness
-		algNames = append(algNames, "MultIndivFitness")
+		Mdl.CalcIndivFitness = MultIndivFitness
+		mdlNames = append(mdlNames, "MultIndivFitness")
 	} else {
-		Alg.CalcIndivFitness = SumIndivFitness
-		algNames = append(algNames, "SumIndivFitness")
+		Mdl.CalcIndivFitness = SumIndivFitness
+		mdlNames = append(mdlNames, "SumIndivFitness")
 	}
 
 	switch {
 	case strings.ToLower(c.Mutations.Mutn_rate_model) == string(FIXED_MUTN_RATE):
-		Alg.CalcNumMutations = CalcSemiFixedNumMutations
-		algNames = append(algNames, "CalcSemiFixedNumMutations")
+		Mdl.CalcNumMutations = CalcSemiFixedNumMutations
+		mdlNames = append(mdlNames, "CalcSemiFixedNumMutations")
 	case strings.ToLower(c.Mutations.Mutn_rate_model) == string(POISSON_MUTN_RATE):
-		Alg.CalcNumMutations = CalcPoissonNumMutations
-		algNames = append(algNames, "CalcPoissonNumMutations")
+		Mdl.CalcNumMutations = CalcPoissonNumMutations
+		mdlNames = append(mdlNames, "CalcPoissonNumMutations")
 	default:
 		log.Fatalf("Error: unrecognized value for mutn_rate_model: %v", c.Mutations.Mutn_rate_model)
 	}
 
-	config.Verbose(3, "Running with these pop algorithms: %v", strings.Join(algNames, ", "))
+	config.Verbose(3, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
 }

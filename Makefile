@@ -13,11 +13,15 @@ run: $(BINARY)
 run-defaults: $(BINARY)
 	time ./$(BINARY) -d
 
-test:
+test-main: mendel_test.go $(BINARY)
+	glide --quiet install
+	go test -v mendel_test.go
+
+test-pkgs:
 	glide --quiet install
 	go test ./random
 
 clean:
 	go clean
 
-.PHONY: default run test clean
+.PHONY: default run run-defaults test-main test-pkgs clean

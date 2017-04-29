@@ -2,16 +2,18 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- cache averages in pop and ind objects for reuse
+- add averages of mutations eliminated
 - figure out why average fitness starts to climb after a while
+- figure out what to do about dynamic linkage blocks
+- cache averages in pop and ind objects for reuse
+- use subclasses for Mutation and stop using MutationType
 - can i use interfaces for the non-class model functions?
-- make num offspring proportional to fitness?
-- what is genome_size used for?
-- add tracking id for each mutation?
+- support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
+- what is genome_size used for besides weibull?
+- add tracking id for each mutation
 - review all of mendel fortran help.html
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
-- run with more linkage blocks
  */
 package main
 
@@ -39,12 +41,12 @@ func initialize() *rand.Rand {
 	// Adjust certain config values
 	config.Cfg.Selection.Heritability = math.Max(1.e-20, config.Cfg.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
 	if config.Cfg.Mutations.Fraction_neutral == 0 { config.Cfg.Computation.Track_neutrals = false }   // no neutrals to track
-	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 }
+	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 } 	//todo: we do not honor this yet
 	if config.Cfg.Mutations.Allow_back_mutn { config.Cfg.Computation.Tracking_threshold = 0 }  // If back mutations are allowed, set the tracking threshold to zero so that all mutations are tracked
 
 	// Set all of the function ptrs for the algorithms we want to use.
-	dna.SetAlgorithms(config.Cfg)
-	pop.SetAlgorithms(config.Cfg)
+	dna.SetModels(config.Cfg)
+	pop.SetModels(config.Cfg)
 
 	// Initialize random number generator
 	var uniformRandom *rand.Rand
@@ -56,8 +58,6 @@ func initialize() *rand.Rand {
 
 	// Read restart file, if specified
 	config.ReadRestartFile("")
-
-	//todo: complete this function
 
 	return uniformRandom
 }
