@@ -2,17 +2,18 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- cache averages in pop and ind objects for reuse
+- add averages of mutations eliminated
 - figure out why average fitness starts to climb after a while
+- figure out what to do about dynamic linkage blocks
+- cache averages in pop and ind objects for reuse
+- use subclasses for Mutation and stop using MutationType
 - can i use interfaces for the non-class model functions?
-- make num offspring proportional to fitness?
-- what is genome_size used for?
-- add tracking id for each mutation?
+- support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
+- what is genome_size used for besides weibull?
+- add tracking id for each mutation
 - review all of mendel fortran help.html
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
-- run with more linkage blocks
-- support fitness_dependent_fertility
  */
 package main
 

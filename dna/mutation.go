@@ -6,6 +6,7 @@ import (
 	"math/rand"
 )
 
+//todo: use subclasses for Mutation and stop using this type
 type MutationType uint8
 const (
 	DELETERIOUS MutationType = iota
