@@ -66,9 +66,9 @@ func (m *Mutation) GetFitnessFactor() float64 { return m.fitnessFactor }
 func CalcFitnessFactor(m Mutation, uniformRandom *rand.Rand) (fitnessFactor float64) {
 	switch {
 	case m.mType == DELETERIOUS:
-		fitnessFactor = Alg.CalcDelMutationFitness(m, uniformRandom)
+		fitnessFactor = Mdl.CalcDelMutationFitness(m, uniformRandom)
 	case m.mType == FAVORABLE:
-		fitnessFactor = Alg.CalcFavMutationFitness(m, uniformRandom)
+		fitnessFactor = Mdl.CalcFavMutationFitness(m, uniformRandom)
 	default:
 		// else neutral is 0
 	}

@@ -10,9 +10,9 @@ import (
 
 type RecombinationType uint8
 const (
-	CLONAL RecombinationType = 1
-	//SUPPRESSED RecombinationType = 2   <-- have not needed these yet, uncomment when we do
-	//FULL_SEXUAL RecombinationType = 3
+	//CLONAL RecombinationType = 1   <-- have not needed these yet, uncomment when we do
+	//SUPPRESSED RecombinationType = 2
+	FULL_SEXUAL RecombinationType = 3
 )
 
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
@@ -23,7 +23,7 @@ type Population struct {
 	Indivs []*Individual
 
 	Size uint32 		// the specified size of this population. 0 if no specific size.
-	Num_offspring float64 		// Average number of offspring each individual should have. Calculated from config values Fraction_random_death and Reproductive_rate
+	Num_offspring float64 		// Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
 	ActualAvgOffspring float64 		// The average number of offspring each individual from last generation actually had in this generation
 }
 
@@ -53,18 +53,20 @@ func (p *Population) Initialize() {
 func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
 
 
-// Append adds a person to this population
+// Append adds a person to this population. This is our function (instead of using append() directly, in case in
+// the future we want to allocate additional individuals in bigger chunks for efficiency.
 func (p *Population) Append(indivs ...*Individual) {
 	p.Indivs = append(p.Indivs, indivs ...)
 }
 
 
-// Mate mates all the pairs of the population, combining their linkage blocks randomly and returns the new/resulting population.
+// Mate mates all the pairs of the population, choosing the linkage block at each linkage block position randomly from
+// the mom or dad (as in meiosis), and then returns the new/resulting population.
 // The mating process is:
 // - randomly choose 2 parents
 // - determine number of offspring
 // - for each offspring:
-//   - for each LB position, choose 1 LB from dad and 1 from mom
+//   - for each LB position, choose 1 LB from dad (from either his dad or mom) and 1 LB from mom (from either her dad or mom)
 //   - add new mutations to random LBs
 //   - add offspring to new population
 func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
@@ -100,8 +102,13 @@ func (p *Population) Select() {
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	indexes := p.sortIndexByFitness()
-	numEliminate := uint32(len(indexes)) - p.Size		// if numEliminate is negative, then the following for loop will just do nothing, which is ok
-	for i:=uint32(0); i<numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true } 	// sorted by fitness in ascending order, so mark the 1st ones dead
+	numDead := p.numAlreadyDead(indexes)
+	if numDead > 0 { config.Verbose(3, "%d individuals died (fitness below 0) as a result of mutations added during mating", numDead) }
+	numEliminate := uint32(len(indexes)) - p.Size		// if numEliminate is negative, it is ok, the loop below will not be executed
+	if numDead < numEliminate {
+		// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
+		for i := uint32(0); i < numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true }
+	}
 
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements
 	nextIndex := 0
@@ -117,6 +124,17 @@ func (p *Population) Select() {
 
 	p.Indivs = p.Indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
 
+	return
+}
+
+
+// numAlreadyDead finds how many individuals (if any) have already been marked dead due to their fitness falling below the
+// allowed threshold when mutations were added during mating. They will be at the beginning.
+func (p *Population) numAlreadyDead(sortedIndexes []IndivFit) (numDead uint32) {
+	for _, index := range sortedIndexes {
+		if ! p.Indivs[index.Index].Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
+		numDead++
+	}
 	return
 }
 
@@ -138,7 +156,6 @@ func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness f
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
 func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float64) {
 	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
-	config.Verbose(9, "pop: entering GetMutationStats()")
 	var delet, neut, fav uint32
 	for _, ind := range p.Indivs {
 		d, n, f, avD, avF := ind.GetMutationStats()
@@ -184,7 +201,6 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	var aveFit, minFit, maxFit float64
 	if config.IsVerbose(perGenVerboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
-		config.Verbose(9, "pop: calling GetMutationStats()")
 		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
 		log.Printf("Gen: %d, Pop size: %v, Average num offspring %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit)
 		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)

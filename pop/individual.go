@@ -42,9 +42,9 @@ func IndividualFactory(pop *Population) *Individual{
 
 // Mate combines this person with the specified person to create a list of offspring.
 func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*Individual {
-	if RecombinationType(config.Cfg.Population.Recombination_model) == CLONAL { utils.NotImplementedYet("Do not support CLONAL recombination yet") }
-	actual_offspring := Alg.CalcNumOffspring(ind, uniformRandom)
-	config.Verbose(8, " actual_offspring=%d", actual_offspring)
+	if RecombinationType(config.Cfg.Population.Recombination_model) != FULL_SEXUAL { utils.NotImplementedYet("Recombination models other than FULL_SEXUAL are not yet supported") }
+	actual_offspring := Mdl.CalcNumOffspring(ind, uniformRandom)
+	//config.Verbose(9, " actual_offspring=%d", actual_offspring)
 	offspr := make([]*Individual, actual_offspring)
 	for child:=uint32(0); child<actual_offspring; child++ {
 		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
@@ -57,7 +57,7 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 // We assume ind is the dad and otherInd is the mom.
 func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Rand) *Individual {
 	offspr := IndividualFactory(ind.Pop)
-	//todo: support...
+	//todo: support non dynamic linkage...
 	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
 	//iseg_max := 3
 	//if !config.Cfg.Population.Dynamic_linkage {
@@ -68,12 +68,13 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//chr_length := config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number 		// num LBs in each chromosome
 	//for chr:=1; chr<=config.Cfg.Population.Haploid_chromosome_number; chr++ {
 	for lb:=uint32(0); lb<config.Cfg.Population.Num_linkage_subunits; lb++ {
-		// randomly choose which parent to get the LB from
+		// randomly choose which grandparents to get the LBs from
 		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromDad[lb].Copy()
 		} else {
 			offspr.LinkagesFromDad[lb] = ind.LinkagesFromMom[lb].Copy()
 		}
+
 		if uniformRandom.Intn(2) == 0 {
 			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromDad[lb].Copy()
 		} else {
@@ -82,7 +83,7 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	}
 
 	// Apply new mutations
-	numMutations := Alg.CalcNumMutations(uniformRandom)
+	numMutations := Mdl.CalcNumMutations(uniformRandom)
 	for m:=uint32(1); m<=numMutations; m++ {
 		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB index
 
@@ -97,7 +98,7 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//d, n, f := offspr.GetNumMutations()
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
-	offspr.Fitness = Alg.CalcIndivFitness(offspr) 		// store resulting fitness
+	offspr.Fitness = Mdl.CalcIndivFitness(offspr) 		// store resulting fitness
 	if offspr.Fitness <= 0.0 { offspr.Dead = true }
 
 	return offspr
