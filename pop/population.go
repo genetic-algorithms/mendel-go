@@ -110,19 +110,52 @@ func (p *Population) Select() {
 		for i := uint32(0); i < numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true }
 	}
 
-	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements
+	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
 	nextIndex := 0
+	elimVerboseLevel := uint32(3)            // level at which we will collect and print stats about dead/eliminated individuals
+	var avgDel, avgNeut, avgFav, avgDelFit, avgFavFit, avgFitness, minFitness, maxFitness float64 	// these are stats for dead/eliminated individuals
+	minFitness = 99.0
+	maxFitness = -99.0
+	var numDel, numNeut, numFav uint32
+	numDead = 0
 	for i:=0; i<len(p.Indivs); i++ {
-		if !p.Indivs[i].Dead {
+		ind := p.Indivs[i]
+		if !ind.Dead {
 			if i > nextIndex {
 				// copy it into the next open spot
-				p.Indivs[nextIndex] = p.Indivs[i] 		// I think a shallow copy is ok, we only copy the pointers to the LB arrays
+				p.Indivs[nextIndex] = ind 		// I think a shallow copy is ok, we only copy the pointers to the LB arrays
 			}
+			// else there are no open slots yet, because we have not encountered dead ones yet
 			nextIndex++
+		} else {
+			// This is a dead individual. Capture some stats before we overwrite it.
+			if config.IsVerbose(elimVerboseLevel) {
+				numDead++
+				avgFitness += ind.Fitness
+				if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
+				if ind.Fitness < minFitness { minFitness = ind.Fitness }
+				d, n, f, avD, avF := ind.GetMutationStats()
+				numDel += d
+				numNeut += n
+				numFav += f
+				avgDelFit += float64(d) * avD
+				avgFavFit += float64(f) * avF
+			}
 		}
 	}
 
 	p.Indivs = p.Indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
+
+	// Calculate and print the elimination stats
+	avgFitness = avgFitness / float64(numDead)
+	if numDead > 0 {
+		avgDel = float64(numDel) / float64(numDead)
+		avgNeut = float64(numNeut) / float64(numDead)
+		avgFav = float64(numFav) / float64(numDead)
+	}
+	if numDel > 0 { avgDelFit = avgDelFit / float64(numDel) }
+	if numFav > 0 { avgFavFit = avgFavFit / float64(numFav) }
+	config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v, del fitness: %v, fav fitness: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav, avgDelFit, avgFavFit)
 
 	return
 }
