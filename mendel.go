@@ -2,7 +2,6 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- add averages of mutations eliminated
 - figure out why average fitness starts to climb after a while
 - figure out what to do about dynamic linkage blocks
 - cache averages in pop and ind objects for reuse
@@ -20,9 +19,7 @@ package main
 import (
 	"log"
 	"os"
-
 	// "github.com/davecgh/go-spew/spew"
-
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"math"
