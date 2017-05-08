@@ -12,9 +12,10 @@ import (
 
 // Individual represents 1 organism in the population, tracking its mutations and alleles.
 type Individual struct {
-	Pop *Population
-	Fitness float64
-	Dead bool 		// if true, selection has identified it for elimination
+	Pop             *Population
+	GenoFitness     float64		// fitness due to genomic mutations
+	PhenoFitness     float64		// fitness due to GenoFitness and environmental noise
+	Dead            bool 		// if true, selection has identified it for elimination
 	// we are not currently modeling chromosomes, only a big array of LBs
 	LinkagesFromDad []*dna.LinkageBlock
 	LinkagesFromMom []*dna.LinkageBlock
@@ -102,8 +103,8 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//d, n, f := offspr.GetNumMutations()
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
-	offspr.Fitness = Mdl.CalcIndivFitness(offspr) 		// store resulting fitness
-	if offspr.Fitness <= 0.0 { offspr.Dead = true }
+	offspr.GenoFitness = Mdl.CalcIndivFitness(offspr) 		// store resulting fitness
+	if offspr.GenoFitness <= 0.0 { offspr.Dead = true }
 
 	return offspr
 }
@@ -161,7 +162,7 @@ func CalcPoissonNumMutations (uniformRandom *rand.Rand) uint32 {
 }
 
 
-// Algorithms for aggregating all of the individual's mutation fitness factors into a single pheno fitness value
+// Algorithms for aggregating all of the individual's mutation fitness factors into a single geno fitness value
 type CalcIndivFitnessType func(ind *Individual) float64
 
 // SumIndivFitness adds together the fitness factors of all of the mutations. An individual's fitness starts at 1 and then deleterious
@@ -218,5 +219,5 @@ func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable uint3
 // Report prints out statistics of this individual. If final==true is prints more details.
 func (ind *Individual) Report(_ bool) {
 	deleterious, neutral, favorable, avDelFit, avFavFit := ind.GetMutationStats()
-	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.Fitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
+	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
 }

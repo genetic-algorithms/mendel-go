@@ -59,5 +59,5 @@ func SetModels(c *config.Config) {
 		log.Fatalf("Error: unrecognized value for fitness_effect_model: %v", c.Mutations.Fitness_effect_model)
 	}
 
-	config.Verbose(3, "Running with these dna models: %v", strings.Join(mdlNames, ", "))
+	config.Verbose(2, "Running with these dna models: %v", strings.Join(mdlNames, ", "))
 }

@@ -91,7 +91,7 @@ func main() {
 	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.
 	for gen := config.Restart.Gen_0+1; gen <= config.Cfg.Basic.Num_generations; gen++ {
 		population = population.Mate(uniformRandom)
-		population.Select()
+		population.Select(uniformRandom)
 		population.ReportEachGen(gen)
 	}
 
