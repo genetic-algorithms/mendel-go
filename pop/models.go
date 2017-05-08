@@ -75,5 +75,5 @@ func SetModels(c *config.Config) {
 		log.Fatalf("Error: unrecognized value for mutn_rate_model: %v", c.Mutations.Mutn_rate_model)
 	}
 
-	config.Verbose(3, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
+	config.Verbose(2, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
 }

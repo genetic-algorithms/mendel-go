@@ -6,6 +6,7 @@ import (
 	"sort"
 	"math/rand"
 	"fmt"
+	"math"
 )
 
 type RecombinationType uint8
@@ -25,6 +26,10 @@ type Population struct {
 	Size uint32 		// the specified size of this population. 0 if no specific size.
 	Num_offspring float64 		// Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
 	ActualAvgOffspring float64 		// The average number of offspring each individual from last generation actually had in this generation
+	PreSelGenoFitnessMean float64		// The average fitness of all of the individuals (before selection) due to their genomic mutations
+	PreSelGenoFitnessVariance float64		//
+	PreSelGenoFitnessStDev float64		// The standard deviation from the GenoFitnessMean
+	Noise float64 		// randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
 }
 
 
@@ -92,13 +97,22 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
 
+	newP.PreSelGenoFitnessMean, newP.PreSelGenoFitnessVariance, newP.PreSelGenoFitnessStDev = newP.CalcFitnessStats()
+
 	return newP
 }
 
 
 // Select removes the least fit individuals in the population
-func (p *Population) Select() {
+func (p *Population) Select(uniformRandom *rand.Rand) {
 	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
+
+	// Calculate noise factor to get pheno fitness of each individual
+	herit := config.Cfg.Selection.Heritability
+	p.Noise = math.Sqrt(p.PreSelGenoFitnessVariance * (1.0-herit) / herit + math.Pow(config.Cfg.Selection.Non_scaling_noise,2))
+	for _, ind := range p.Indivs {
+		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * p.Noise
+	}
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	indexes := p.sortIndexByFitness()
@@ -109,15 +123,10 @@ func (p *Population) Select() {
 		// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
 		for i := uint32(0); i < numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true }
 	}
+	p.ReportDeadStats()
 
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
 	nextIndex := 0
-	elimVerboseLevel := uint32(3)            // level at which we will collect and print stats about dead/eliminated individuals
-	var avgDel, avgNeut, avgFav, avgDelFit, avgFavFit, avgFitness, minFitness, maxFitness float64 	// these are stats for dead/eliminated individuals
-	minFitness = 99.0
-	maxFitness = -99.0
-	var numDel, numNeut, numFav uint32
-	numDead = 0
 	for i:=0; i<len(p.Indivs); i++ {
 		ind := p.Indivs[i]
 		if !ind.Dead {
@@ -127,24 +136,59 @@ func (p *Population) Select() {
 			}
 			// else there are no open slots yet, because we have not encountered dead ones yet
 			nextIndex++
-		} else {
-			// This is a dead individual. Capture some stats before we overwrite it.
-			if config.IsVerbose(elimVerboseLevel) {
-				numDead++
-				avgFitness += ind.Fitness
-				if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
-				if ind.Fitness < minFitness { minFitness = ind.Fitness }
-				d, n, f, avD, avF := ind.GetMutationStats()
-				numDel += d
-				numNeut += n
-				numFav += f
-				avgDelFit += float64(d) * avD
-				avgFavFit += float64(f) * avF
-			}
 		}
 	}
 
 	p.Indivs = p.Indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
+
+	return
+}
+
+
+// CalcFitnessStats returns the mean geno fitness and std deviation
+func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
+	// Calc mean (average)
+	for _, ind := range p.Indivs {
+		genoFitnessMean += ind.GenoFitness
+	}
+	genoFitnessMean = genoFitnessMean / float64(p.GetCurrentSize())
+
+	for _, ind := range p.Indivs {
+		genoFitnessVariance += math.Pow(ind.GenoFitness-genoFitnessMean, 2)
+	}
+	genoFitnessVariance = genoFitnessVariance / float64(p.GetCurrentSize())
+	genoFitnessStDev = math.Sqrt(genoFitnessVariance)
+	return
+}
+
+
+// ReportDeadStats reports means of all the individuals that are being eliminated by selection
+func (p *Population) ReportDeadStats() {
+	elimVerboseLevel := uint32(4)            // level at which we will collect and print stats about dead/eliminated individuals
+	if !config.IsVerbose(elimVerboseLevel) { return }
+	var avgDel, avgNeut, avgFav, avgDelFit, avgFavFit, avgFitness, minFitness, maxFitness float64 	// these are stats for dead/eliminated individuals
+	minFitness = 99.0
+	maxFitness = -99.0
+	var numDead, numDel, numNeut, numFav uint32
+	for _, ind := range p.Indivs {
+		if ind.Dead {
+			// This is a dead individual. Capture some stats before we overwrite it.
+			numDead++
+			avgFitness += ind.GenoFitness
+			if ind.GenoFitness > maxFitness {
+				maxFitness = ind.GenoFitness
+			}
+			if ind.GenoFitness < minFitness {
+				minFitness = ind.GenoFitness
+			}
+			d, n, f, avD, avF := ind.GetMutationStats()
+			numDel += d
+			numNeut += n
+			numFav += f
+			avgDelFit += float64(d) * avD
+			avgFavFit += float64(f) * avF
+		}
+	}
 
 	// Calculate and print the elimination stats
 	avgFitness = avgFitness / float64(numDead)
@@ -156,8 +200,6 @@ func (p *Population) Select() {
 	if numDel > 0 { avgDelFit = avgDelFit / float64(numDel) }
 	if numFav > 0 { avgFavFit = avgFavFit / float64(numFav) }
 	config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v, del fitness: %v, fav fitness: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav, avgDelFit, avgFavFit)
-
-	return
 }
 
 
@@ -177,9 +219,11 @@ func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness f
 	minFitness = 99.0
 	maxFitness = -99.0
 	for _, ind := range p.Indivs {
-		averageFitness += ind.Fitness
-		if ind.Fitness > maxFitness { maxFitness = ind.Fitness }
-		if ind.Fitness < minFitness { minFitness = ind.Fitness }
+		averageFitness += ind.GenoFitness
+		if ind.GenoFitness > maxFitness { maxFitness = ind.GenoFitness
+		}
+		if ind.GenoFitness < minFitness { minFitness = ind.GenoFitness
+		}
 	}
 	averageFitness = averageFitness / float64(p.GetCurrentSize())
 	return
@@ -217,7 +261,7 @@ func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit Avg-neut-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness")
+		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit Avg-neut-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
 	}
 }
 
@@ -225,20 +269,23 @@ func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 // Report prints out statistics of this population. If final==true is prints more details.
 func (p *Population) ReportEachGen(genNum uint32) {
 	//todo: for reporting we go thru all individuals and LB multiple times. Make this more efficient
-	perGenVerboseLevel := uint32(3)            // level at which we will print population level info
-	perGenIndivVerboseLevel := uint32(7)    // level at which we will print individual level info
+	verboseLevel := uint32(2)            // level at which we will print population level info
+	indSumVerboseLevel := uint32(3)            // level at which we will print population level info
+	indDetailVerboseLevel := uint32(7)    // level at which we will print individual level info
 	popSize := p.GetCurrentSize()
 
 	// Not final
 	var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
 	var aveFit, minFit, maxFit float64
-	if config.IsVerbose(perGenVerboseLevel) {
+	if config.IsVerbose(verboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
-		log.Printf("Gen: %d, Pop size: %v, Average num offspring %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit)
-		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
+		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.Noise)
+		if config.IsVerbose(indSumVerboseLevel) {
+			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
+		}
 	}
-	if config.IsVerbose(perGenIndivVerboseLevel) {
+	if config.IsVerbose(indDetailVerboseLevel) {
 		log.Println(" Individual Detail:")
 		for _, ind := range p.Indivs { ind.Report(false) }
 	}
@@ -248,7 +295,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
 		if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
 		if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit)
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.Noise)
 		//histWriter.Flush()
 	}
 }
@@ -256,18 +303,24 @@ func (p *Population) ReportEachGen(genNum uint32) {
 
 // Report prints out statistics of this population. If final==true is prints more details.
 func (p *Population) ReportFinal(genNum uint32) {
-	perGenVerboseLevel := uint32(3)            // level at which we will print population level info
-	perGenIndivVerboseLevel := uint32(7)    // level at which we will print individual level info
+	perGenVerboseLevel := uint32(2)            // level at which we already printed this info for each gen
+	finalVerboseLevel := uint32(1)            // level at which we will print population level info
+	perGenIndSumVerboseLevel := uint32(3)            // level at which we will print population level info
+	finalIndSumVerboseLevel := uint32(2)            // level at which we will print population level info
+	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print individual level info
+	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print individual level info
 	popSize := p.GetCurrentSize()
 
-	if !config.IsVerbose(perGenVerboseLevel) {
+	if !config.IsVerbose(perGenVerboseLevel) && config.IsVerbose(finalVerboseLevel) {
 		log.Println("Final report:")
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		log.Printf("After %d generations: Pop size: %v, Average num offspring %v, Indiv avg num mutations: %v, avg fitness: %v, min fitness: %v, max fitness: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit)
-		log.Printf(" Indiv mutation avgs: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
+		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.Noise)
+		if !config.IsVerbose(perGenIndSumVerboseLevel) && config.IsVerbose(finalIndSumVerboseLevel) {
+			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
+		}
 	}
-	if !config.IsVerbose(perGenIndivVerboseLevel) && config.IsVerbose(4) {
+	if !config.IsVerbose(perGenIndDetailVerboseLevel) && config.IsVerbose(finalIndDetailVerboseLevel) {
 		log.Println(" Individual Detail:")
 		for _, i := range p.Indivs {
 			i.Report(true)
@@ -293,7 +346,7 @@ func (p *Population) sortIndexByFitness() []IndivFit {
 	indexes := make([]IndivFit, p.GetCurrentSize())
 	for i := range indexes {
 		indexes[i].Index = uint32(i)
-		indexes[i].Fitness = p.Indivs[i].Fitness
+		indexes[i].Fitness = p.Indivs[i].PhenoFitness
 	}
 
 	sort.Sort(ByFitness(indexes)) 		// sort the indexes according to fitness
@@ -301,7 +354,8 @@ func (p *Population) sortIndexByFitness() []IndivFit {
 	// Output the fitnesses to check them
 	if config.IsVerbose(9) {
 		fitSlice := make([]float64, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
-		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].Fitness }
+		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].PhenoFitness
+		}
 		config.Verbose(9, "fitSlice: %v", fitSlice)
 	}
 
