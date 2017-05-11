@@ -87,7 +87,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
-	for i:=uint32(0); i<p.GetCurrentSize()-1; i=i+2 {
+	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
 		dadI := parentIndices[i]
 		momI := parentIndices[i+1]
 		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], uniformRandom)
@@ -117,17 +117,29 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	indexes := p.sortIndexByFitness()
 	numDead := p.numAlreadyDead(indexes)
-	if numDead > 0 { config.Verbose(3, "%d individuals died (fitness below 0) as a result of mutations added during mating", numDead) }
-	numEliminate := uint32(len(indexes)) - p.Size		// if numEliminate is negative, it is ok, the loop below will not be executed
-	if numDead < numEliminate {
-		// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
-		for i := uint32(0); i < numEliminate; i++ { p.Indivs[indexes[i].Index].Dead = true }
+
+	if numDead > 0 {
+		config.Verbose(3, "%d individuals died (fitness below 0) as a result of mutations added during mating", numDead)
 	}
+
+	currentSize := uint32(len(indexes))
+
+	if currentSize > p.Size {
+		numEliminate := currentSize - p.Size
+
+		if numDead < numEliminate {
+			// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
+			for i := uint32(0); i < numEliminate; i++ {
+				p.Indivs[indexes[i].Index].Dead = true
+			}
+		}
+	}
+
 	p.ReportDeadStats()
 
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
 	nextIndex := 0
-	for i:=0; i<len(p.Indivs); i++ {
+	for i := 0; i < len(p.Indivs); i++ {
 		ind := p.Indivs[i]
 		if !ind.Dead {
 			if i > nextIndex {

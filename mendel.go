@@ -92,6 +92,12 @@ func main() {
 	for gen := config.Restart.Gen_0+1; gen <= config.Cfg.Basic.Num_generations; gen++ {
 		population = population.Mate(uniformRandom)
 		population.Select(uniformRandom)
+
+		if len(population.Indivs) == 0 {
+			log.Println("Population is extinct. Stopping simulation.")
+			break
+		}
+
 		population.ReportEachGen(gen)
 	}
 
