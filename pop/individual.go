@@ -14,7 +14,7 @@ import (
 type Individual struct {
 	Pop             *Population
 	GenoFitness     float64		// fitness due to genomic mutations
-	PhenoFitness     float64		// fitness due to GenoFitness and environmental noise
+	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
 	// we are not currently modeling chromosomes, only a big array of LBs
 	LinkagesFromDad []*dna.LinkageBlock

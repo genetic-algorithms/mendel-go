@@ -50,7 +50,7 @@ var CmdArgs *CommandArgs
 // ReadCmdArgs reads the command line args/flag, checks them, and puts them into the Config struct. Will exit if user input error.
 // This is also the factory method for the CommandArgs class and will store the created instance in this packages CmdArgs var.
 func ReadCmdArgs() {
-	log.Println("Reading command line arguments and flags...") 	// can not use verbosity here because we have not read the config file yet
+	//log.Println("Reading command line arguments and flags...") 	// can not use verbosity here because we have not read the config file yet
 	CmdArgs = &CommandArgs{} 		// create and set the singleton config
 	var useDefaults bool
 	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file")

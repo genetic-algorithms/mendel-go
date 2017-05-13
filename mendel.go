@@ -3,14 +3,17 @@
 
 /* Order of todos:
 - figure out why average fitness starts to climb after a while
-- figure out what to do about dynamic linkage blocks
+- model selection_scheme==2 (unrestricted probability selection, selection.f90, line 521)
+- figure out how to model linkage blocks, chromosomes, and crossover
+- add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
+- integrate with spc again
+- if track_neutrals=false, just maintain neutral count in LB
+- support tracking_threshold to enable larger/faster runs
 - cache averages in pop and ind objects for reuse
 - use subclasses for Mutation and stop using MutationType
 - can i use interfaces for the non-class model functions?
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
-- what is genome_size used for besides weibull?
-- add tracking id for each mutation
-- review all of mendel fortran help.html
+- add tracking id for each mutation?
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - combine mutation effects according to Multiplicative_weighting
  */
@@ -93,7 +96,7 @@ func main() {
 		population = population.Mate(uniformRandom)
 		population.Select(uniformRandom)
 
-		if len(population.Indivs) == 0 {
+		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && len(population.Indivs) < 2) || len(population.Indivs) == 0 {
 			log.Println("Population is extinct. Stopping simulation.")
 			break
 		}
