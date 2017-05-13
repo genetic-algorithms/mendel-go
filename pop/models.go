@@ -20,12 +20,21 @@ const (
 	POISSON_MUTN_RATE MutationRateModelType = "poisson"
 )
 
+type SelectionNoiseModelType string
+const (
+	FULL_TRUNC_SELECTION SelectionNoiseModelType = "fulltrunc"
+	UNRESTRICT_PROB_SELECTION SelectionNoiseModelType = "ups"
+	PROPORT_PROB_SELECTION SelectionNoiseModelType = "spps"
+	PARTIAL_TRUNC_SELECTION SelectionNoiseModelType = "partialtrunc"
+)
+
 
 // Models holds pointers to functions that implement the various algorithms chosen by the input file.
 type Models struct {
 	CalcNumOffspring CalcNumOffspringType
 	CalcIndivFitness CalcIndivFitnessType
 	CalcNumMutations CalcNumMutationsType
+	ApplySelectionNoise ApplySelectionNoiseType
 }
 
 // Mdl is the singleton instance of Models that can be accessed throughout the dna package. It gets set in SetModels().
@@ -73,6 +82,23 @@ func SetModels(c *config.Config) {
 		mdlNames = append(mdlNames, "CalcPoissonNumMutations")
 	default:
 		log.Fatalf("Error: unrecognized value for mutn_rate_model: %v", c.Mutations.Mutn_rate_model)
+	}
+
+	switch {
+	case strings.ToLower(c.Selection.Selection_model) == string(FULL_TRUNC_SELECTION):
+		Mdl.ApplySelectionNoise = ApplyFullTruncationNoise
+		mdlNames = append(mdlNames, "ApplyFullTruncationNoise")
+	case strings.ToLower(c.Selection.Selection_model) == string(UNRESTRICT_PROB_SELECTION):
+		Mdl.ApplySelectionNoise = ApplyUnrestrictProbNoise
+		mdlNames = append(mdlNames, "ApplyUnrestrictProbNoise")
+	case strings.ToLower(c.Selection.Selection_model) == string(PROPORT_PROB_SELECTION):
+		Mdl.ApplySelectionNoise = ApplyProportProbNoise
+		mdlNames = append(mdlNames, "ApplyProportProbNoise")
+	case strings.ToLower(c.Selection.Selection_model) == string(PARTIAL_TRUNC_SELECTION):
+		Mdl.ApplySelectionNoise = ApplyPartialTruncationNoise
+		mdlNames = append(mdlNames, "ApplyPartialTruncationNoise")
+	default:
+		log.Fatalf("Error: unrecognized value for selection_model: %v", c.Selection.Selection_model)
 	}
 
 	config.Verbose(2, "Running with these pop models: %v", strings.Join(mdlNames, ", "))

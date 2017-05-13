@@ -49,7 +49,7 @@ type Config struct {
 		Heritability float64
 		Non_scaling_noise float64
 		Fitness_dependent_fertility bool
-		Selection_scheme int
+		Selection_model string
 		Partial_truncation_value float64
 	}
 	Population struct {

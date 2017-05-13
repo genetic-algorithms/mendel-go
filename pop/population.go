@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"fmt"
 	"math"
+	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
 type RecombinationType uint8
@@ -19,17 +20,15 @@ const (
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
 // like mating and selection.
 type Population struct {
-	//todo: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed
-	//		sex ratio for the population. Only allow opposite sex individuals to mate.
-	Indivs []*Individual
+	Indivs []*Individual		//todo: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
 
-	Size uint32 		// the specified size of this population. 0 if no specific size.
-	Num_offspring float64 		// Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
-	ActualAvgOffspring float64 		// The average number of offspring each individual from last generation actually had in this generation
-	PreSelGenoFitnessMean float64		// The average fitness of all of the individuals (before selection) due to their genomic mutations
-	PreSelGenoFitnessVariance float64		//
-	PreSelGenoFitnessStDev float64		// The standard deviation from the GenoFitnessMean
-	Noise float64 		// randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
+	Size uint32                       // the specified size of this population. 0 if no specific size.
+	Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
+	ActualAvgOffspring        float64 // The average number of offspring each individual from last generation actually had in this generation
+	PreSelGenoFitnessMean     float64 // The average fitness of all of the individuals (before selection) due to their genomic mutations
+	PreSelGenoFitnessVariance float64 //
+	PreSelGenoFitnessStDev    float64 // The standard deviation from the GenoFitnessMean
+	EnvironNoise              float64 // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
 }
 
 
@@ -109,13 +108,11 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 
 	// Calculate noise factor to get pheno fitness of each individual
 	herit := config.Cfg.Selection.Heritability
-	p.Noise = math.Sqrt(p.PreSelGenoFitnessVariance * (1.0-herit) / herit + math.Pow(config.Cfg.Selection.Non_scaling_noise,2))
-	for _, ind := range p.Indivs {
-		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * p.Noise
-	}
+	p.EnvironNoise = math.Sqrt(p.PreSelGenoFitnessVariance * (1.0-herit) / herit + math.Pow(config.Cfg.Selection.Non_scaling_noise,2))
+	Mdl.ApplySelectionNoise(p, p.EnvironNoise, uniformRandom) 		// this sets PhenoFitness in each of the individuals
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
-	indexes := p.sortIndexByFitness()
+	indexes := p.sortIndexByPhenoFitness()
 	numDead := p.numAlreadyDead(indexes)
 
 	if numDead > 0 {
@@ -154,6 +151,56 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	p.Indivs = p.Indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
 
 	return
+}
+
+
+// ApplySelectionNoiseType functions add environmental noise and selection noise to the GenoFitness to set the PhenoFitness of all of the individuals of the population
+type ApplySelectionNoiseType func(p *Population, envNoise float64, uniformRandom *rand.Rand)
+
+// ApplyTruncationNoise only adds environmental noise (no selection noise)
+func ApplyFullTruncationNoise(p *Population, envNoise float64, uniformRandom *rand.Rand) {
+	for _, ind := range p.Indivs {
+		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
+	}
+}
+
+// ApplyUnrestrictProbNoise adds environmental noise and unrestricted probability selection noise
+func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *rand.Rand) {
+	/*
+	For unrestricted probability selection, divide the phenotypic fitness by a uniformly distributed random number prior to
+	ranking and truncation.  This procedure allows the probability of surviving and reproducing in the next generation to be
+	directly related to phenotypic fitness and also for the correct number of individuals to be eliminated to maintain a constant
+	population size.
+	*/
+	for _, ind := range p.Indivs {
+		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
+		ind.PhenoFitness = ind.PhenoFitness / (uniformRandom.Float64() + 1.0e-15)
+	}
+}
+
+// ApplyProportProbNoise adds environmental noise and strict proportionality probability selection noise
+func ApplyProportProbNoise(_ *Population, _ float64, _ *rand.Rand) {
+	/*
+	For strict proportionality probability selection, rescale the phenotypic fitness values such that the maximum value is one.
+	Then divide the scaled phenotypic fitness by a uniformly distributed random number prior to ranking and truncation.
+	Allow only those individuals to reproduce whose resulting ratio of scaled phenotypic fitness to the random number value
+	exceeds one.  This approach ensures that no individual automatically survives to reproduce regardless of the value
+	of the random number.  But it restricts the fraction of the offspring that can survive.  Therefore, when the reproduction
+	rate is low, the number of surviving offspring may not be large enough to sustain a constant population size.
+	 */
+	utils.NotImplementedYet("ApplyProportProbNoise not implemented yet")
+}
+
+// ApplyPartialTruncationNoise adds environmental noise and partial truncation selection noise
+func ApplyPartialTruncationNoise(_ *Population, _ float64, _ *rand.Rand) {
+	/*
+	For partial truncation selection, divide the phenotypic fitness by the sum of theta and (1. - theta) times a random
+	number distributed uniformly between 0.0 and 1.0 prior to ranking and truncation, where theta is the parameter
+	partial_truncation_value.  This selection scheme is intermediate between truncation selection and unrestricted
+	probability selection.  The procedure allows for the correct number of individuals to be eliminated to maintain a constant
+	population size.
+	*/
+	utils.NotImplementedYet("ApplyPartialTruncationNoise not implemented yet")
 }
 
 
@@ -292,7 +339,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	if config.IsVerbose(verboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
-		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.Noise)
+		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.EnvironNoise)
 		if config.IsVerbose(indSumVerboseLevel) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
@@ -307,7 +354,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
 		if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
 		if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.Noise)
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.EnvironNoise)
 		//histWriter.Flush()
 	}
 }
@@ -327,7 +374,7 @@ func (p *Population) ReportFinal(genNum uint32) {
 		log.Println("Final report:")
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.Noise)
+		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.EnvironNoise)
 		if !config.IsVerbose(perGenIndSumVerboseLevel) && config.IsVerbose(finalIndSumVerboseLevel) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 		}
@@ -353,7 +400,7 @@ func (a ByFitness) Less(i, j int) bool { return a[i].Fitness < a[j].Fitness }
 
 
 // sortIndexByFitness sorts the indexes of the individuals according to fitness (in ascending order)
-func (p *Population) sortIndexByFitness() []IndivFit {
+func (p *Population) sortIndexByPhenoFitness() []IndivFit {
 	// Initialize the index array
 	indexes := make([]IndivFit, p.GetCurrentSize())
 	for i := range indexes {
