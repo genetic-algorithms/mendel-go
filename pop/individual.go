@@ -93,11 +93,11 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 		lb := uniformRandom.Intn(int(ind.GetNumLinkages()))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
-		// Note: MutationFactory() chooses deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant rates
+		// Note: AppendMutation() creates a mutation with deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant input parameter rates
 		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromDad[lb].Append(dna.MutationFactory(uniformRandom))
+			offspr.LinkagesFromDad[lb].AppendMutation(uniformRandom)
 		} else {
-			offspr.LinkagesFromMom[lb].Append(dna.MutationFactory(uniformRandom))
+			offspr.LinkagesFromMom[lb].AppendMutation(uniformRandom)
 		}
 	}
 	//d, n, f := offspr.GetNumMutations()
@@ -172,12 +172,12 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 	fitness = 1.0
 	for _, lb := range ind.LinkagesFromDad {
 		// Note: the deleterious mutation fitness factors are already negative
-		for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
-		for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
+		for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	for _, lb := range ind.LinkagesFromMom {
-		for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
-		for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessFactor() } }
+		for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	return
 }

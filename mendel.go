@@ -2,8 +2,6 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- figure out why average fitness starts to climb after a while
-- model selection_scheme==2 (unrestricted probability selection, selection.f90, line 521)
 - figure out how to model linkage blocks, chromosomes, and crossover
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - integrate with spc again
