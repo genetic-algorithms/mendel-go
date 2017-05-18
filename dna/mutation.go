@@ -6,7 +6,6 @@ import (
 	"math/rand"
 )
 
-//todo: use subclasses for Mutation and stop using this type
 type MutationType uint8
 const (
 	DELETERIOUS MutationType = iota
@@ -15,33 +14,35 @@ const (
 )
 
 // Mutation is the base class for all mutation types. It represents 1 mutation in 1 individual.
-// We are depending on mutations being immutable, once created, because we pass them from parent to child.
-// To enforce that, the fields are only available thru getter functions.
+// We depend on mutations being immutable, once created, because we pass them from parent to child.
+// To enforce that, the members are only available thru getter functions.
 type Mutation struct {
-	mType         MutationType
-	dominant      bool    // dominant or recessive mutation
+	//mType         MutationType
+	//dominant      bool    // dominant or recessive mutation <- i do not think i need to save this, because its effect is embodied in expressed
 	expressed     bool    // whether or not this allele is expressed, based on Dominant_hetero_expression and Recessive_hetero_expression
 	fitnessEffect float64 // consider making this float32 to save space
+	//generation uint16	// the generation number in which this mutation was created. Used for statistics of how long the mutations survive in the pop.
 }
 
 // This interface enables us to hold subclasses of Mutation in a variable of the base class
 type Mutator interface {
-	GetMType() MutationType
-	GetDominant() bool
+	//GetMType() MutationType
+	//GetDominant() bool
 	GetExpressed() bool
 	GetFitnessEffect() float64
 }
 
 
 // Member access methods
-func (m *Mutation) GetMType() MutationType { return m.mType }
-func (m *Mutation) GetDominant() bool { return m.dominant }
+//func (m *Mutation) GetMType() MutationType { return m.mType }
+//func (m *Mutation) GetDominant() bool { return m.dominant }
 func (m *Mutation) GetExpressed() bool { return m.expressed }
 func (m *Mutation) GetFitnessEffect() float64 { return m.fitnessEffect
 }
 
 
 // CalcMutationType determines if the next mutation should be deleterious/neutral/favorable based on a random number and the various relevant rates for this population.
+// This is used by the LB to determine which of the Mutation subclasses to create.
 func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 	//m = &Mutation{}
 
@@ -61,12 +62,13 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 }
 
 
-// calcMutationAttrs determines the dominant and expressed attributes of a new mutation, based on a random number and the config params
-func calcMutationAttrs(uniformRandom *rand.Rand) (dominant bool, expressed bool) {
+// calcMutationAttrs determines the dominant and expressed attributes of a new mutation, based on a random number and the config params.
+// This is used in the subclass factories to initialize the base Mutation class members.
+func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
 	//m.fitnessEffect = CalcFitnessEffect(*m, uniformRandom)
 
 	// Determine if this mutation is dominant or recessive
-	dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
+	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
 
 	// Determine if this mutated allele is expressed or not (whether if affects the fitness)
 	rnd := uniformRandom.Float64()
@@ -77,31 +79,6 @@ func calcMutationAttrs(uniformRandom *rand.Rand) (dominant bool, expressed bool)
 	}
 	return
 }
-
-
-// CalcFitnessFactor determines the fitness factor this mutation contributes to the overall individual fitness, using the method specified in the input file.
-// Note: this is not a method of the Mutation object, because that is immutable.
-/*
-func CalcFitnessEffect(m Mutation, uniformRandom *rand.Rand) (fitnessEffect float64) {
-	switch {
-	case m.mType == DELETERIOUS:
-		fitnessFactor = Mdl.CalcDelMutationFitness(m, uniformRandom)
-	case m.mType == FAVORABLE:
-		fitnessFactor = Mdl.CalcFavMutationFitness(m, uniformRandom)
-	default:
-	// else neutral is 0
-	}
-	switch _ := m.(type) {
-	case DeleteriousMutation:
-		fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)
-	case FavorableMutation:
-		fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom)
-	default:
-		// else neutral is 0
-	}
-	return
-}
-*/
 
 
 // These are the different algorithms for assigning a fitness factor to a mutation. Pointers to 2 of them are chosen at initialization time.
@@ -132,15 +109,28 @@ func CalcWeibullFavMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 
 }
 
 
+/* To switch on Mutation subclass, do something like this:
+	switch _ := m.(type) {
+	case DeleteriousMutation:
+		fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)
+	case FavorableMutation:
+		fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom)
+	default:
+		// else neutral is 0
+	}
+*/
+
+
 // DeleteriousMutation represents 1 deleterious mutation in 1 individual.
 type DeleteriousMutation struct {
 	Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func DeleteriousMutationFactory(uniformRandom *rand.Rand) *DeleteriousMutation {
-	m := &DeleteriousMutation{Mutation{mType: DELETERIOUS}}
+	//m := &DeleteriousMutation{Mutation{mType: DELETERIOUS}}
+	m := &DeleteriousMutation{Mutation{}}
 	m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)
-	m.dominant, m.expressed = calcMutationAttrs(uniformRandom)
+	m.expressed = calcMutationAttrs(uniformRandom)
 	return m
 }
 
@@ -150,8 +140,9 @@ type NeutralMutation struct {
 }
 
 func NeutralMutationFactory(uniformRandom *rand.Rand) *NeutralMutation {
-	m := &NeutralMutation{Mutation{mType: NEUTRAL}}
-	m.dominant, m.expressed = calcMutationAttrs(uniformRandom)
+	//m := &NeutralMutation{Mutation{mType: NEUTRAL}}
+	m := &NeutralMutation{Mutation{}}
+	//m.expressed = calcMutationAttrs(uniformRandom)   <-- do not need to calc expressed because neutrals are not considered in fitness calc
 	return m
 }
 
@@ -161,8 +152,9 @@ type FavorableMutation struct {
 }
 
 func FavorableMutationFactory(uniformRandom *rand.Rand) *FavorableMutation {
-	m := &FavorableMutation{Mutation{mType: FAVORABLE}}
+	//m := &FavorableMutation{Mutation{mType: FAVORABLE}}
+	m := &FavorableMutation{Mutation{}}
 	m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom)
-	m.dominant, m.expressed = calcMutationAttrs(uniformRandom)
+	m.expressed = calcMutationAttrs(uniformRandom)
 	return m
 }

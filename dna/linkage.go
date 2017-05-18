@@ -1,6 +1,9 @@
 package dna
 
-import "math/rand"
+import (
+	"math/rand"
+	"bitbucket.org/geneticentropy/mendel-go/config"
+)
 
 // LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB
 // and the cumulative fitness affect on the individual's fitness.
@@ -9,12 +12,13 @@ type LinkageBlock struct {
 	//Mutn []*Mutation
 	DMutn []*DeleteriousMutation
 	NMutn []*NeutralMutation
+	NumNeutrals uint16		// this is used instead of the array above if track_neutrals==false
 	FMutn []*FavorableMutation
 }
 
 
 func LinkageBlockFactory() *LinkageBlock {
-	// Initially there are no mutations??
+	// Initially there are no mutations.
 	// We do not need to initialize the mutn slices, go automatically makes them ready for append()
 	return &LinkageBlock{}
 }
@@ -26,17 +30,23 @@ func (lb *LinkageBlock) Copy() *LinkageBlock {
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	newLb.DMutn = make([]*DeleteriousMutation, len(lb.DMutn)) 	// allocate a new underlying array the same length as the source
 	if len(lb.DMutn) > 0 { copy(newLb.DMutn, lb.DMutn) } 		// this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+
 	newLb.NMutn = make([]*NeutralMutation, len(lb.NMutn))
 	if len(lb.NMutn) > 0 { copy(newLb.NMutn, lb.NMutn) }
+	newLb.NumNeutrals = lb.NumNeutrals
+	//if len(lb.NMutn) > 0 || lb.NumNeutrals > 0 { config.Verbose(3, "inheriting %d neutral mutations and %d num neutral", len(lb.NMutn), lb.NumNeutrals) }
+
 	newLb.FMutn = make([]*FavorableMutation, len(lb.FMutn))
 	if len(lb.FMutn) > 0 { copy(newLb.FMutn, lb.FMutn) }
 	return newLb
 }
 
 
-// GetMutnCount returns the number of mutations currently on this LB
+// GetTotalMutnCount returns the number of mutations currently on this LB
 func (lb *LinkageBlock) GetTotalMutnCount() uint32 {
-	return uint32(len(lb.DMutn)+len(lb.NMutn)+len(lb.FMutn))
+	numNeuts := lb.NumNeutrals
+	if numNeuts == 0 { numNeuts = uint16(len(lb.NMutn)) }		// maybe we are tracking neutrals
+	return uint32(len(lb.DMutn)+int(numNeuts)+len(lb.FMutn))
 }
 
 
@@ -47,32 +57,20 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 	case DELETERIOUS:
 		lb.DMutn = append(lb.DMutn, DeleteriousMutationFactory(uniformRandom))
 	case NEUTRAL:
-		lb.NMutn = append(lb.NMutn, NeutralMutationFactory(uniformRandom))
+		if config.Cfg.Computation.Track_neutrals {
+			//config.Verbose(3, "adding a neutral mutation")
+			lb.NMutn = append(lb.NMutn, NeutralMutationFactory(uniformRandom))
+		} else {
+			//config.Verbose(3, "adding to the neutral mutation count")
+			lb.NumNeutrals++
+		}
 	case FAVORABLE:
 		lb.FMutn = append(lb.FMutn, FavorableMutationFactory(uniformRandom))
 	}
 }
 
 
-/*
-// Append adds a mutations to this LB
-func (lb *LinkageBlock) Append(mutn ...*Mutation) {
-	for _, m := range mutn {
-		switch m.GetMType() {
-		case DELETERIOUS:
-			lb.DMutn = append(lb.DMutn, m)
-		case NEUTRAL:
-			lb.NMutn = append(lb.NMutn, m)
-		case FAVORABLE:
-			lb.FMutn = append(lb.FMutn, m)
-		}
-	}
-	//lb.calcFitness()
-}
-*/
-
-
-/* Not using this, so we can apply the fitness factor aggregation at the individual level...
+/* Not using this, so we can apply the fitness factor aggregation at the individual level, using the appropriate model...
 func (lb *LinkageBlock) GetFitness() (fitness float64) {
 	fitness = 0.0
 	for _, m := range lb.Mutn {
@@ -89,7 +87,8 @@ func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint
 	for _, m := range lb.DMutn { avDelFit += m.GetFitnessEffect() }
 	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) } 		// else avDelFit is already 0.0
 
-	neutral = uint32(len(lb.NMutn))
+	neutral = uint32(lb.NumNeutrals)
+	if neutral == 0 { neutral = uint32(len(lb.NMutn)) }		// maybe we are tracking neutrals
 
 	favorable = uint32(len(lb.FMutn))
 	for _, m := range lb.FMutn { avFavFit += m.GetFitnessEffect() }
