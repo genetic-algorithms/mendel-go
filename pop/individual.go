@@ -172,12 +172,14 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 	fitness = 1.0
 	for _, lb := range ind.LinkagesFromDad {
 		// Note: the deleterious mutation fitness factors are already negative
-		for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
-		for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		fitness += lb.SumFitness()
+		//for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		//for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	for _, lb := range ind.LinkagesFromMom {
-		for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
-		for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		fitness += lb.SumFitness()
+		//for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+		//for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	return
 }
@@ -186,7 +188,7 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 // based on config.Cfg.Mutations.Multiplicative_weighting
 func MultIndivFitness(_ *Individual) (fitness float64) {
 	fitness = 1.0
-	//todo: do not know the exact forumla to use for this yet
+	//todo: do not know the exact formula to use for this yet
 	utils.NotImplementedYet("Multiplicative_weighting not implemented yet")
 	return fitness
 }

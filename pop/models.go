@@ -57,7 +57,6 @@ func SetModels(c *config.Config) {
 	case strings.ToLower(c.Population.Num_offspring_model) == string(FORTRAN_NUM_OFFSPRING):
 		Mdl.CalcNumOffspring = CalcFortranNumOffspring
 		mdlNames = append(mdlNames, "CalcFortranNumOffspring")
-	//todo: this should be dependent on fitness_dependent_fertility or removed that value
 	case strings.ToLower(c.Population.Num_offspring_model) == string(FITNESS_NUM_OFFSPRING):
 		Mdl.CalcNumOffspring = CalcFitnessNumOffspring
 		mdlNames = append(mdlNames, "CalcFitnessNumOffspring")

@@ -21,7 +21,6 @@ type Config struct {
 		Mutn_rate_model string 		// toml does not know how to handle user-defined types like MutationRateModelType
 		Frac_fav_mutn float64
 		Fraction_neutral float64
-		Fitness_distrib_type int
 		Genome_size float64
 		High_impact_mutn_fraction float64
 		High_impact_mutn_threshold float64

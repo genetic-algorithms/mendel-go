@@ -339,7 +339,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	if config.IsVerbose(verboseLevel) {
 		aveFit, minFit, maxFit = p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
-		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.EnvironNoise)
+		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
 		if config.IsVerbose(indSumVerboseLevel) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
@@ -374,7 +374,7 @@ func (p *Population) ReportFinal(genNum uint32) {
 		log.Println("Final report:")
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean num mutations: %v, mean fitness: %v, min fitness: %v, max fitness: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, d+n+f, aveFit, minFit, maxFit, p.EnvironNoise)
+		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
 		if !config.IsVerbose(perGenIndSumVerboseLevel) && config.IsVerbose(finalIndSumVerboseLevel) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
 		}

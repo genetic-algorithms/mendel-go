@@ -41,6 +41,32 @@ func TestMendelCase1(t *testing.T) {
 }
 
 
+// Same as TestMendelCase1 except that none of the mutations are tracked, but the results should be the same.
+func TestMendelCase2(t *testing.T) {
+	num := "2"
+	testCase := "testcase" + num
+	inFileName := "test/input/mendel-" + testCase + ".ini"
+	outFileName := "test/output/" + testCase + "/mendel.hst"
+	expFileName := "test/expected/testcase1/mendel.hst"		// output should be the same as testcase1
+	cmdString := "./mendel-go"
+	cmdFailed := false
+	stdoutBytes, stderrBytes, err := runCmd(t, cmdString, "-f", inFileName)
+	if err != nil {
+		t.Errorf("Error running command %v: %v", cmdString, err)
+		cmdFailed = true
+	}
+
+	if stdoutBytes != nil && cmdFailed { t.Logf("stdout: %s", stdoutBytes) }
+	if stderrBytes != nil && len(stderrBytes) > 0 {
+		t.Logf("stderr: %s", stderrBytes)
+	}
+	if cmdFailed { return }
+
+	// Open the actual and expected the policy files
+	compareFiles(t, outFileName, expFileName)
+}
+
+
 // Run a command with args, and return stdout, stderr
 func runCmd(t *testing.T, commandString string, args ...string) ([]byte, []byte, error) {
 	// For debug, build the full cmd string

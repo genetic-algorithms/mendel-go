@@ -83,12 +83,12 @@ func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
 
 // These are the different algorithms for assigning a fitness factor to a mutation. Pointers to 2 of them are chosen at initialization time.
 type CalcMutationFitnessType func(m Mutator, uniformRandom *rand.Rand) float64
-func CalcFixedDelMutationFitness(_ Mutator, _ *rand.Rand) float64 { return 0.0 - config.Cfg.Mutations.Uniform_fitness_effect_del }
+func CalcFixedDelMutationFitness(_ Mutator, _ *rand.Rand) float64 { return -config.Cfg.Mutations.Uniform_fitness_effect_del }
 func CalcFixedFavMutationFitness(_ Mutator, _ *rand.Rand) float64 { return config.Cfg.Mutations.Uniform_fitness_effect_fav }
 
-// Calculate a random fitness between -0.1 and 0 (deleterious) or 0 and 0.1 (favorable)
-func CalcUniformDelMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 {return 0.0 - (uniformRandom.Float64() / 10) }
-func CalcUniformFavMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 { return uniformRandom.Float64() / 10 }
+// Calculate a random fitness between -Uniform_fitness_effect_del and 0 (deleterious) or 0 and Uniform_fitness_effect_fav (favorable)
+func CalcUniformDelMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 {return -(uniformRandom.Float64() * config.Cfg.Mutations.Uniform_fitness_effect_del) }
+func CalcUniformFavMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 { return uniformRandom.Float64() * config.Cfg.Mutations.Uniform_fitness_effect_fav }
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311
 func CalcWeibullDelMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 {
@@ -99,13 +99,18 @@ func CalcWeibullDelMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 
 	return -math.Exp(-alphaDel * math.Pow(uniformRandom.Float64(), gammaDel))
 }
 
-// Algorithm according to Wes and the Fortran version
+// Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311 and mutation.f90 line 104
 func CalcWeibullFavMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 {
-	alphaFav := math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
+	var alphaFav float64
+	if config.Cfg.Mutations.Max_fav_fitness_gain > 0.0 {
+		alphaFav = math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
+	} else {
+		alphaFav = math.Log(config.Cfg.Mutations.Genome_size)
+	}
 	gammaFav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alphaFav) /
 	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return math.Exp(-alphaFav * math.Pow(uniformRandom.Float64(), gammaFav))
+	return config.Cfg.Mutations.Max_fav_fitness_gain * math.Exp(-alphaFav * math.Pow(uniformRandom.Float64(), gammaFav))
 }
 
 
@@ -129,7 +134,7 @@ type DeleteriousMutation struct {
 func DeleteriousMutationFactory(uniformRandom *rand.Rand) *DeleteriousMutation {
 	//m := &DeleteriousMutation{Mutation{mType: DELETERIOUS}}
 	m := &DeleteriousMutation{Mutation{}}
-	m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)
+	m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)		// should we bother calculating this if expressed==false? Because we currently do not use it in that case.
 	m.expressed = calcMutationAttrs(uniformRandom)
 	return m
 }
@@ -139,7 +144,7 @@ type NeutralMutation struct {
 	Mutation 		// this anonymous reference includes the base class's struct here
 }
 
-func NeutralMutationFactory(uniformRandom *rand.Rand) *NeutralMutation {
+func NeutralMutationFactory(_ *rand.Rand) *NeutralMutation {
 	//m := &NeutralMutation{Mutation{mType: NEUTRAL}}
 	m := &NeutralMutation{Mutation{}}
 	//m.expressed = calcMutationAttrs(uniformRandom)   <-- do not need to calc expressed because neutrals are not considered in fitness calc

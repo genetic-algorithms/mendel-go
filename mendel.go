@@ -2,15 +2,14 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- confirm we do not need to save the dominant property of mutations
-- support tracking_threshold to enable larger/faster runs
+- figure out why weibull in defaults run still rises
 - figure out how to model linkage blocks, chromosomes, and crossover
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
-- add tracking id for each mutation?
 - integrate with spc again
 - cache averages in pop and ind objects for reuse
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
+- Read forsim_complex_example.pdf to make mendel more flexible/customizable
 - combine mutation effects according to Multiplicative_weighting
  */
 package main
@@ -32,13 +31,12 @@ import (
 func initialize() *rand.Rand {
 	config.Verbose(5, "Initializing...\n")
 
-	//todo: support parallel
-
-	// Adjust certain config values
+	// Check and adjust certain config values
 	config.Cfg.Selection.Heritability = math.Max(1.e-20, config.Cfg.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
 	//if config.Cfg.Mutations.Fraction_neutral == 0 { config.Cfg.Computation.Track_neutrals = false }   // do not actually need this
-	if config.Cfg.Computation.Track_neutrals { config.Cfg.Computation.Tracking_threshold = 0 } 	//todo: we do not honor Tracking_threshold yet
-	if config.Cfg.Mutations.Allow_back_mutn { config.Cfg.Computation.Tracking_threshold = 0 }  // If back mutations are allowed, set the tracking threshold to zero so that all mutations are tracked
+	if config.Cfg.Computation.Track_neutrals && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both track_neutrals and a non-zero tracking_threshold.") }
+	if config.Cfg.Mutations.Allow_back_mutn && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
+	if config.Cfg.Mutations.Multiplicative_weighting != 0.0 && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)

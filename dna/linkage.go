@@ -8,12 +8,16 @@ import (
 // LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB
 // and the cumulative fitness affect on the individual's fitness.
 type LinkageBlock struct {
-	//Fitness float64
-	//Mutn []*Mutation
-	DMutn []*DeleteriousMutation
-	NMutn []*NeutralMutation
-	NumNeutrals uint16		// this is used instead of the array above if track_neutrals==false
-	FMutn []*FavorableMutation
+	//TotalFitness float64   // keep a running total of the LB's fitness if the combination model is only additive?
+	DMutn                  []*DeleteriousMutation
+	FMutn                  []*FavorableMutation
+	UntrackedDelFitnessEffect float64 // these 4 members are used instead of some or all of the individual mutations if Tracking_threshold is set
+	UntrackedFavFitnessEffect float64
+	NumUntrackedDeleterious         uint16
+	NumUntrackedFavorable           uint16
+
+	NMutn                  []*NeutralMutation
+	NumUntrackedNeutrals   uint16  // this is used instead of the array above if track_neutrals==false
 }
 
 
@@ -30,23 +34,26 @@ func (lb *LinkageBlock) Copy() *LinkageBlock {
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	newLb.DMutn = make([]*DeleteriousMutation, len(lb.DMutn)) 	// allocate a new underlying array the same length as the source
 	if len(lb.DMutn) > 0 { copy(newLb.DMutn, lb.DMutn) } 		// this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+	newLb.NumUntrackedDeleterious = lb.NumUntrackedDeleterious
+	newLb.UntrackedDelFitnessEffect = lb.UntrackedDelFitnessEffect
 
 	newLb.NMutn = make([]*NeutralMutation, len(lb.NMutn))
 	if len(lb.NMutn) > 0 { copy(newLb.NMutn, lb.NMutn) }
-	newLb.NumNeutrals = lb.NumNeutrals
+	newLb.NumUntrackedNeutrals = lb.NumUntrackedNeutrals
 	//if len(lb.NMutn) > 0 || lb.NumNeutrals > 0 { config.Verbose(3, "inheriting %d neutral mutations and %d num neutral", len(lb.NMutn), lb.NumNeutrals) }
 
 	newLb.FMutn = make([]*FavorableMutation, len(lb.FMutn))
 	if len(lb.FMutn) > 0 { copy(newLb.FMutn, lb.FMutn) }
+	newLb.NumUntrackedFavorable = lb.NumUntrackedFavorable
+	newLb.UntrackedFavFitnessEffect = lb.UntrackedFavFitnessEffect
 	return newLb
 }
 
 
 // GetTotalMutnCount returns the number of mutations currently on this LB
 func (lb *LinkageBlock) GetTotalMutnCount() uint32 {
-	numNeuts := lb.NumNeutrals
-	if numNeuts == 0 { numNeuts = uint16(len(lb.NMutn)) }		// maybe we are tracking neutrals
-	return uint32(len(lb.DMutn)+int(numNeuts)+len(lb.FMutn))
+	// Every mutation added to the LB is either in 1 of the arrays or in 1 of the Untracked vars (but not both), so it is ok to sum them all
+	return uint32(len(lb.DMutn)) + uint32(lb.NumUntrackedDeleterious) + uint32(len(lb.NMutn)) + uint32(lb.NumUntrackedNeutrals) + uint32(len(lb.FMutn)) + uint32(lb.NumUntrackedFavorable)
 }
 
 
@@ -55,43 +62,64 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 	mType := CalcMutationType(uniformRandom)
 	switch mType {
 	case DELETERIOUS:
-		lb.DMutn = append(lb.DMutn, DeleteriousMutationFactory(uniformRandom))
+		mutn := DeleteriousMutationFactory(uniformRandom)
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || mutn.GetFitnessEffect() < -config.Cfg.Computation.Tracking_threshold {
+			lb.DMutn = append(lb.DMutn, mutn)
+		} else {
+			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
+			if mutn.GetExpressed() { lb.UntrackedDelFitnessEffect += mutn.GetFitnessEffect() }
+			lb.NumUntrackedDeleterious++
+		}
+		//lb.DMutn = append(lb.DMutn, DeleteriousMutationFactory(uniformRandom))
 	case NEUTRAL:
 		if config.Cfg.Computation.Track_neutrals {
 			//config.Verbose(3, "adding a neutral mutation")
 			lb.NMutn = append(lb.NMutn, NeutralMutationFactory(uniformRandom))
 		} else {
 			//config.Verbose(3, "adding to the neutral mutation count")
-			lb.NumNeutrals++
+			lb.NumUntrackedNeutrals++
 		}
 	case FAVORABLE:
-		lb.FMutn = append(lb.FMutn, FavorableMutationFactory(uniformRandom))
+		mutn := FavorableMutationFactory(uniformRandom)
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || mutn.GetFitnessEffect() > config.Cfg.Computation.Tracking_threshold {
+			lb.FMutn = append(lb.FMutn, mutn)
+		} else {
+			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
+			if mutn.GetExpressed() { lb.UntrackedFavFitnessEffect += mutn.GetFitnessEffect() }
+			lb.NumUntrackedFavorable++
+		}
+		//lb.FMutn = append(lb.FMutn, FavorableMutationFactory(uniformRandom))
 	}
 }
 
 
-/* Not using this, so we can apply the fitness factor aggregation at the individual level, using the appropriate model...
-func (lb *LinkageBlock) GetFitness() (fitness float64) {
+// SumFitness combines the fitness effect of all of its mutations in the additive method
+func (lb *LinkageBlock) SumFitness() (fitness float64) {
 	fitness = 0.0
-	for _, m := range lb.Mutn {
-		if (m.GetExpressed()) { fitness += m.GetFitnessFactor() }
-	}
+	// Note: the deleterious mutation fitness factors are already negative.
+	// If there are no tracked mutations, this is still ok
+	for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+	for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+	// If there are no untracked mutations, this is still ok
+	fitness += lb.UntrackedDelFitnessEffect + lb.UntrackedFavFitnessEffect
 	return
 }
-*/
 
 
-// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
+// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the mean fitness factor of each.
+// Note: the mean fitnesses take into account whether or not the mutation is expressed, so even for fixed mutation fitness the mean will not be that value.
 func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
-	deleterious = uint32(len(lb.DMutn))
-	for _, m := range lb.DMutn { avDelFit += m.GetFitnessEffect() }
+	//todo: this is only valid for the additive combination method
+	deleterious = uint32(len(lb.DMutn)) + uint32(lb.NumUntrackedDeleterious)
+	for _, m := range lb.DMutn { if (m.GetExpressed()) { avDelFit += m.GetFitnessEffect() } }
+	avDelFit += lb.UntrackedDelFitnessEffect
 	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) } 		// else avDelFit is already 0.0
 
-	neutral = uint32(lb.NumNeutrals)
-	if neutral == 0 { neutral = uint32(len(lb.NMutn)) }		// maybe we are tracking neutrals
+	neutral = uint32(len(lb.NMutn)) + uint32(lb.NumUntrackedNeutrals)
 
-	favorable = uint32(len(lb.FMutn))
-	for _, m := range lb.FMutn { avFavFit += m.GetFitnessEffect() }
+	favorable = uint32(len(lb.FMutn)) + uint32(lb.NumUntrackedFavorable)
+	for _, m := range lb.FMutn { if (m.GetExpressed()) { avFavFit += m.GetFitnessEffect() } }
+	avFavFit += lb.UntrackedFavFitnessEffect
 	if favorable > 0 { avFavFit = avFavFit / float64(favorable) } 		// else avFavFit is already 0.0
 	return
 }
