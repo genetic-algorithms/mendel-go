@@ -47,17 +47,17 @@ func SetModels(c *config.Config) {
 	var mdlNames []string 		// gather the models we use so we can print it out
 
 	// uniform (even distribution), fixed (rounded to nearest int), fortran (what mendel-f90 used), fitness (weighted according to fitness)
-	switch {
-	case strings.ToLower(c.Population.Num_offspring_model) == string(UNIFORM_NUM_OFFSPRING):
+	switch NumOffSpringModelType(strings.ToLower(c.Population.Num_offspring_model)) {
+	case UNIFORM_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcUniformNumOffspring
 		mdlNames = append(mdlNames, "CalcUniformNumOffspring")
-	case strings.ToLower(c.Population.Num_offspring_model) == string(FIXED_NUM_OFFSPRING):
+	case FIXED_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcSemiFixedNumOffspring
 		mdlNames = append(mdlNames, "CalcFixedNumOffspring")
-	case strings.ToLower(c.Population.Num_offspring_model) == string(FORTRAN_NUM_OFFSPRING):
+	case FORTRAN_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcFortranNumOffspring
 		mdlNames = append(mdlNames, "CalcFortranNumOffspring")
-	case strings.ToLower(c.Population.Num_offspring_model) == string(FITNESS_NUM_OFFSPRING):
+	case FITNESS_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcFitnessNumOffspring
 		mdlNames = append(mdlNames, "CalcFitnessNumOffspring")
 	default:
@@ -72,28 +72,28 @@ func SetModels(c *config.Config) {
 		mdlNames = append(mdlNames, "SumIndivFitness")
 	}
 
-	switch {
-	case strings.ToLower(c.Mutations.Mutn_rate_model) == string(FIXED_MUTN_RATE):
+	switch MutationRateModelType(strings.ToLower(c.Mutations.Mutn_rate_model)) {
+	case FIXED_MUTN_RATE:
 		Mdl.CalcNumMutations = CalcSemiFixedNumMutations
 		mdlNames = append(mdlNames, "CalcSemiFixedNumMutations")
-	case strings.ToLower(c.Mutations.Mutn_rate_model) == string(POISSON_MUTN_RATE):
+	case POISSON_MUTN_RATE:
 		Mdl.CalcNumMutations = CalcPoissonNumMutations
 		mdlNames = append(mdlNames, "CalcPoissonNumMutations")
 	default:
 		log.Fatalf("Error: unrecognized value for mutn_rate_model: %v", c.Mutations.Mutn_rate_model)
 	}
 
-	switch {
-	case strings.ToLower(c.Selection.Selection_model) == string(FULL_TRUNC_SELECTION):
+	switch SelectionNoiseModelType(strings.ToLower(c.Selection.Selection_model)) {
+	case FULL_TRUNC_SELECTION:
 		Mdl.ApplySelectionNoise = ApplyFullTruncationNoise
 		mdlNames = append(mdlNames, "ApplyFullTruncationNoise")
-	case strings.ToLower(c.Selection.Selection_model) == string(UNRESTRICT_PROB_SELECTION):
+	case UNRESTRICT_PROB_SELECTION:
 		Mdl.ApplySelectionNoise = ApplyUnrestrictProbNoise
 		mdlNames = append(mdlNames, "ApplyUnrestrictProbNoise")
-	case strings.ToLower(c.Selection.Selection_model) == string(PROPORT_PROB_SELECTION):
+	case PROPORT_PROB_SELECTION:
 		Mdl.ApplySelectionNoise = ApplyProportProbNoise
 		mdlNames = append(mdlNames, "ApplyProportProbNoise")
-	case strings.ToLower(c.Selection.Selection_model) == string(PARTIAL_TRUNC_SELECTION):
+	case PARTIAL_TRUNC_SELECTION:
 		Mdl.ApplySelectionNoise = ApplyPartialTruncationNoise
 		mdlNames = append(mdlNames, "ApplyPartialTruncationNoise")
 	default:

@@ -60,6 +60,7 @@ type Config struct {
 		Max_total_fitness_increase uint32
 		Initial_alleles_pop_frac float64
 		Initial_alleles_amp_factor int
+		Crossover_model string
 		Dynamic_linkage bool
 		Haploid_chromosome_number uint32
 		Num_linkage_subunits uint32

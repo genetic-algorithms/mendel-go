@@ -17,32 +17,41 @@ type Individual struct {
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
 	// we are not currently modeling chromosomes, only a big array of LBs
-	LinkagesFromDad []*dna.LinkageBlock
-	LinkagesFromMom []*dna.LinkageBlock
+	ChromosomesFromDad []*dna.Chromosome
+	ChromosomesFromMom []*dna.Chromosome
+	//LinkagesFromDad []*dna.LinkageBlock
+	//LinkagesFromMom []*dna.LinkageBlock
 }
 
 
-func IndividualFactory(pop *Population) *Individual{
+func IndividualFactory(pop *Population, initialize bool) *Individual{
 	ind := &Individual{
 		Pop: pop,
-		//Chromos: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
-		LinkagesFromDad: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
-		LinkagesFromMom: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
+		ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		//LinkagesFromDad: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
+		//LinkagesFromMom: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
 	}
 	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
 	//		appended to with append(). Altho we will prob eventually want to implement our own append function to do it in bigger chunks.
 	//		See https://blog.golang.org/go-slices-usage-and-internals
 
-	//todo: there is probably a faster way to initialize these arrays
-	for i := range ind.LinkagesFromDad { ind.LinkagesFromDad[i] = dna.LinkageBlockFactory() }
-	for i := range ind.LinkagesFromMom { ind.LinkagesFromMom[i] = dna.LinkageBlockFactory() }
+	// If this is gen 0, initialize with empty chromosomes and linkage blocks (with no mutations).
+	// Otherwise this is an offspring that will get its chromosomes and LBs from meiosis.
+	if initialize {
+		//todo: there is probably a faster way to initialize these arrays
+		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
+		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
+		//for i := range ind.LinkagesFromDad { ind.LinkagesFromDad[i] = dna.LinkageBlockFactory() }
+		//for i := range ind.LinkagesFromMom { ind.LinkagesFromMom[i] = dna.LinkageBlockFactory() }
+	}
 
 	return ind
 }
 
 
-// GetNumLinkages returns the number of linkage blocks from each parent (we assume they always have the same number of LBs frome each parent)
-func (ind *Individual) GetNumLinkages() uint32 { return uint32(len(ind.LinkagesFromDad)) }
+// GetNumChromosomes returns the number of chromosomes from each parent (we assume they always have the same number from each parent)
+func (ind *Individual) GetNumChromosomes() uint32 { return uint32(len(ind.ChromosomesFromDad)) }
 
 
 // Mate combines this person with the specified person to create a list of offspring.
@@ -58,10 +67,9 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 }
 
 
-// Offspring returns 1 offspring of this person and the specified person.
-// We assume ind is the dad and otherInd is the mom.
-func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Rand) *Individual {
-	offspr := IndividualFactory(ind.Pop)
+// Offspring returns 1 offspring of this person (dad) and the specified person (mom).
+func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *Individual {
+	offspr := IndividualFactory(dad.Pop, false)
 	//todo: support non dynamic linkage...
 	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
 	//iseg_max := 3
@@ -70,34 +78,27 @@ func (ind *Individual) OneOffspring(otherInd *Individual, uniformRandom *rand.Ra
 	//}
 
 	// Inherit linkage blocks
-	//chr_length := config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number 		// num LBs in each chromosome
-	//for chr:=1; chr<=config.Cfg.Population.Haploid_chromosome_number; chr++ {
-	for lb:=uint32(0); lb<ind.GetNumLinkages(); lb++ {
-		// randomly choose which grandparents to get the LBs from
-		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromDad[lb] = ind.LinkagesFromDad[lb].Copy()
-		} else {
-			offspr.LinkagesFromDad[lb] = ind.LinkagesFromMom[lb].Copy()
-		}
-
-		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromDad[lb].Copy()
-		} else {
-			offspr.LinkagesFromMom[lb] = otherInd.LinkagesFromMom[lb].Copy()
-		}
+	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
+		// Meiosis() implements the crossover model specified in the config file
+		offspr.ChromosomesFromDad[c] = dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		offspr.ChromosomesFromMom[c] = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
 	}
 
 	// Apply new mutations
 	numMutations := Mdl.CalcNumMutations(uniformRandom)
 	for m:=uint32(1); m<=numMutations; m++ {
-		lb := uniformRandom.Intn(int(ind.GetNumLinkages()))	// choose a random LB index
+		//todo: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes
+		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB within the individual
+		chr := lb / int(dad.Pop.LBsPerChromosome) 		// get the chromosome index
+		lbInChr := lb % int(dad.Pop.LBsPerChromosome)	// get index of LB within the chromosome
+		//lb := uniformRandom.Intn(int(dad.GetNumLinkages()))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: AppendMutation() creates a mutation with deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant input parameter rates
 		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromDad[lb].AppendMutation(uniformRandom)
+			offspr.ChromosomesFromDad[chr].AppendMutation(lbInChr, uniformRandom)
 		} else {
-			offspr.LinkagesFromMom[lb].AppendMutation(uniformRandom)
+			offspr.ChromosomesFromMom[chr].AppendMutation(lbInChr, uniformRandom)
 		}
 	}
 	//d, n, f := offspr.GetNumMutations()
@@ -168,16 +169,16 @@ type CalcIndivFitnessType func(ind *Individual) float64
 // SumIndivFitness adds together the fitness factors of all of the mutations. An individual's fitness starts at 1 and then deleterious
 // mutations subtract from that and favorable mutations add to it. A total fitness of 0 means the individual is dead.
 func SumIndivFitness(ind *Individual) (fitness float64) {
-	// Sum all the LB fitness numbers
+	// Sum all the chromosome fitness numbers
 	fitness = 1.0
-	for _, lb := range ind.LinkagesFromDad {
+	for _, c := range ind.ChromosomesFromDad {
 		// Note: the deleterious mutation fitness factors are already negative
-		fitness += lb.SumFitness()
+		fitness += c.SumFitness()
 		//for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 		//for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
-	for _, lb := range ind.LinkagesFromMom {
-		fitness += lb.SumFitness()
+	for _, c := range ind.ChromosomesFromMom {
+		fitness += c.SumFitness()
 		//for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 		//for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
@@ -197,16 +198,16 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
 func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
-	for _,lb := range ind.LinkagesFromDad {
-		delet, neut, fav, avD, avF := lb.GetMutationStats()
+	for _, c := range ind.ChromosomesFromDad {
+		delet, neut, fav, avD, avF := c.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
 		avDelFit += (float64(delet) * avD)
 		avFavFit += (float64(fav) * avF)
 	}
-	for _,lb := range ind.LinkagesFromMom {
-		delet, neut, fav, avD, avF := lb.GetMutationStats()
+	for _, c := range ind.ChromosomesFromMom {
+		delet, neut, fav, avD, avF := c.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav

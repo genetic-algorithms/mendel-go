@@ -29,6 +29,7 @@ type Population struct {
 	PreSelGenoFitnessVariance float64 //
 	PreSelGenoFitnessStDev    float64 // The standard deviation from the GenoFitnessMean
 	EnvironNoise              float64 // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
+	LBsPerChromosome uint32		// How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
 }
 
 
@@ -42,6 +43,8 @@ func PopulationFactory(initialSize uint32) *Population {
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
 	p.Num_offspring = 2.0 * config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
 
+	p.LBsPerChromosome = uint32(config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number)	// main.initialize() already confirmed it was a clean multiple
+
 	return p
 }
 
@@ -49,7 +52,7 @@ func PopulationFactory(initialSize uint32) *Population {
 // Initialize creates individuals (with no mutations) for the 1st generation
 func (p *Population) Initialize() {
 	//todo: there is probably a faster way to initialize these arrays
-	for i:=uint32(1); i<=p.Size; i++ { p.Append(IndividualFactory(p)) }
+	for i:=uint32(1); i<=p.Size; i++ { p.Append(IndividualFactory(p, true)) }
 }
 
 

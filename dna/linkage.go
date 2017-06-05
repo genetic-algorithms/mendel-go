@@ -28,7 +28,7 @@ func LinkageBlockFactory() *LinkageBlock {
 }
 
 
-// Copy makes a semi-deep copy (copies the array of pointers to mutations, but not the mutations themselves) and returns it
+// Copy makes a semi-deep copy (makes a copy of the array of pointers to mutations, but does *not* copy the mutations themselves, because they are immutable) and returns it
 func (lb *LinkageBlock) Copy() *LinkageBlock {
 	newLb := LinkageBlockFactory()
 	// Assigning a slice does not copy all the array elements, so we have to make that happen

@@ -2,10 +2,10 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- figure out why weibull in defaults run still rises
+- compare results with fortran version to figure out why weibull in defaults run still rises
 - figure out how to model linkage blocks, chromosomes, and crossover
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
-- integrate with spc again
+- integrate with spc again (jon)
 - cache averages in pop and ind objects for reuse
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
@@ -37,6 +37,8 @@ func initialize() *rand.Rand {
 	if config.Cfg.Computation.Track_neutrals && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both track_neutrals and a non-zero tracking_threshold.") }
 	if config.Cfg.Mutations.Allow_back_mutn && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
 	if config.Cfg.Mutations.Multiplicative_weighting != 0.0 && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
+	if (config.Cfg.Population.Num_linkage_subunits % config.Cfg.Population.Haploid_chromosome_number) != 0 { log.Fatalln("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
+
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
