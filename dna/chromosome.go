@@ -41,7 +41,7 @@ func (c *Chromosome) GetNumLinkages() uint32 { return uint32(len(c.LinkageBlocks
 func (dad *Chromosome) Meiosis(mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
 	gamete = Mdl.Crossover(dad, mom, lBsPerChromosome, uniformRandom)
 
-	/* This is what we used to do from individual.OneOffspring(). Keeping it for reference...
+	/* This is what we used to do in individual.OneOffspring(). Keeping it for reference...
 	for lb:=uint32(0); lb< dad.GetNumLinkages(); lb++ {
 		// randomly choose which grandparents to get the LBs from
 		if uniformRandom.Intn(2) == 0 {
