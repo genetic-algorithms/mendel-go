@@ -61,6 +61,8 @@ type Config struct {
 		Initial_alleles_pop_frac float64
 		Initial_alleles_amp_factor int
 		Crossover_model string
+		Mean_num_crossovers uint32
+		Crossover_fraction float64
 		Dynamic_linkage bool
 		Haploid_chromosome_number uint32
 		Num_linkage_subunits uint32

@@ -3,7 +3,6 @@
 
 /* Order of todos:
 - compare results with fortran version to figure out why weibull in defaults run still rises
-- figure out how to model linkage blocks, chromosomes, and crossover
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - integrate with spc again (jon)
 - cache averages in pop and ind objects for reuse

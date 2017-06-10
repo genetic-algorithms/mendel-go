@@ -80,7 +80,9 @@ func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *
 	// Inherit linkage blocks
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
+		config.Verbose(9, "Copying chromosomes from dad...")
 		offspr.ChromosomesFromDad[c] = dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		config.Verbose(9, "Copying chromosomes from mom...")
 		offspr.ChromosomesFromMom[c] = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
 	}
 

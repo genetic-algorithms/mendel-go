@@ -17,6 +17,7 @@ type CrossoverModelType string
 const (
 	NO_CROSSOVER CrossoverModelType = "none"
 	FULL_CROSSOVER CrossoverModelType = "full"
+	PARTIAL_CROSSOVER CrossoverModelType = "partial"
 )
 
 
@@ -73,6 +74,9 @@ func SetModels(c *config.Config) {
 	case FULL_CROSSOVER:
 		Mdl.Crossover = FullCrossover
 		mdlNames = append(mdlNames, "FullCrossover")
+	case PARTIAL_CROSSOVER:
+		Mdl.Crossover = PartialCrossover
+		mdlNames = append(mdlNames, "PartialCrossover")
 	default:
 		log.Fatalf("Error: unrecognized value for crossover_model: %v", c.Population.Crossover_model)
 	}

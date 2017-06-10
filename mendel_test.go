@@ -6,48 +6,39 @@ import (
 	"errors"
 	"io/ioutil"
 	"bytes"
+	"strconv"
+	"os"
 )
 
-
+// Typical small run
 func TestMendelCase1(t *testing.T) {
-	num := "1"
-	testCase := "testcase" + num
-	//t.Logf("Running mendel %v", testCase)
-	inFileName := "test/input/mendel-" + testCase + ".ini"
-	outFileName := "test/output/" + testCase + "/mendel.hst"
-	expFileName := "test/expected/" + testCase + "/mendel.hst"
-	cmdString := "./mendel-go"
-	cmdFailed := false
-	stdoutBytes, stderrBytes, err := runCmd(t, cmdString, "-f", inFileName)
-	if err != nil {
-		t.Errorf("Error running command %v: %v", cmdString, err)
-		cmdFailed = true
-	}
-
-	if stdoutBytes != nil && cmdFailed { t.Logf("stdout: %s", stdoutBytes) }
-	if stderrBytes != nil && len(stderrBytes) > 0 {
-		t.Logf("stderr: %s", stderrBytes)
-	}
-	if cmdFailed { return }
-
-	// Open the actual and expected the policy files
-	compareFiles(t, outFileName, expFileName)
-
-	// read output file
-	//jInbytes, err := ioutil.ReadFile(filename)
-	//if err != nil {
-	//	return nil, nil, errors.New("Unable to read " + filename + " file, error: " + err.Error())
-	//}
+	mendelCase(t, 1, 1)
 }
-
 
 // Same as TestMendelCase1 except that none of the mutations are tracked, but the results should be the same.
 func TestMendelCase2(t *testing.T) {
-	num := "2"
-	testCase := "testcase" + num
+	mendelCase(t, 2, 1)
+}
+
+// Same as TestMendelCase2 except crossover_model=partial and crossover_fraction=0.2
+func TestMendelCase3(t *testing.T) {
+	mendelCase(t, 3, 3)
+}
+
+
+// mendelCase runs a typical test case with an input file number and expected output file number.
+func mendelCase(t *testing.T, num, expNum int) {
+	testCase := "testcase" + strconv.Itoa(num)
+	expTestCase := "testcase" + strconv.Itoa(expNum)		// the number of the expected output file
 	inFileName := "test/input/mendel-" + testCase + ".ini"
-	outFileName := "test/output/" + testCase + "/mendel.hst"
-	expFileName := "test/expected/testcase1/mendel.hst"		// output should be the same as testcase1
+	outFileDir := "test/output/" + testCase
+	outFileName := outFileDir + "/mendel.hst"
+	expFileName := "test/expected/" + expTestCase + "/mendel.hst"
+	if err := os.MkdirAll(outFileDir, 0755); err != nil {
+		t.Errorf("Error creating %v: %v", outFileDir, err)
+		return
+	}
+
 	cmdString := "./mendel-go"
 	cmdFailed := false
 	stdoutBytes, stderrBytes, err := runCmd(t, cmdString, "-f", inFileName)

@@ -86,7 +86,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
-	config.Verbose(9, "parentIndices: %v\n", parentIndices)
+	//config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
@@ -418,7 +418,7 @@ func (p *Population) sortIndexByPhenoFitness() []IndivFit {
 		fitSlice := make([]float64, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
 		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].PhenoFitness
 		}
-		config.Verbose(9, "fitSlice: %v", fitSlice)
+		//config.Verbose(9, "fitSlice: %v", fitSlice)
 	}
 
 	return indexes
