@@ -5,5 +5,8 @@ vendor/
 # Test files
 /test/output/
 
+# Performance profiling output
+/pprof
+
 # Intellij files
 .idea/

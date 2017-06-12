@@ -19,25 +19,17 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
-	"math"
 	"bitbucket.org/geneticentropy/mendel-go/pop"
 	"bitbucket.org/geneticentropy/mendel-go/random"
 	"math/rand"
 	"bitbucket.org/geneticentropy/mendel-go/dna"
+	"github.com/pkg/profile"
+	"strings"
 )
 
 // Initialize initializes variables, objects, and settings for either an initial run or a restart.
 func initialize() *rand.Rand {
 	config.Verbose(5, "Initializing...\n")
-
-	// Check and adjust certain config values
-	config.Cfg.Selection.Heritability = math.Max(1.e-20, config.Cfg.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
-	//if config.Cfg.Mutations.Fraction_neutral == 0 { config.Cfg.Computation.Track_neutrals = false }   // do not actually need this
-	if config.Cfg.Computation.Track_neutrals && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both track_neutrals and a non-zero tracking_threshold.") }
-	if config.Cfg.Mutations.Allow_back_mutn && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
-	if config.Cfg.Mutations.Multiplicative_weighting != 0.0 && config.Cfg.Computation.Tracking_threshold != 0.0 { log.Fatalln("Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
-	if (config.Cfg.Population.Num_linkage_subunits % config.Cfg.Population.Haploid_chromosome_number) != 0 { log.Fatalln("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
-
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
@@ -81,6 +73,18 @@ func main() {
 	} else { config.Usage(0) }
 
 	// Initialize
+	switch strings.ToLower(config.Cfg.Computation.Performance_profile) {
+	case "":
+		// no profiling, do nothing
+	case "cpu":
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath("./pprof")).Stop()
+	case "mem":
+		defer profile.Start(profile.MemProfile, profile.ProfilePath("./pprof")).Stop()
+	case "block":
+		defer profile.Start(profile.BlockProfile, profile.ProfilePath("./pprof")).Stop()
+	default:
+		log.Fatalf("Error: unrecognized value for performance_profile: %v", config.Cfg.Computation.Performance_profile)
+	}
 	uniformRandom := initialize()
 	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 	population.Initialize()

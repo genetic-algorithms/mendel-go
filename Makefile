@@ -1,6 +1,9 @@
 SHELL = /bin/bash -e
 BINARY = mendel-go
 
+# Make will search this relative paths for input and target files
+VPATH=pprof
+
 default: run
 
 $(BINARY): mendel.go */*.go
@@ -8,14 +11,20 @@ $(BINARY): mendel.go */*.go
 	go build
 
 run: $(BINARY)
-	time ./$(BINARY) -f test/input/mendel-case1.ini
+	time ./$? -f test/input/mendel-case1.ini
+
+cpu.pprof: run
+	go tool pprof -text ./$(BINARY) ./pprof/$@
+
+mem.pprof: run
+	go tool pprof -text ./$(BINARY) ./pprof/$@
 
 run-defaults: $(BINARY)
 	time ./$(BINARY) -d
 
 test-main: mendel_test.go $(BINARY)
 	glide --quiet install
-	go test -v mendel_test.go
+	go test -v $<
 
 test-pkgs:
 	glide --quiet install
@@ -24,4 +33,4 @@ test-pkgs:
 clean:
 	go clean
 
-.PHONY: default run run-defaults test-main test-pkgs clean
+.PHONY: default run prof run-defaults test-main test-pkgs clean

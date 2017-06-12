@@ -2,11 +2,13 @@
 package config
 
 import (
-	"github.com/naoina/toml" 		// implementation of TOML we are using to read input files
-	"io/ioutil"
+	//"github.com/naoina/toml" 		// implementation of TOML we are using to read input files
+	"github.com/BurntSushi/toml" 		// implementation of TOML we are using to read input files
+	//"io/ioutil"
 	"log"
 	"errors"
 	"fmt"
+	"math"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -103,6 +105,7 @@ type Config struct {
 		Verbosity uint32
 		Data_file_path string
 		Files_to_output string
+		Performance_profile string
 	}
 }
 
@@ -114,18 +117,37 @@ var Cfg *Config
 // This is also the factory method for the Config class and will store the created instance in this packages Cfg var.
 func ReadFromFile(filename string) error {
 	log.Printf("Reading %v...\n", filename) 	// can not use verbosity here because we have not read the config file yet
-	buf, err := ioutil.ReadFile(filename)
-	if err != nil { return err }
 	Cfg = &Config{} 		// create and set the singleton config
+
+	// 1st read defaults and then apply the specified config file values on top of that
+	/*
+	buf, err := ioutil.ReadFile(DEFAULT_INPUT_FILE)
+	if err != nil { return err }
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+	buf, err = ioutil.ReadFile(filename)
+	if err != nil { return err }
+	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
+	*/
+	if _, err := toml.DecodeFile(DEFAULT_INPUT_FILE, Cfg); err != nil { return err }
+	if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
+
+	if err := Cfg.Validate(); err != nil { log.Fatalln(err) }
 
 	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
-	return Cfg.validate()
+	return nil
 }
 
 // Validate checks the config values to make sure they are valid.
-func (c *Config) validate() error {
+func (c *Config) Validate() error {
+	// Check and adjust certain config values
 	if c.Basic.Pop_size % 2 != 0 { return errors.New("Error: basic.pop_size must be an even number") }
+	c.Selection.Heritability = math.Max(1.e-20, c.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
+	//if c.Mutations.Fraction_neutral == 0 { c.Computation.Track_neutrals = false }   // do not actually need this
+	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { return errors.New("Can not set both track_neutrals and a non-zero tracking_threshold.") }
+	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
+	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
+	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
+
 	return nil
 }
 
