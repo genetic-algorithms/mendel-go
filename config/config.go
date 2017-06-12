@@ -120,7 +120,7 @@ func ReadFromFile(filename string) error {
 	Cfg = &Config{} 		// create and set the singleton config
 
 	// 1st read defaults and then apply the specified config file values on top of that
-	/*
+	/* this is the old code when i was using github.com/naoina/toml ...
 	buf, err := ioutil.ReadFile(DEFAULT_INPUT_FILE)
 	if err != nil { return err }
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
@@ -129,7 +129,9 @@ func ReadFromFile(filename string) error {
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
 	*/
 	if _, err := toml.DecodeFile(DEFAULT_INPUT_FILE, Cfg); err != nil { return err }
-	if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
+	if filename != DEFAULT_INPUT_FILE {
+		if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
+	}
 
 	if err := Cfg.Validate(); err != nil { log.Fatalln(err) }
 
