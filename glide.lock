@@ -1,10 +1,8 @@
-hash: 9ad5c692a9ba5544b5447fce92a593cce5bd36b5e9530743d6a390e7bfc8e07c
-updated: 2017-02-27T03:01:06.662281445-05:00
+hash: 3971c4deb8b674d1ad1e11a28f3e2d510ea52198846adfaa1fdda1bbb08be7b6
+updated: 2017-06-12T22:08:21.198326704-04:00
 imports:
-- name: github.com/naoina/go-stringutil
-  version: 6b638e95a32d0c1131db0e7fe83775cbea4a0d0b
-- name: github.com/naoina/toml
-  version: 751171607256bb66e64c9f0220c00662420c38e9
-  subpackages:
-  - ast
+- name: github.com/BurntSushi/toml
+  version: b26d9c308763d68093482582cea63d69be07a0f0
+- name: github.com/pkg/profile
+  version: 5b67d428864e92711fcbd2f8629456121a56d91f
 testImports: []
