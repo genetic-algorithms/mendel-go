@@ -63,7 +63,7 @@ func main() {
 
 	// Handle the different input file choices
 	if config.CmdArgs.InputFileToCreate != "" {
-		if err := utils.CopyFile(config.DEFAULT_INPUT_FILE, config.CmdArgs.InputFileToCreate); err != nil { log.Fatalln(err) }
+		if err := utils.CopyFile(config.FindDefaultFile(), config.CmdArgs.InputFileToCreate); err != nil { log.Fatalln(err) }
 		os.Exit(0)
 
 	} else if config.CmdArgs.InputFile != ""{

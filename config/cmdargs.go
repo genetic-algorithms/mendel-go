@@ -5,14 +5,15 @@ import (
 	"flag"
 	"os"
 	"fmt"
+	"path/filepath"
 )
 
-const DEFAULT_INPUT_FILE = "./mendel-defaults.ini"
+const DEFAULT_INPUT_FILE = "mendel-defaults.ini"
 
 func Usage(exitCode int) {
 	usageStr1 := `Usage:
-  mendel {-c | -f} [filename]
-  mendel -d
+  mendel {-c | -f} <filename> [-D <defaults-path>]
+  mendel -d [-D <defaults-path>]
 
 Performs a mendel run...
 
@@ -40,7 +41,7 @@ Examples:
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
 type CommandArgs struct {
-	InputFile, InputFileToCreate string
+	InputFile, InputFileToCreate, DefaultFile string
 }
 
 // CmdArgs is the singleton instance of CommandArgs that can be accessed throughout the mendel code.
@@ -53,7 +54,8 @@ func ReadCmdArgs() {
 	//log.Println("Reading command line arguments and flags...") 	// can not use verbosity here because we have not read the config file yet
 	CmdArgs = &CommandArgs{} 		// create and set the singleton config
 	var useDefaults bool
-	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file")
+	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file (backed by the defaults file)")
+	flag.StringVar(&CmdArgs.DefaultFile, "D", "", "Path to the defaults file. If not set, looks for "+DEFAULT_INPUT_FILE+" in the current directory or the directory of the executable")
 	flag.StringVar(&CmdArgs.InputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
 	flag.Usage = func() { Usage(0) }
@@ -66,10 +68,30 @@ func ReadCmdArgs() {
 
 	} else if useDefaults {
 		if CmdArgs.InputFile != "" || CmdArgs.InputFileToCreate != "" { log.Println("Error: if you specify -d you can not specify either -f or -c"); Usage(1) }
-		CmdArgs.InputFile = DEFAULT_INPUT_FILE
+		CmdArgs.InputFile = FindDefaultFile()
 
 	} else if CmdArgs.InputFile != ""{
 		// We already verified inputFileToCreate or useDefaults was not specified with this
 
 	} else { Usage(0) }
+}
+
+
+// FindDefaultFile looks for the defaults input file and returns the 1st one it finds
+func FindDefaultFile() string {
+	// If they explicitly told us on the cmd line where it is use that
+	if CmdArgs.DefaultFile != "" { return CmdArgs.DefaultFile }
+
+	// Check for it in the current directory
+	if _, err := os.Stat(DEFAULT_INPUT_FILE); err == nil { return DEFAULT_INPUT_FILE }
+
+	// Check in the directory this executable came from
+	executableDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil { log.Fatal(err) }
+	defaultFile := executableDir + "/" + DEFAULT_INPUT_FILE
+	if _, err := os.Stat(defaultFile); err == nil {
+		return defaultFile
+	}
+
+	return ""		// could not find it
 }

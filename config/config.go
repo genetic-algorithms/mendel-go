@@ -128,8 +128,10 @@ func ReadFromFile(filename string) error {
 	if err != nil { return err }
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
 	*/
-	if _, err := toml.DecodeFile(DEFAULT_INPUT_FILE, Cfg); err != nil { return err }
-	if filename != DEFAULT_INPUT_FILE {
+	defaultFile := FindDefaultFile()
+	if defaultFile == "" { return errors.New("Error: can not find "+DEFAULT_INPUT_FILE) }
+	if _, err := toml.DecodeFile(defaultFile, Cfg); err != nil { return err }
+	if filename != defaultFile {
 		if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
 	}
 
