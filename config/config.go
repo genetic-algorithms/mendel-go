@@ -172,12 +172,12 @@ func FindDefaultFile() string {
 	if _, err := os.Stat(DEFAULT_INPUT_FILE); err == nil { return DEFAULT_INPUT_FILE }
 	lookedIn := []string{"."}
 
-	executableDir, err := filepath.EvalSymlinks(filepath.Dir(os.Args[0]))
+	canonicalPath, err := filepath.EvalSymlinks(os.Args[0])
 	if err != nil { log.Fatal(err) }
-	executableDir, err = filepath.Abs(executableDir)   // the result of EvalSymlinks can be relative in some situations
+	executableDir, err := filepath.Abs(filepath.Dir(canonicalPath))   // the result of EvalSymlinks can be relative in some situations
 	if err != nil { log.Fatal(err) }
-	defaultFile := executableDir + "/" + DEFAULT_INPUT_FILE
-	if _, err := os.Stat(defaultFile); err == nil { return defaultFile }
+	defaultsFile := executableDir + "/" + DEFAULT_INPUT_FILE
+	if _, err := os.Stat(defaultsFile); err == nil { return defaultsFile }
 	lookedIn = append(lookedIn, executableDir)
 
 	log.Fatalf("Error: can not find %v. Looked in: %v", DEFAULT_INPUT_FILE, strings.Join(lookedIn, " and "))
