@@ -20,7 +20,7 @@ const (
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
 // like mating and selection.
 type Population struct {
-	Indivs []*Individual		//todo: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
+	Indivs []*Individual		// Note: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
 
 	Size uint32                       // the specified size of this population. 0 if no specific size.
 	Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
@@ -51,7 +51,6 @@ func PopulationFactory(initialSize uint32) *Population {
 
 // Initialize creates individuals (with no mutations) for the 1st generation
 func (p *Population) Initialize() {
-	//todo: there is probably a faster way to initialize these arrays
 	for i:=uint32(1); i<=p.Size; i++ { p.Append(IndividualFactory(p, true)) }
 }
 
@@ -60,9 +59,10 @@ func (p *Population) Initialize() {
 func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
 
 
-// Append adds a person to this population. This is our function (instead of using append() directly, in case in
-// the future we want to allocate additional individuals in bigger chunks for efficiency.
+// Append adds a person to this population. This is our function (instead of using append() directly), in case in
+// the future we want to allocate additional individuals in bigger chunks for efficiency. See https://blog.golang.org/go-slices-usage-and-internals
 func (p *Population) Append(indivs ...*Individual) {
+	//todo: ensure the initial make of the Indivs array is big enough that we do not keep copying this array to append
 	p.Indivs = append(p.Indivs, indivs ...)
 }
 

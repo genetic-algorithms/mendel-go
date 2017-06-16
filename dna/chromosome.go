@@ -18,7 +18,7 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 		LinkageBlocks: make([]*LinkageBlock, lBsPerChromosome),
 	}
 
-	if initialize {
+	if initialize {			// first generation
 		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory()	}
 	}
 

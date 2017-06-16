@@ -23,7 +23,9 @@ type LinkageBlock struct {
 
 func LinkageBlockFactory() *LinkageBlock {
 	// Initially there are no mutations.
-	// We do not need to initialize the mutn slices, go automatically makes them ready for append()
+	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
+	//		appended to with append(). Altho we will prob eventually want to implement our own append function to do it in bigger chunks.
+	//		See https://blog.golang.org/go-slices-usage-and-internals
 	return &LinkageBlock{}
 }
 

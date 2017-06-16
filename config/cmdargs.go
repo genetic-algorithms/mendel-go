@@ -5,7 +5,6 @@ import (
 	"flag"
 	"os"
 	"fmt"
-	"path/filepath"
 )
 
 const DEFAULT_INPUT_FILE = "mendel-defaults.ini"
@@ -33,7 +32,7 @@ Examples:
 	fmt.Fprintln(os.Stderr, usageStr2)		// send it to stderr
 	//} else {
 	//	fmt.Println(usageStr1)		// send it to stdout
-	//	flag.PrintDefaults()		//todo: do not yet know how to get this to print to stdout
+	//	flag.PrintDefaults()		// do not yet know how to get this to print to stdout
 	//	fmt.Println(usageStr2)		// send it to stdout
 	//}
 	os.Exit(exitCode)
@@ -74,24 +73,4 @@ func ReadCmdArgs() {
 		// We already verified inputFileToCreate or useDefaults was not specified with this
 
 	} else { Usage(0) }
-}
-
-
-// FindDefaultFile looks for the defaults input file and returns the 1st one it finds
-func FindDefaultFile() string {
-	// If they explicitly told us on the cmd line where it is use that
-	if CmdArgs.DefaultFile != "" { return CmdArgs.DefaultFile }
-
-	// Check for it in the current directory
-	if _, err := os.Stat(DEFAULT_INPUT_FILE); err == nil { return DEFAULT_INPUT_FILE }
-
-	// Check in the directory this executable came from
-	executableDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil { log.Fatal(err) }
-	defaultFile := executableDir + "/" + DEFAULT_INPUT_FILE
-	if _, err := os.Stat(defaultFile); err == nil {
-		return defaultFile
-	}
-
-	return ""		// could not find it
 }

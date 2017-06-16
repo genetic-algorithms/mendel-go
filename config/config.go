@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -116,7 +119,6 @@ var Cfg *Config
 // ReadFromFile reads the specified input file and parses all of the values into the Config struct.
 // This is also the factory method for the Config class and will store the created instance in this packages Cfg var.
 func ReadFromFile(filename string) error {
-	log.Printf("Reading %v...\n", filename) 	// can not use verbosity here because we have not read the config file yet
 	Cfg = &Config{} 		// create and set the singleton config
 
 	// 1st read defaults and then apply the specified config file values on top of that
@@ -130,8 +132,10 @@ func ReadFromFile(filename string) error {
 	*/
 	defaultFile := FindDefaultFile()
 	if defaultFile == "" { return errors.New("Error: can not find "+DEFAULT_INPUT_FILE) }
+	log.Printf("Using defaults file %v\n", defaultFile) 	// can not use verbosity here because we have not read the config file yet
 	if _, err := toml.DecodeFile(defaultFile, Cfg); err != nil { return err }
 	if filename != defaultFile {
+		log.Printf("Using config file %v\n", filename) 	// can not use verbosity here because we have not read the config file yet
 		if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
 	}
 
@@ -153,6 +157,31 @@ func (c *Config) Validate() error {
 	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
 
 	return nil
+}
+
+
+// FindDefaultFile looks for the defaults input file and returns the 1st one it finds. It exists with error if it can't find one.
+func FindDefaultFile() string {
+	// If they explicitly told us on the cmd line where it is use that
+	if CmdArgs.DefaultFile != "" {
+		if _, err := os.Stat(CmdArgs.DefaultFile); err == nil { return CmdArgs.DefaultFile }
+		log.Fatalf("Error: specified defaults file %v does not exist", CmdArgs.DefaultFile)
+	}
+
+	// Check for it in the current directory
+	if _, err := os.Stat(DEFAULT_INPUT_FILE); err == nil { return DEFAULT_INPUT_FILE }
+	lookedIn := []string{"."}
+
+	executableDir, err := filepath.EvalSymlinks(filepath.Dir(os.Args[0]))
+	if err != nil { log.Fatal(err) }
+	executableDir, err = filepath.Abs(executableDir)   // the result of EvalSymlinks can be relative in some situations
+	if err != nil { log.Fatal(err) }
+	defaultFile := executableDir + "/" + DEFAULT_INPUT_FILE
+	if _, err := os.Stat(defaultFile); err == nil { return defaultFile }
+	lookedIn = append(lookedIn, executableDir)
+
+	log.Fatalf("Error: can not find %v. Looked in: %v", DEFAULT_INPUT_FILE, strings.Join(lookedIn, " and "))
+	return ""		// could not find it
 }
 
 /* toml.Marshal writes floats in a long exponention form not convenient

@@ -32,14 +32,10 @@ func IndividualFactory(pop *Population, initialize bool) *Individual{
 		//LinkagesFromDad: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
 		//LinkagesFromMom: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
 	}
-	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
-	//		appended to with append(). Altho we will prob eventually want to implement our own append function to do it in bigger chunks.
-	//		See https://blog.golang.org/go-slices-usage-and-internals
 
 	// If this is gen 0, initialize with empty chromosomes and linkage blocks (with no mutations).
-	// Otherwise this is an offspring that will get its chromosomes and LBs from meiosis.
+	// Otherwise this is an offspring that will get its chromosomes and LBs later from meiosis.
 	if initialize {
-		//todo: there is probably a faster way to initialize these arrays
 		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
 		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
 		//for i := range ind.LinkagesFromDad { ind.LinkagesFromDad[i] = dna.LinkageBlockFactory() }
@@ -70,7 +66,7 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
 func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *Individual {
 	offspr := IndividualFactory(dad.Pop, false)
-	//todo: support non dynamic linkage...
+	//todo: make sure we are covering all of the dynamic_linkage cases. This is from mating.f90, line 335:
 	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
 	//iseg_max := 3
 	//if !config.Cfg.Population.Dynamic_linkage {
@@ -89,7 +85,8 @@ func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *
 	// Apply new mutations
 	numMutations := Mdl.CalcNumMutations(uniformRandom)
 	for m:=uint32(1); m<=numMutations; m++ {
-		//todo: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes
+		// Note: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes.
+		//		Can change this in the future if you want.
 		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB within the individual
 		chr := lb / int(dad.Pop.LBsPerChromosome) 		// get the chromosome index
 		lbInChr := lb % int(dad.Pop.LBsPerChromosome)	// get index of LB within the chromosome
@@ -133,7 +130,7 @@ func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32
 
 // An algorithm taken from the fortran mendel for calculating the number of offspring
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
-	//todo: i do not understand some of this logic, it is from lines 64-73 of mating.f90
+	// I am still not sure about the rationale of some of this logic, it is from lines 64-73 of mating.f90
 	actual_offspring := uint32(ind.Pop.Num_offspring)		// truncate num offspring to integer
 	if ind.Pop.Num_offspring - float64(uint32(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) } 	// assuming this was some special case specific to the fortran implementation

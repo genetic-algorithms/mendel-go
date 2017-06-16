@@ -15,7 +15,7 @@ func ReadRestartFile(filename string) error {
 		Restart = &RestartValues{Gen_0: 0}
 	} else {
 		// Load the restart file
-		log.Fatalln("Error: loading a restart file is not yet supported.")   //todo: support restart file
+		log.Fatalln("Error: loading a restart file is not yet supported.")
 	}
 	return nil
 }
