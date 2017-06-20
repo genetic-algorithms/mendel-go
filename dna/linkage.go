@@ -69,7 +69,7 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 			lb.DMutn = append(lb.DMutn, mutn)
 		} else {
 			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
-			if mutn.GetExpressed() { lb.UntrackedDelFitnessEffect += mutn.GetFitnessEffect() }
+			lb.UntrackedDelFitnessEffect += mutn.GetFitnessEffect()
 			lb.NumUntrackedDeleterious++
 		}
 		//lb.DMutn = append(lb.DMutn, DeleteriousMutationFactory(uniformRandom))
@@ -87,7 +87,7 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 			lb.FMutn = append(lb.FMutn, mutn)
 		} else {
 			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
-			if mutn.GetExpressed() { lb.UntrackedFavFitnessEffect += mutn.GetFitnessEffect() }
+			lb.UntrackedFavFitnessEffect += mutn.GetFitnessEffect()
 			lb.NumUntrackedFavorable++
 		}
 		//lb.FMutn = append(lb.FMutn, FavorableMutationFactory(uniformRandom))
@@ -100,8 +100,8 @@ func (lb *LinkageBlock) SumFitness() (fitness float64) {
 	fitness = 0.0
 	// Note: the deleterious mutation fitness factors are already negative.
 	// If there are no tracked mutations, this is still ok
-	for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
-	for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
+	for _, m := range lb.DMutn { fitness += m.GetFitnessEffect() }
+	for _, m := range lb.FMutn { fitness += m.GetFitnessEffect() }
 	// If there are no untracked mutations, this is still ok
 	fitness += lb.UntrackedDelFitnessEffect + lb.UntrackedFavFitnessEffect
 	return
@@ -113,14 +113,14 @@ func (lb *LinkageBlock) SumFitness() (fitness float64) {
 func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	//todo: this is only valid for the additive combination method
 	deleterious = uint32(len(lb.DMutn)) + uint32(lb.NumUntrackedDeleterious)
-	for _, m := range lb.DMutn { if (m.GetExpressed()) { avDelFit += m.GetFitnessEffect() } }
+	for _, m := range lb.DMutn { avDelFit += m.GetFitnessEffect() }
 	avDelFit += lb.UntrackedDelFitnessEffect
 	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) } 		// else avDelFit is already 0.0
 
 	neutral = uint32(len(lb.NMutn)) + uint32(lb.NumUntrackedNeutrals)
 
 	favorable = uint32(len(lb.FMutn)) + uint32(lb.NumUntrackedFavorable)
-	for _, m := range lb.FMutn { if (m.GetExpressed()) { avFavFit += m.GetFitnessEffect() } }
+	for _, m := range lb.FMutn { avFavFit += m.GetFitnessEffect() }
 	avFavFit += lb.UntrackedFavFitnessEffect
 	if favorable > 0 { avFavFit = avFavFit / float64(favorable) } 		// else avFavFit is already 0.0
 	return

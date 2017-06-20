@@ -323,7 +323,7 @@ func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit Avg-neut-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
+		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
 	}
 }
 

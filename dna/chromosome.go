@@ -119,37 +119,53 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		secondary = dad
 	}
 
-	// Determine number crossovers for this meiosis, between 0 and twice the mean plus 1 (so the average turns out to be Mean_num_crossovers)
-	numCrossovers := uniformRandom.Intn(int(2 * config.Cfg.Population.Mean_num_crossovers) + 1)
+	// Mean_num_crossovers is the average number of crossovers for the chromosome PAIR during Meiosis 1 Metaphase. So for each chromosome (chromotid)
+	// the mean = (Mean_num_crossovers / 2). When determining the actual num crossovers for this instance, we get a random number in the
+	// range: 0 - (2 * mean + 1) which is (2 * Mean_num_crossovers / 2 + 1) which is (Mean_num_crossovers + 1)
+	// To clarify, numCrossovers is the num crossovers in this specific 1 chromosome
+	numCrossovers := uniformRandom.Intn(int(config.Cfg.Population.Mean_num_crossovers) + 1)
 	//todo: track mean of numCrossovers
-	if numCrossovers <= 0 {
+	// For numCrossovers=2 the chromosome would normally look like this :  |  S  |         P         |  S  |
+	// But to make the section sizes of the secondary and primary more similar we will model it like this :  |  P  |  S  |  P  |  S  |
+	// numCrossovers=1 means 2 LB sections, numCrossovers=2 means 3 LB sections, numCrossovers=3 means 5 LB sections
+	var numLbSections int
+	switch {
+	case numCrossovers <= 0:
 		// Handle special case of no crossover - copy all LBs from primary
 		config.Verbose(9, " Copying all LBs from primary")
 		gamete = primary.Copy(lBsPerChromosome)
 		return
+	default:
+		numLbSections = (2 * numCrossovers)
 	}
-	numLbSections := 2 * numCrossovers		// numCrossovers sections for primary, numCrossovers sections for secondary
-	primaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*(1.0-config.Cfg.Population.Crossover_fraction), float64(numCrossovers))	// weight the primary section size to be bigger
-	secondaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*config.Cfg.Population.Crossover_fraction, float64(numCrossovers))
-	config.Verbose(9, " Mean_num_crossovers=%v, numCrossovers=%v, numLbSections=%v, primaryMeanSectionSize=%v, secondaryMeanSectionSize=%v\n", config.Cfg.Population.Mean_num_crossovers, numCrossovers, numLbSections, primaryMeanSectionSize, secondaryMeanSectionSize)
+	//primaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*(1.0-config.Cfg.Population.Crossover_fraction), float64(numCrossovers))	// weight the primary section size to be bigger
+	//secondaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*config.Cfg.Population.Crossover_fraction, float64(numCrossovers))
+	meanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome), float64(numLbSections))
+	config.Verbose(9, " Mean_num_crossovers=%v, numCrossovers=%v, numLbSections=%v, meanSectionSize=%v\n", config.Cfg.Population.Mean_num_crossovers, numCrossovers, numLbSections, meanSectionSize)
 
-	// Copy each LB section
+	// Copy each LB section.
 	begIndex := 0		// points to the beginning of the next LB section
 	maxIndex := int(lBsPerChromosome) - 1	// 0 based
+	parent := primary		// we will alternate between secondary and primary
 	// go 2 at a time thru the sections, 1 for primary, 1 for secondary
-	for section:=1; section<numLbSections; section+=2 {
-		// Copy LB section from primary
+	for section:=1; section<=numLbSections; section++ {
+		// Copy LB section
 		if begIndex > maxIndex { break }
 		var sectionLen int
-		if primaryMeanSectionSize <= 0 {
-			sectionLen = 1
+		if meanSectionSize <= 0 {
+			sectionLen = 1		// because we can not pass 0 into Intn()
 		} else {
-			sectionLen = uniformRandom.Intn(2 * primaryMeanSectionSize) + 1		// randomly choose a length for this section that on average will be meanSectionSize. Should never be 0
+			sectionLen = uniformRandom.Intn(2 * meanSectionSize) + 1		// randomly choose a length for this section that on average will be meanSectionSize. Should never be 0
 		}
 		endIndex := utils.MinInt(begIndex+sectionLen-1, maxIndex)
-		config.Verbose(9, " Copying LBs %v-%v from primary\n", begIndex, endIndex)
-		for lb:=begIndex; lb<=endIndex; lb++ { gamete.LinkageBlocks[lb] = primary.LinkageBlocks[lb].Copy() }
+		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
+		config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
+		for lb:=begIndex; lb<=endIndex; lb++ {
+			//todo: give (transfer ownership) this LB to the child (instead of copy) if it hasn't already been given to another child
+			gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
+		}
 
+		/*
 		// Copy LB section from secondary
 		begIndex = endIndex + 1
 		if begIndex > maxIndex { break }
@@ -162,9 +178,15 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		if section+1 >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		config.Verbose(9, " Copying LBs %v-%v from secondary\n", begIndex, endIndex)
 		for lb:=begIndex; lb<=endIndex; lb++ { gamete.LinkageBlocks[lb] = secondary.LinkageBlocks[lb].Copy() }
+		*/
 
 		// For next iteration
 		begIndex = endIndex + 1
+		if parent == primary {
+			parent = secondary
+		} else {
+			parent = primary
+		}
 	}
 	return
 }

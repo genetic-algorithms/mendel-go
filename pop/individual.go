@@ -66,12 +66,6 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
 func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *Individual {
 	offspr := IndividualFactory(dad.Pop, false)
-	//todo: make sure we are covering all of the dynamic_linkage cases. This is from mating.f90, line 335:
-	// Set the number of segments.  Three linkgage blocks of the chromosome that are involved in the crossover.  Form the gametes chromosome by chromosome.
-	//iseg_max := 3
-	//if !config.Cfg.Population.Dynamic_linkage {
-	//	iseg_max = 1  // can come from any parent
-	//}
 
 	// Inherit linkage blocks
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {

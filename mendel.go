@@ -2,9 +2,15 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- compare results with fortran version to figure out why weibull in defaults run still rises
+- (bruce) Transfer LBs instead of copy when possible
+- (bruce) More plots (9) and more efficient
+- (bruce) selection_model spps and partialtrunc
+- (bruce) Initial alleles and track, deleterious and favorable, send data to bucket-brigade for plotting
+- (jon) Population growth
+- (jon) Tribe
+- (jon) Bottleneck
+- Multiple threads
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
-- integrate with spc again (jon)
 - cache averages in pop and ind objects for reuse
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv

@@ -18,8 +18,8 @@ const (
 // To enforce that, the members are only available thru getter functions.
 type Mutation struct {
 	//mType         MutationType
-	//dominant      bool    // dominant or recessive mutation <- i do not think i need to save this, because its effect is embodied in expressed
-	expressed     bool    // whether or not this allele is expressed, based on Dominant_hetero_expression and Recessive_hetero_expression
+	//dominant      bool    // dominant or recessive mutation <- i do not think i need to save this, because its effect is embodied in expressed. Do we need to save this info??
+	//expressed     bool    // whether or not this allele is expressed, based on Dominant_hetero_expression and Recessive_hetero_expression
 	fitnessEffect float64 // consider making this float32 to save space
 	//generation uint16	// the generation number in which this mutation was created. Used for statistics of how long the mutations survive in the pop.
 }
@@ -28,7 +28,7 @@ type Mutation struct {
 type Mutator interface {
 	//GetMType() MutationType
 	//GetDominant() bool
-	GetExpressed() bool
+	//GetExpressed() bool
 	GetFitnessEffect() float64
 }
 
@@ -36,7 +36,7 @@ type Mutator interface {
 // Member access methods
 //func (m *Mutation) GetMType() MutationType { return m.mType }
 //func (m *Mutation) GetDominant() bool { return m.dominant }
-func (m *Mutation) GetExpressed() bool { return m.expressed }
+//func (m *Mutation) GetExpressed() bool { return m.expressed }
 func (m *Mutation) GetFitnessEffect() float64 { return m.fitnessEffect
 }
 
@@ -64,19 +64,20 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 
 // calcMutationAttrs determines the dominant and expressed attributes of a new mutation, based on a random number and the config params.
 // This is used in the subclass factories to initialize the base Mutation class members.
-func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
+//func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
+func calcMutationAttrs(uniformRandom *rand.Rand) (dominant bool) {
 	//m.fitnessEffect = CalcFitnessEffect(*m, uniformRandom)
 
 	// Determine if this mutation is dominant or recessive
-	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
+	dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
 
 	// Determine if this mutated allele is expressed or not (whether if affects the fitness)
-	rnd := uniformRandom.Float64()
-	if (dominant) {
-		expressed = (rnd < config.Cfg.Mutations.Dominant_hetero_expression)
-	} else {
-		expressed = (rnd < config.Cfg.Mutations.Recessive_hetero_expression)
-	}
+	//rnd := uniformRandom.Float64()
+	//if (dominant) {
+	//	expressed = (rnd < config.Cfg.Mutations.Dominant_hetero_expression)
+	//} else {
+	//	expressed = (rnd < config.Cfg.Mutations.Recessive_hetero_expression)
+	//}
 	return
 }
 
@@ -132,10 +133,13 @@ type DeleteriousMutation struct {
 }
 
 func DeleteriousMutationFactory(uniformRandom *rand.Rand) *DeleteriousMutation {
-	//m := &DeleteriousMutation{Mutation{mType: DELETERIOUS}}
 	m := &DeleteriousMutation{Mutation{}}
-	m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)		// should we bother calculating this if expressed==false? Because we currently do not use it in that case.
-	m.expressed = calcMutationAttrs(uniformRandom)
+	dominant := calcMutationAttrs(uniformRandom)
+	if (dominant) {
+		m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression
+	} else {
+		m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression
+	}
 	return m
 }
 
@@ -145,9 +149,7 @@ type NeutralMutation struct {
 }
 
 func NeutralMutationFactory(_ *rand.Rand) *NeutralMutation {
-	//m := &NeutralMutation{Mutation{mType: NEUTRAL}}
 	m := &NeutralMutation{Mutation{}}
-	//m.expressed = calcMutationAttrs(uniformRandom)   <-- do not need to calc expressed because neutrals are not considered in fitness calc
 	return m
 }
 
@@ -157,9 +159,12 @@ type FavorableMutation struct {
 }
 
 func FavorableMutationFactory(uniformRandom *rand.Rand) *FavorableMutation {
-	//m := &FavorableMutation{Mutation{mType: FAVORABLE}}
 	m := &FavorableMutation{Mutation{}}
-	m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom)
-	m.expressed = calcMutationAttrs(uniformRandom)
+	dominant := calcMutationAttrs(uniformRandom)
+	if (dominant) {
+		m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression
+	} else {
+		m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression
+	}
 	return m
 }
