@@ -135,31 +135,32 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 }
 
 
-// Various algorithms for determining the random number of offspring for an individual
+// Various algorithms for determining the random number of offspring for a mating pair of individuals
 type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) uint32
 
-// A uniform algorithm for calculating the number of offspring that gives an even distribution between 1 and 2*Num_offspring-1
+// A uniform algorithm for calculating the number of offspring that gives an even distribution between 1 and 2*(Num_offspring*2)-1
 func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
-	// If Num_offspring is 4.5, we want a range from 1-8
-	maxRange := (2 * ind.Pop.Num_offspring) - 2 		// subtract 2 to get a buffer of 1 at each end
+	// If (Num_offspring*2) is 4.5, we want a range from 1-8
+	maxRange := (2 * ind.Pop.Num_offspring * 2) - 2 		// subtract 2 to get a buffer of 1 at each end
 	numOffspring := uniformRandom.Float64() * maxRange 		// some float between 0 and maxRange
 	return uint32(random.Round(uniformRandom, numOffspring + 1)) 	// shift it so it is between 1 and maxRange+1, then get to an uint32
 }
 
 
-// Randomly rounds the desired number of offspring to the integer below or above, proportional to how close it is to each (so the resulting average should be Num_offspring)
+// Randomly rounds the desired number of offspring to the integer below or above, proportional to how close it is to each (so the resulting average should be (Num_offspring*2) )
 func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
-	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring))
+	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring*2))
 }
 
 
 // An algorithm taken from the fortran mendel for calculating the number of offspring
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// I am still not sure about the rationale of some of this logic, it is from lines 64-73 of mating.f90
-	actual_offspring := uint32(ind.Pop.Num_offspring)		// truncate num offspring to integer
-	if ind.Pop.Num_offspring - float64(uint32(ind.Pop.Num_offspring)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
+	offspring_per_pair := ind.Pop.Num_offspring * 2
+	actual_offspring := uint32(offspring_per_pair)		// truncate num offspring to integer
+	if offspring_per_pair - float64(uint32(offspring_per_pair)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) } 	// assuming this was some special case specific to the fortran implementation
-	actual_offspring = utils.MinUint32(uint32(ind.Pop.Num_offspring+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(ind.Pop.Num_offspring)+1 or uint32(ind.Pop.Num_offspring)
+	actual_offspring = utils.MinUint32(uint32(offspring_per_pair+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(offspring_per_pair)+1 or uint32(offspring_per_pair)
 	return actual_offspring
 }
 
@@ -168,7 +169,7 @@ func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// in the fortran version this is controlled by fitness_dependent_fertility
 	utils.NotImplementedYet("CalcFitnessNumOffspring not implemented yet")
-	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring))
+	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring*2))
 }
 
 
@@ -209,11 +210,11 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 	return
 }
 
-// MultIndivFitness aggregates the fitness factors of all of the mutations using a combination of additive and mutliplicative,
+// Note implemented yet. MultIndivFitness aggregates the fitness factors of all of the mutations using a combination of additive and mutliplicative,
 // based on config.Cfg.Mutations.Multiplicative_weighting
 func MultIndivFitness(_ *Individual) (fitness float64) {
 	fitness = 1.0
-	//todo: do not know the exact formula to use for this yet
+	// do not know the exact formula to use for this yet
 	utils.NotImplementedYet("Multiplicative_weighting not implemented yet")
 	return fitness
 }

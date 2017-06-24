@@ -2,7 +2,6 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Transfer LBs instead of copy when possible
 - (bruce) More plots (9) and more efficient
 - (bruce) selection_model spps and partialtrunc
 - (bruce) Initial alleles and track, deleterious and favorable, send data to bucket-brigade for plotting
@@ -91,8 +90,8 @@ func main() {
 		log.Fatalf("Error: unrecognized value for performance_profile: %v", config.Cfg.Computation.Performance_profile)
 	}
 	uniformRandom := initialize()
-	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
-	population.Initialize()
+	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size, true) 		// time 0 population
+	//population.Initialize()
 	population.ReportInitial(config.Restart.Gen_0, config.Cfg.Basic.Num_generations)
 
 	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.

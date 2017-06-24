@@ -23,7 +23,8 @@ type Population struct {
 	Indivs []*Individual		// Note: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
 
 	Size uint32                       // the specified size of this population. 0 if no specific size.
-	Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
+	//Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
+	Num_offspring float64             // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
 	ActualAvgOffspring        float64 // The average number of offspring each individual from last generation actually had in this generation
 	PreSelGenoFitnessMean     float64 // The average fitness of all of the individuals (before selection) due to their genomic mutations
 	PreSelGenoFitnessVariance float64 //
@@ -34,24 +35,24 @@ type Population struct {
 
 
 // PopulationFactory creates a new population (either the initial pop, or the next generation).
-func PopulationFactory(initialSize uint32) *Population {
+func PopulationFactory(initialSize uint32, initialize bool) *Population {
 	p := &Population{
 		Indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Size: config.Cfg.Basic.Pop_size,
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
-	p.Num_offspring = 2.0 * config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
+	//p.Num_offspring = 2.0 * config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
+	p.Num_offspring = config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 2
 
 	p.LBsPerChromosome = uint32(config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number)	// main.initialize() already confirmed it was a clean multiple
 
+	if initialize {
+		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
+		for i:=uint32(1); i<=initialSize; i++ { p.Append(IndividualFactory(p, true)) }
+	}
+
 	return p
-}
-
-
-// Initialize creates individuals (with no mutations) for the 1st generation
-func (p *Population) Initialize() {
-	for i:=uint32(1); i<=p.Size; i++ { p.Append(IndividualFactory(p, true)) }
 }
 
 
@@ -62,7 +63,7 @@ func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
 // Append adds a person to this population. This is our function (instead of using append() directly), in case in
 // the future we want to allocate additional individuals in bigger chunks for efficiency. See https://blog.golang.org/go-slices-usage-and-internals
 func (p *Population) Append(indivs ...*Individual) {
-	//todo: ensure the initial make of the Indivs array is big enough that we do not keep copying this array to append
+	// Note: the initial make of the Indivs array is approximately big enough avoid append having to copy the array in most cases
 	p.Indivs = append(p.Indivs, indivs ...)
 }
 
@@ -81,8 +82,9 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
 	// size a little, because we will add individuals with p.Append() anyway.
-	newGenerationSize := uint32((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
-	newP := PopulationFactory(newGenerationSize)
+	//newGenerationSize := uint32((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
+	newGenerationSize := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
+	newP := PopulationFactory(newGenerationSize, false)
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))

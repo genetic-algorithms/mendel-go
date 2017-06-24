@@ -164,7 +164,6 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lb:=begIndex; lb<=endIndex; lb++ {
-			//todo: give (transfer ownership) this LB to the child (instead of copy) if it hasn't already been given to another child
 			//gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
 			parent.LinkageBlocks[lb].Transfer(parent, gamete, lb)
 		}

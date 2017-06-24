@@ -26,8 +26,7 @@ type LinkageBlock struct {
 func LinkageBlockFactory(owner *Chromosome) *LinkageBlock {
 	// Initially there are no mutations.
 	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
-	//		appended to with append(). Altho we will prob eventually want to implement our own append function to do it in bigger chunks.
-	//		See https://blog.golang.org/go-slices-usage-and-internals
+	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
 	return &LinkageBlock{Owner: owner}
 }
 
@@ -80,7 +79,8 @@ func (lb *LinkageBlock) GetTotalMutnCount() uint32 {
 }
 
 
-// AppendMutation creates and adds a mutations to this LB
+// AppendMutation creates and adds a mutations to this LB.
+// Note: The implementation of golang's append() appears to be that if it has to copy the array is doubles the capacity, which is probably what we want for the Mutation arrays.
 func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 	mType := CalcMutationType(uniformRandom)
 	switch mType {
@@ -130,7 +130,7 @@ func (lb *LinkageBlock) SumFitness() (fitness float64) {
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the mean fitness factor of each.
 // Note: the mean fitnesses take into account whether or not the mutation is expressed, so even for fixed mutation fitness the mean will not be that value.
 func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
-	//todo: this is only valid for the additive combination method
+	// Note: this is only valid for the additive combination method
 	deleterious = uint32(len(lb.DMutn)) + uint32(lb.NumUntrackedDeleterious)
 	for _, m := range lb.DMutn { avDelFit += m.GetFitnessEffect() }
 	avDelFit += lb.UntrackedDelFitnessEffect
