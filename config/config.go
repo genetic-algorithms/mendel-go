@@ -109,6 +109,7 @@ type Config struct {
 		Data_file_path string
 		Files_to_output string
 		Performance_profile string
+		Transfer_linkage_blocks bool
 	}
 }
 

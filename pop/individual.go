@@ -53,12 +53,21 @@ func (ind *Individual) GetNumChromosomes() uint32 { return uint32(len(ind.Chromo
 // Mate combines this person with the specified person to create a list of offspring.
 func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*Individual {
 	if RecombinationType(config.Cfg.Population.Recombination_model) != FULL_SEXUAL { utils.NotImplementedYet("Recombination models other than FULL_SEXUAL are not yet supported") }
+
+	// Mate ind and otherInd to create offspring
 	actual_offspring := Mdl.CalcNumOffspring(ind, uniformRandom)
 	//config.Verbose(9, " actual_offspring=%d", actual_offspring)
 	offspr := make([]*Individual, actual_offspring)
 	for child:=uint32(0); child<actual_offspring; child++ {
 		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
 	}
+
+	// Add mutations to each offspring. Note: this is done after mating is completed for these parents, because as an optimization some of the LBs are
+	// just transferred to the child (not copied). If we added mutations during mating, some children could get the same added mutations.
+	for _, child := range offspr {
+		child.AddMutations(ind.Pop.LBsPerChromosome, uniformRandom)
+	}
+
 	return offspr
 }
 
@@ -70,37 +79,59 @@ func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *
 	// Inherit linkage blocks
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
-		config.Verbose(9, "Copying chromosomes from dad...")
+		//config.Verbose(9, "Copying LBs from dad chromosomes %p and %p ...", dad.ChromosomesFromDad[c], dad.ChromosomesFromMom[c])
 		offspr.ChromosomesFromDad[c] = dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
-		config.Verbose(9, "Copying chromosomes from mom...")
+		//config.Verbose(9, "Copying LBs from mom chromosomes %p and %p ...", mom.ChromosomesFromDad[c], mom.ChromosomesFromMom[c])
 		offspr.ChromosomesFromMom[c] = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
 	}
 
+	/*
+	for c := range offspr.ChromosomesFromDad {
+		config.Verbose(9, "Chromosome from dad %v, %p:", c, offspr.ChromosomesFromDad[c])
+		for lb := range offspr.ChromosomesFromDad[c].LinkageBlocks {
+			config.Verbose(9, "  LB %v, %p: %v", lb, offspr.ChromosomesFromDad[c].LinkageBlocks[lb], offspr.ChromosomesFromDad[c].LinkageBlocks[lb])
+		}
+	}
+
+	for c := range offspr.ChromosomesFromMom {
+		config.Verbose(9, "Chromosome from mom %v, %p:", c, offspr.ChromosomesFromMom[c])
+		for lb := range offspr.ChromosomesFromMom[c].LinkageBlocks {
+			config.Verbose(9, "  LB %v, %p: %v", lb, offspr.ChromosomesFromMom[c].LinkageBlocks[lb], offspr.ChromosomesFromMom[c].LinkageBlocks[lb])
+		}
+	}
+	*/
+
+	return offspr
+}
+
+
+// AddMutations adds new mutations to this child right after mating.
+func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *rand.Rand) {
 	// Apply new mutations
 	numMutations := Mdl.CalcNumMutations(uniformRandom)
 	for m:=uint32(1); m<=numMutations; m++ {
 		// Note: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes.
 		//		Can change this in the future if you want.
 		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB within the individual
-		chr := lb / int(dad.Pop.LBsPerChromosome) 		// get the chromosome index
-		lbInChr := lb % int(dad.Pop.LBsPerChromosome)	// get index of LB within the chromosome
+		chr := lb / int(lBsPerChromosome) 		// get the chromosome index
+		lbInChr := lb % int(lBsPerChromosome)	// get index of LB within the chromosome
 		//lb := uniformRandom.Intn(int(dad.GetNumLinkages()))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: AppendMutation() creates a mutation with deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant input parameter rates
 		if uniformRandom.Intn(2) == 0 {
-			offspr.ChromosomesFromDad[chr].AppendMutation(lbInChr, uniformRandom)
+			child.ChromosomesFromDad[chr].AppendMutation(lbInChr, uniformRandom)
 		} else {
-			offspr.ChromosomesFromMom[chr].AppendMutation(lbInChr, uniformRandom)
+			child.ChromosomesFromMom[chr].AppendMutation(lbInChr, uniformRandom)
 		}
 	}
 	//d, n, f := offspr.GetNumMutations()
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
-	offspr.GenoFitness = Mdl.CalcIndivFitness(offspr) 		// store resulting fitness
-	if offspr.GenoFitness <= 0.0 { offspr.Dead = true }
+	child.GenoFitness = Mdl.CalcIndivFitness(child) 		// store resulting fitness
+	if child.GenoFitness <= 0.0 { child.Dead = true }
 
-	return offspr
+	return
 }
 
 

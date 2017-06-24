@@ -15,7 +15,6 @@
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
 - Read forsim_complex_example.pdf to make mendel more flexible/customizable
-- combine mutation effects according to Multiplicative_weighting
  */
 package main
 

@@ -19,7 +19,7 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 	}
 
 	if initialize {			// first generation
-		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory()	}
+		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c)	}
 	}
 
 	return c
@@ -30,7 +30,8 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
 	for lb := range c.LinkageBlocks {
-		newChr.LinkageBlocks[lb] = c.LinkageBlocks[lb].Copy()
+		//newChr.LinkageBlocks[lb] = c.LinkageBlocks[lb].Copy()
+		c.LinkageBlocks[lb].Transfer(c, newChr, lb)
 	}
 	return
 }
@@ -41,7 +42,7 @@ func (c *Chromosome) GetNumLinkages() uint32 { return uint32(len(c.LinkageBlocks
 
 
 // Meiosis creates and returns a chromosome as part of reproduction by implementing the crossover model specified in the config file.
-// This is the Chromosome class version of Copy().
+// This is 1 form of Copy() for the Chromosome class.
 func (dad *Chromosome) Meiosis(mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
 	gamete = Mdl.Crossover(dad, mom, lBsPerChromosome, uniformRandom)
 
@@ -92,11 +93,13 @@ func NoCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, unif
 func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
 	gamete = ChromosomeFactory(lBsPerChromosome, false)
 	// Each LB can come from either dad or mom
-	for lb:=uint32(0); lb< dad.GetNumLinkages(); lb++ {
+	for lb:=0; lb<int(dad.GetNumLinkages()); lb++ {
 		if uniformRandom.Intn(2) == 0 {
-			gamete.LinkageBlocks[lb] = dad.LinkageBlocks[lb].Copy()
+			//gamete.LinkageBlocks[lb] = dad.LinkageBlocks[lb].Copy()
+			dad.LinkageBlocks[lb].Transfer(dad, gamete, lb)
 		} else {
-			gamete.LinkageBlocks[lb] = mom.LinkageBlocks[lb].Copy()
+			//gamete.LinkageBlocks[lb] = mom.LinkageBlocks[lb].Copy()
+			mom.LinkageBlocks[lb].Transfer(mom, gamete, lb)
 		}
 	}
 	return
@@ -162,7 +165,8 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lb:=begIndex; lb<=endIndex; lb++ {
 			//todo: give (transfer ownership) this LB to the child (instead of copy) if it hasn't already been given to another child
-			gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
+			//gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
+			parent.LinkageBlocks[lb].Transfer(parent, gamete, lb)
 		}
 
 		/*

@@ -18,21 +18,42 @@ type LinkageBlock struct {
 
 	NMutn                  []*NeutralMutation
 	NumUntrackedNeutrals   uint16  // this is used instead of the array above if track_neutrals==false
+
+	Owner *Chromosome		// keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
 
 
-func LinkageBlockFactory() *LinkageBlock {
+func LinkageBlockFactory(owner *Chromosome) *LinkageBlock {
 	// Initially there are no mutations.
 	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
 	//		appended to with append(). Altho we will prob eventually want to implement our own append function to do it in bigger chunks.
 	//		See https://blog.golang.org/go-slices-usage-and-internals
-	return &LinkageBlock{}
+	return &LinkageBlock{Owner: owner}
+}
+
+
+// Transfer will give the "to" chromosome (of the child) the equivalent LB, by just transferring ownership of this LB instance (if it has not already given it
+// to another child), or by copying the LB if it must. The reason transfer of ownership to a child is ok is once this function is called, the "from" chromosome (the parent) will
+// never do anything with this LB again, except maybe copy the contents to another child. From this perspective, it is also important that
+// the children of these parents not do anything with their LBs until the parents are done creating all of their children.
+func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) {
+	if lb.Owner == from && config.Cfg.Computation.Transfer_linkage_blocks {
+		// "From" still owns this LB, so it is his to give away
+		config.Verbose(5, " Transferring ownership of LB %p from %p to %p", lb, from, to)
+		to.LinkageBlocks[lbIndex] = lb
+		lb.Owner = to
+	} else {
+		// This LB has already been given away to another offspring, so need to make a copy
+		//config.Verbose(2, "copying LB")
+		to.LinkageBlocks[lbIndex] = lb.Copy(to)
+		// maybe try moving Copy() contents here to avoid another function call
+	}
 }
 
 
 // Copy makes a semi-deep copy (makes a copy of the array of pointers to mutations, but does *not* copy the mutations themselves, because they are immutable) and returns it
-func (lb *LinkageBlock) Copy() *LinkageBlock {
-	newLb := LinkageBlockFactory()
+func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
+	newLb := LinkageBlockFactory(owner)
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	newLb.DMutn = make([]*DeleteriousMutation, len(lb.DMutn)) 	// allocate a new underlying array the same length as the source
 	if len(lb.DMutn) > 0 { copy(newLb.DMutn, lb.DMutn) } 		// this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
@@ -72,7 +93,6 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 			lb.UntrackedDelFitnessEffect += mutn.GetFitnessEffect()
 			lb.NumUntrackedDeleterious++
 		}
-		//lb.DMutn = append(lb.DMutn, DeleteriousMutationFactory(uniformRandom))
 	case NEUTRAL:
 		if config.Cfg.Computation.Track_neutrals {
 			//config.Verbose(3, "adding a neutral mutation")
@@ -90,7 +110,6 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 			lb.UntrackedFavFitnessEffect += mutn.GetFitnessEffect()
 			lb.NumUntrackedFavorable++
 		}
-		//lb.FMutn = append(lb.FMutn, FavorableMutationFactory(uniformRandom))
 	}
 }
 
