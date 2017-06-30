@@ -140,9 +140,9 @@ func ReadFromFile(filename string) error {
 		if _, err := toml.DecodeFile(filename, Cfg); err != nil { return err }
 	}
 
-	if err := Cfg.Validate(); err != nil { log.Fatalln(err) }
-
 	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
+
+	if err := Cfg.Validate(); err != nil { log.Fatalln(err) }
 	return nil
 }
 
@@ -155,6 +155,9 @@ func (c *Config) Validate() error {
 	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { return errors.New("Can not set both track_neutrals and a non-zero tracking_threshold.") }
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
+
+	if c.Computation.Tracking_threshold >= 1.0 && c.Computation.Plot_allele_gens > 0 { return errors.New("No alleles will be plotted when tracking_threshold >= 1.0") }
+
 	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
 
 	return nil

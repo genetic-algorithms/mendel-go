@@ -2,9 +2,10 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) More plots (9) and more efficient
-- (bruce) selection_model spps and partialtrunc
+- (bruce) Allele plots data (9)
+- (bruce) selection_model spps and partialtrunc and compare runs with mendel-f90
 - (bruce) Initial alleles and track, deleterious and favorable, send data to bucket-brigade for plotting
+- (bruce) Increase number of automated tests
 - (jon) Population growth
 - (jon) Tribe
 - (jon) Bottleneck
@@ -108,6 +109,6 @@ func main() {
 	}
 
 	// Finish up
-	population.ReportFinal(config.Cfg.Basic.Num_generations)
+	//population.ReportFinal(config.Cfg.Basic.Num_generations)
 	shutdown()
 }

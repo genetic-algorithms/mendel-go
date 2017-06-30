@@ -32,6 +32,14 @@ type Mutator interface {
 	GetFitnessEffect() float64
 }
 
+// All the alleles for 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
+type Alleles struct {
+	GenerationNumber     uint32     `json:"generationNumber"`
+	Deleterious         []uintptr `json:"deleterious"`
+	Neutral         []uintptr `json:"neutral"`
+	Favorable         []uintptr `json:"favorable"`
+}
+
 
 // Member access methods
 //func (m *Mutation) GetMType() MutationType { return m.mType }

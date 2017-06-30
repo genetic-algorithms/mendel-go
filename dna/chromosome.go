@@ -197,6 +197,8 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 
 // AppendMutation creates and adds a mutations to the LB specified
 func (c *Chromosome) AppendMutation(lbInChr int, uniformRandom *rand.Rand) {
+	// Note: to try to save time, we could accumulate the chromosome fitness as we go, but doing so would bypass the LB method
+	//		of calculating its own fitness, so we won't do that.
 	c.LinkageBlocks[lbInChr].AppendMutation(uniformRandom)
 }
 
@@ -205,6 +207,7 @@ func (c *Chromosome) SumFitness() (fitness float64) {
 	for _, lb := range c.LinkageBlocks {
 		fitness += lb.SumFitness()
 	}
+	// Note: we don't bother caching the fitness in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
 }
 
@@ -222,5 +225,12 @@ func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable uint32,
 	}
 	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
 	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
+	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
+}
+
+
+// GatherAlleles adds all of this chromosome's alleles to the given struct
+func (c *Chromosome) GatherAlleles(alleles *Alleles) {
+	for _, lb := range c.LinkageBlocks { lb.GatherAlleles(alleles) }
 }

@@ -16,7 +16,10 @@ type Individual struct {
 	GenoFitness     float64		// fitness due to genomic mutations
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
-	// we are not currently modeling chromosomes, only a big array of LBs
+
+	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
+	MeanDelFit, MeanFavFit float64
+
 	ChromosomesFromDad []*dna.Chromosome
 	ChromosomesFromMom []*dna.Chromosome
 	//LinkagesFromDad []*dna.LinkageBlock
@@ -207,6 +210,7 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 		//for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 		//for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
+	// Note: AddMutations() will cache the fitness
 	return
 }
 
@@ -220,29 +224,40 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 }
 
 
-// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (ind *Individual) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
+// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of deleterious and favorable
+func (ind *Individual) GetMutationStats() (uint32, uint32, uint32, float64, float64) {
+	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
+	if ind.NumDeleterious > 0 && ind.MeanDelFit > 0.0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit	}
+
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _, c := range ind.ChromosomesFromDad {
 		delet, neut, fav, avD, avF := c.GetMutationStats()
-		deleterious += delet
-		neutral += neut
-		favorable += fav
-		avDelFit += (float64(delet) * avD)
-		avFavFit += (float64(fav) * avF)
+		ind.NumDeleterious += delet
+		ind.NumNeutral += neut
+		ind.NumFavorable += fav
+		ind.MeanDelFit += (float64(delet) * avD)
+		ind.MeanFavFit += (float64(fav) * avF)
 	}
 	for _, c := range ind.ChromosomesFromMom {
 		delet, neut, fav, avD, avF := c.GetMutationStats()
-		deleterious += delet
-		neutral += neut
-		favorable += fav
-		avDelFit += (float64(delet) * avD)
-		avFavFit += (float64(fav) * avF)
+		ind.NumDeleterious += delet
+		ind.NumNeutral += neut
+		ind.NumFavorable += fav
+		ind.MeanDelFit += (float64(delet) * avD)
+		ind.MeanFavFit += (float64(fav) * avF)
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
-	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
-	return
+	if ind.NumDeleterious > 0 { ind.MeanDelFit = ind.MeanDelFit / float64(ind.NumDeleterious) }
+	if ind.NumFavorable > 0 { ind.MeanFavFit = ind.MeanFavFit / float64(ind.NumFavorable) }
+	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit
 }
+
+
+// GatherAlleles adds all of this individual's alleles to the given struct
+func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
+	for _, c := range ind.ChromosomesFromDad { c.GatherAlleles(alleles) }
+	for _, c := range ind.ChromosomesFromMom { c.GatherAlleles(alleles) }
+}
+
 
 // Report prints out statistics of this individual. If final==true is prints more details.
 func (ind *Individual) Report(_ bool) {

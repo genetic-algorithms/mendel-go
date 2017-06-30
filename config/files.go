@@ -9,6 +9,7 @@ import (
 // Supported file names. Do we need to make this a literal map to be able to check inputted file names??
 const (
 	HISTORY_FILENAME string = "mendel.hst"
+	ALLELES_FILENAME string = "alleles.json"
 )
 
 // Not using buffered io because we need write to be flushed every generation to support restart

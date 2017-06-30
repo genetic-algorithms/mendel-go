@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
+	"encoding/json"
+	"bitbucket.org/geneticentropy/mendel-go/dna"
 )
 
 type RecombinationType uint8
@@ -22,7 +24,7 @@ const (
 type Population struct {
 	Indivs []*Individual		// Note: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
 
-	Size uint32                       // the specified size of this population. 0 if no specific size.
+	Size uint32                       // the specified size of this population. 0 if no specified size.
 	//Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
 	Num_offspring float64             // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
 	ActualAvgOffspring        float64 // The average number of offspring each individual from last generation actually had in this generation
@@ -31,6 +33,11 @@ type Population struct {
 	PreSelGenoFitnessStDev    float64 // The standard deviation from the GenoFitnessMean
 	EnvironNoise              float64 // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
 	LBsPerChromosome uint32		// How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
+
+	MeanFitness, MinFitness, MaxFitness float64		// cache summary info about the individuals
+
+	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable float64		// cache some of the stats we usually gather
+	MeanDelFit, MeanFavFit float64
 }
 
 
@@ -278,24 +285,29 @@ func (p *Population) numAlreadyDead(sortedIndexes []IndivFit) (numDead uint32) {
 }
 
 
-// GetFitnessStats returns the average of all the individuals fitness levels
-func (p *Population) GetFitnessStats() (averageFitness, minFitness, maxFitness float64) {
-	minFitness = 99.0
-	maxFitness = -99.0
+// GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max
+func (p *Population) GetFitnessStats() (float64, float64, float64) {
+	// See if we already calculated and cached the values
+	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness }
+	p.MinFitness = 99.0
+	p.MaxFitness = -99.0
 	for _, ind := range p.Indivs {
-		averageFitness += ind.GenoFitness
-		if ind.GenoFitness > maxFitness { maxFitness = ind.GenoFitness
+		p.MeanFitness += ind.GenoFitness
+		if ind.GenoFitness > p.MaxFitness { p.MaxFitness = ind.GenoFitness
 		}
-		if ind.GenoFitness < minFitness { minFitness = ind.GenoFitness
+		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness
 		}
 	}
-	averageFitness = averageFitness / float64(p.GetCurrentSize())
-	return
+	p.MeanFitness = p.MeanFitness / float64(p.GetCurrentSize())
+	return p.MeanFitness, p.MinFitness, p.MaxFitness
 }
 
 
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDelFit, avFavFit float64) {
+func (p *Population) GetMutationStats() (float64, float64, float64,  float64, float64) {
+	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
+	if p.MeanNumDeleterious > 0 && p.MeanDelFit > 0.0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit	}
+
 	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
 	for _, ind := range p.Indivs {
@@ -304,22 +316,22 @@ func (p *Population) GetMutationStats() (deleterious, neutral, favorable,  avDel
 		delet += d
 		neut += n
 		fav += f
-		avDelFit += float64(d) * avD
-		avFavFit += float64(f) * avF
+		p.MeanDelFit += float64(d) * avD
+		p.MeanFavFit += float64(f) * avF
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
-		deleterious = float64(delet) / size
-		neutral = float64(neut) / size
-		favorable = float64(fav) / size
+		p.MeanNumDeleterious = float64(delet) / size
+		p.MeanNumNeutral = float64(neut) / size
+		p.MeanNumFavorable = float64(fav) / size
 	}
-	if delet > 0 { avDelFit = avDelFit / float64(delet) }
-	if fav > 0 { avFavFit = avFavFit / float64(fav) }
-	return
+	if delet > 0 { p.MeanDelFit = p.MeanDelFit / float64(delet) }
+	if fav > 0 { p.MeanFavFit = p.MeanFavFit / float64(fav) }
+	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit
 }
 
 
-// Report prints out statistics of this population. If final==true is prints more details.
+// ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 	config.Verbose(3, "Starting mendel simulation with a population size of %d at generation %d and continuing to generation %d", p.GetCurrentSize(), genNum, maxGenNum)
 
@@ -330,49 +342,76 @@ func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 }
 
 
-// Report prints out statistics of this population. If final==true is prints more details.
+// Report prints out statistics of this population
 func (p *Population) ReportEachGen(genNum uint32) {
-	//todo: for reporting we go thru all individuals and LB multiple times. Make this more efficient
-	verboseLevel := uint32(2)            // level at which we will print population level info
-	indSumVerboseLevel := uint32(3)            // level at which we will print population level info
-	indDetailVerboseLevel := uint32(7)    // level at which we will print individual level info
+	lastGen := genNum == config.Cfg.Basic.Num_generations
+	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
+	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
+	perGenIndSumVerboseLevel := uint32(3)            // level at which we will print individuals summary info each generation
+	finalIndSumVerboseLevel := uint32(2)            // level at which we will print individuals summary info at the end of the run
+	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print info about each individual each generation
+	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
 
-	// Not final
-	var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
-	var aveFit, minFit, maxFit float64
-	if config.IsVerbose(verboseLevel) {
-		aveFit, minFit, maxFit = p.GetFitnessStats()
-		d, n, f, avDelFit, avFavFit = p.GetMutationStats()
+	//var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
+	//var aveFit, minFit, maxFit float64
+	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
+		aveFit, minFit, maxFit := p.GetFitnessStats()
+		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
 		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
-		if config.IsVerbose(indSumVerboseLevel) {
+		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
 	}
-	if config.IsVerbose(indDetailVerboseLevel) {
+	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
-		for _, ind := range p.Indivs { ind.Report(false) }
+		for _, ind := range p.Indivs { ind.Report(lastGen) }
 	}
 
-	//if histWriter := config.FMgr.GetFileWriter(config.HISTORY_FILENAME); histWriter != nil {
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-		if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
-		if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
+		//if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
+		d, n, f, avDelFit, avFavFit := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
+		//if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
+		aveFit, minFit, maxFit := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		// If you change this line, you must also change the header in ReportInitial()
 		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.EnvironNoise)
-		//histWriter.Flush()
+		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
+		if lastGen {
+			//todo: put summary stats in comments at the end of the file?
+		}
+	}
+
+	//todo: wrap these allele json objects in a json array
+	if alleleWriter := config.FMgr.GetFile(config.ALLELES_FILENAME); alleleWriter != nil && ((lastGen && config.Cfg.Computation.Plot_allele_gens == 0) || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+		// Gather the alleles from all individuals
+		alleles := &dna.Alleles{GenerationNumber: genNum}
+		for _, ind := range p.Indivs {
+			ind.GatherAlleles(alleles)
+		}
+
+		// Convert the struct to json and write it to the file
+		newJson, err := json.MarshalIndent(alleles, "", "  ")
+		if err != nil {
+			log.Fatalf("error marshaling alleles to json: %v", err)
+		}
+		if _, err := alleleWriter.Write(newJson); err != nil {
+			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_FILENAME, err)
+		}
+
 	}
 }
 
 
-// Report prints out statistics of this population. If final==true is prints more details.
+/* combined this with ReportEachGen()...
+// ReportFinal prints out summary statistics of this population.
 func (p *Population) ReportFinal(genNum uint32) {
 	perGenVerboseLevel := uint32(2)            // level at which we already printed this info for each gen
-	finalVerboseLevel := uint32(1)            // level at which we will print population level info
-	perGenIndSumVerboseLevel := uint32(3)            // level at which we will print population level info
-	finalIndSumVerboseLevel := uint32(2)            // level at which we will print population level info
-	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print individual level info
-	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print individual level info
+	finalVerboseLevel := uint32(1)            // level at which we will print population info
+	perGenIndSumVerboseLevel := uint32(3)            // level at which we already printed this info for each gen
+	finalIndSumVerboseLevel := uint32(2)            // level at which we will print individuals summary info
+	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will already printed this info for each gen
+	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual
 	popSize := p.GetCurrentSize()
 
 	if !config.IsVerbose(perGenVerboseLevel) && config.IsVerbose(finalVerboseLevel) {
@@ -391,6 +430,7 @@ func (p *Population) ReportFinal(genNum uint32) {
 		}
 	}
 }
+*/
 
 
 // Used as the elements to be sorted for selection
