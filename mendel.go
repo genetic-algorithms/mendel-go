@@ -2,7 +2,6 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Allele plots data (9)
 - (bruce) selection_model spps and partialtrunc and compare runs with mendel-f90
 - (bruce) Initial alleles and track, deleterious and favorable, send data to bucket-brigade for plotting
 - (bruce) Increase number of automated tests
