@@ -25,6 +25,11 @@ func TestMendelCase3(t *testing.T) {
 	mendelCase(t, 3, 3)
 }
 
+// Same as TestMendelCase3 except with initial alleles
+func TestMendelCase4(t *testing.T) {
+	mendelCase(t, 4, 4)
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

@@ -62,8 +62,9 @@ type Config struct {
 		Recombination_model uint32
 		Fraction_self_fertilization float64
 		Num_contrasting_alleles uint32
-		Max_total_fitness_increase uint32
 		Initial_alleles_pop_frac float64
+		Initial_allele_fitness_model string
+		Max_total_fitness_increase float64
 		Initial_alleles_amp_factor int
 		Crossover_model string
 		Mean_num_crossovers uint32
@@ -159,6 +160,8 @@ func (c *Config) Validate() error {
 	if c.Computation.Tracking_threshold >= 1.0 && c.Computation.Plot_allele_gens > 0 { return errors.New("No alleles will be plotted when tracking_threshold >= 1.0") }
 
 	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
+
+	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
 
 	return nil
 }

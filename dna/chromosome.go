@@ -135,7 +135,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 	switch {
 	case numCrossovers <= 0:
 		// Handle special case of no crossover - copy all LBs from primary
-		config.Verbose(9, " Copying all LBs from primary")
+		//config.Verbose(9, " Copying all LBs from primary")
 		gamete = primary.Copy(lBsPerChromosome)
 		return
 	default:
@@ -144,7 +144,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 	//primaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*(1.0-config.Cfg.Population.Crossover_fraction), float64(numCrossovers))	// weight the primary section size to be bigger
 	//secondaryMeanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome)*config.Cfg.Population.Crossover_fraction, float64(numCrossovers))
 	meanSectionSize := utils.RoundIntDiv(float64(lBsPerChromosome), float64(numLbSections))
-	config.Verbose(9, " Mean_num_crossovers=%v, numCrossovers=%v, numLbSections=%v, meanSectionSize=%v\n", config.Cfg.Population.Mean_num_crossovers, numCrossovers, numLbSections, meanSectionSize)
+	//config.Verbose(9, " Mean_num_crossovers=%v, numCrossovers=%v, numLbSections=%v, meanSectionSize=%v\n", config.Cfg.Population.Mean_num_crossovers, numCrossovers, numLbSections, meanSectionSize)
 
 	// Copy each LB section.
 	begIndex := 0		// points to the beginning of the next LB section
@@ -162,7 +162,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		}
 		endIndex := utils.MinInt(begIndex+sectionLen-1, maxIndex)
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
-		config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
+		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lb:=begIndex; lb<=endIndex; lb++ {
 			//gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
 			parent.LinkageBlocks[lb].Transfer(parent, gamete, lb)
@@ -230,7 +230,25 @@ func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable uint32,
 }
 
 
-// GatherAlleles adds all of this chromosome's alleles to the given struct
+// GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
+func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
+	// Calc the average of each type of allele: multiply the average from each LB and num alleles from each LB, then at the end divide by total num alleles
+	for _,lb := range c.LinkageBlocks {
+		delet, neut, fav, avD, avF := lb.GetInitialAlleleStats()
+		deleterious += delet
+		neutral += neut
+		favorable += fav
+		avDelFit += (float64(delet) * avD)
+		avFavFit += (float64(fav) * avF)
+	}
+	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
+	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
+	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
+	return
+}
+
+
+// GatherAlleles adds all of this chromosome's alleles (both mutations and initial alleles) to the given struct
 func (c *Chromosome) GatherAlleles(alleles *Alleles) {
 	for _, lb := range c.LinkageBlocks { lb.GatherAlleles(alleles) }
 }

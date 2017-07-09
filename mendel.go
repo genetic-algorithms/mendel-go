@@ -91,7 +91,7 @@ func main() {
 	}
 	uniformRandom := initialize()
 	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size, true) 		// time 0 population
-	//population.Initialize()
+	population.GenerateInitialAlleles(uniformRandom)
 	population.ReportInitial(config.Restart.Gen_0, config.Cfg.Basic.Num_generations)
 
 	// Main generation loop. config.Restart.Gen_0 allows us to restart some number of generations into the simulation.

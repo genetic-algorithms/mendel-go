@@ -13,6 +13,11 @@ const (
 	WEIBULL_FITNESS_EFFECT MutationFitnessModelType = "weibull"
 )
 
+type AlleleFitnessModelType string
+const (
+	UNIFORM_ALLELE_FITNESS_EFFECT AlleleFitnessModelType = "uniform"
+)
+
 type CrossoverModelType string
 const (
 	NO_CROSSOVER CrossoverModelType = "none"
@@ -25,6 +30,7 @@ const (
 type Models struct {
 	CalcDelMutationFitness CalcMutationFitnessType
 	CalcFavMutationFitness CalcMutationFitnessType
+	CalcAlleleFitness CalcAlleleFitnessType
 	Crossover CrossoverType
 }
 
@@ -42,29 +48,32 @@ func SetModels(c *config.Config) {
 		if c.Mutations.Uniform_fitness_effect_del == 0.0 { log.Fatal("Error: if fitness_effect_model==fixed, you must set uniform_fitness_effect_del to a non-zero value.") }
 		Mdl.CalcDelMutationFitness = CalcFixedDelMutationFitness
 		mdlNames = append(mdlNames, "CalcFixedDelMutationFitness")
-	case UNIFORM_FITNESS_EFFECT:
-		Mdl.CalcDelMutationFitness = CalcUniformDelMutationFitness
-		mdlNames = append(mdlNames, "CalcUniformDelMutationFitness")
-	case WEIBULL_FITNESS_EFFECT:
-		Mdl.CalcDelMutationFitness = CalcWeibullDelMutationFitness
-		mdlNames = append(mdlNames, "CalcWeibullDelMutationFitness")
-	default:
-		log.Fatalf("Error: unrecognized value for fitness_effect_model: %v", c.Mutations.Fitness_effect_model)
-	}
-
-	switch MutationFitnessModelType(strings.ToLower(c.Mutations.Fitness_effect_model)) {
-	case FIXED_FITNESS_EFFECT:
 		if c.Mutations.Uniform_fitness_effect_fav == 0.0 { log.Fatal("Error: if fitness_effect_model==fixed, you must set uniform_fitness_effect_fav to a non-zero value.") }
 		Mdl.CalcFavMutationFitness = CalcFixedFavMutationFitness
 		mdlNames = append(mdlNames, "CalcFixedFavMutationFitness")
 	case UNIFORM_FITNESS_EFFECT:
+		Mdl.CalcDelMutationFitness = CalcUniformDelMutationFitness
+		mdlNames = append(mdlNames, "CalcUniformDelMutationFitness")
 		Mdl.CalcFavMutationFitness = CalcUniformFavMutationFitness
 		mdlNames = append(mdlNames, "CalcUniformFavMutationFitness")
 	case WEIBULL_FITNESS_EFFECT:
+		Mdl.CalcDelMutationFitness = CalcWeibullDelMutationFitness
+		mdlNames = append(mdlNames, "CalcWeibullDelMutationFitness")
 		Mdl.CalcFavMutationFitness = CalcWeibullFavMutationFitness
 		mdlNames = append(mdlNames, "CalcWeibullFavMutationFitness")
 	default:
 		log.Fatalf("Error: unrecognized value for fitness_effect_model: %v", c.Mutations.Fitness_effect_model)
+	}
+
+	switch AlleleFitnessModelType(strings.ToLower(c.Population.Initial_allele_fitness_model)) {
+	case UNIFORM_ALLELE_FITNESS_EFFECT:
+		if c.Population.Num_contrasting_alleles > 0 && c.Population.Max_total_fitness_increase <= 0.0 { log.Fatal("Error: if initial_allele_fitness_model==uniform, then max_total_fitness_increase must be > 0.") }
+		Mdl.CalcAlleleFitness = CalcUniformAlleleFitness
+		mdlNames = append(mdlNames, "CalcUniformAlleleFitness")
+		//Mdl.CalcFavAlleleFitness = CalcUniformFavAlleleFitness
+		//mdlNames = append(mdlNames, "CalcUniformFavAlleleFitness")
+	default:
+		log.Fatalf("Error: unrecognized value for initial_allele_fitness_model: %v", c.Population.Initial_allele_fitness_model)
 	}
 
 	switch CrossoverModelType(strings.ToLower(c.Population.Crossover_model)) {

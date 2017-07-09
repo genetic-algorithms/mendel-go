@@ -38,6 +38,9 @@ type Population struct {
 
 	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable float64		// cache some of the stats we usually gather
 	MeanDelFit, MeanFavFit float64
+
+	MeanNumDelAllele, MeanNumNeutAllele, MeanNumFavAllele float64		// cache some of the stats we usually gather
+	MeanDelAlleleFit, MeanFavAlleleFit float64
 }
 
 
@@ -72,6 +75,34 @@ func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
 func (p *Population) Append(indivs ...*Individual) {
 	// Note: the initial make of the Indivs array is approximately big enough avoid append having to copy the array in most cases
 	p.Indivs = append(p.Indivs, indivs ...)
+}
+
+
+// GenerateInitialAlleles creates the initial contrasting allele pairs (if specified by the config file) and adds them to the population
+func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
+	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
+
+	//numIndivs := utils.RoundInt(float64(p.GetCurrentSize()) * config.Cfg.Population.Initial_alleles_pop_frac)
+
+	// Loop thru individuals, and skipping or choosing individuals to maintain a ratio close to Initial_alleles_pop_frac
+	// Note: config.Validate() already confirms Initial_alleles_pop_frac is > 0 and <= 1.0
+	var numWithAlleles uint32 = 0 		// so we can calc the ratio so far of indivs we've given alleles to vs. number of indivs we've processed
+	var numLBsWithAlleles uint32
+	var numProcessedLBs uint32
+	for i, ind := range p.Indivs {
+		var ratioSoFar float64
+		if i > 0 { ratioSoFar = float64(numWithAlleles) / float64(i) }
+		// else ratioSoFar = 0
+		if ratioSoFar <= config.Cfg.Population.Initial_alleles_pop_frac {
+			// Give this indiv alleles to boost the ratio closer to Initial_alleles_pop_frac
+			config.Verbose(9, "Giving initial contrasting allele to individual %v", i)
+			numLBsWithAlleles, numProcessedLBs = ind.AddInitialContrastingAlleles(config.Cfg.Population.Num_contrasting_alleles, uniformRandom)
+			numWithAlleles++
+		}
+		// else we don't give this indiv alleles to bring the ratio down closer to Initial_alleles_pop_frac
+	}
+
+	config.Verbose(2, "Initial alleles given to faction %v of individuals (%v/%v). Each individual got alleles on fraction %v of LBs (%v/%v)", float64(numWithAlleles)/float64(p.GetCurrentSize()), numWithAlleles, p.GetCurrentSize(),float64(numLBsWithAlleles)/float64(numProcessedLBs), numLBsWithAlleles, numProcessedLBs)
 }
 
 
@@ -291,6 +322,7 @@ func (p *Population) GetFitnessStats() (float64, float64, float64) {
 	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness }
 	p.MinFitness = 99.0
 	p.MaxFitness = -99.0
+	p.MeanFitness = 0.0
 	for _, ind := range p.Indivs {
 		p.MeanFitness += ind.GenoFitness
 		if ind.GenoFitness > p.MaxFitness { p.MaxFitness = ind.GenoFitness
@@ -306,13 +338,15 @@ func (p *Population) GetFitnessStats() (float64, float64, float64) {
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
 func (p *Population) GetMutationStats() (float64, float64, float64,  float64, float64) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if p.MeanNumDeleterious > 0 && p.MeanDelFit > 0.0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit	}
+	//config.Verbose(9, "p.MeanNumDeleterious=%v, p.MeanDelFit=%v", p.MeanNumDeleterious, p.MeanDelFit)
+	if p.MeanNumDeleterious > 0 && p.MeanDelFit < 0.0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit }
+	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0;  p.MeanDelFit=0.0;  p.MeanFavFit=0.0
 
-	// Get the average fitness factor of type of mutation, example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
+	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
 	for _, ind := range p.Indivs {
 		d, n, f, avD, avF := ind.GetMutationStats()
-		config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
+		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
 		neut += n
 		fav += f
@@ -328,6 +362,35 @@ func (p *Population) GetMutationStats() (float64, float64, float64,  float64, fl
 	if delet > 0 { p.MeanDelFit = p.MeanDelFit / float64(delet) }
 	if fav > 0 { p.MeanFavFit = p.MeanFavFit / float64(fav) }
 	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit
+}
+
+
+// GetInitialAlleleStats returns the average number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
+func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float64, float64) {
+	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
+	if p.MeanNumDelAllele > 0 && p.MeanDelAlleleFit < 0.0 { return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele, p.MeanDelAlleleFit, p.MeanFavAlleleFit	}
+	p.MeanNumDelAllele=0.0;  p.MeanNumNeutAllele=0.0;  p.MeanNumFavAllele=0.0;  p.MeanDelAlleleFit=0.0;  p.MeanFavAlleleFit=0.0
+
+	// For each type of allele, get the average fitness factor and number of alleles for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
+	var delet, neut, fav uint32
+	for _, ind := range p.Indivs {
+		d, n, f, avD, avF := ind.GetInitialAlleleStats()
+		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
+		delet += d
+		neut += n
+		fav += f
+		p.MeanDelAlleleFit += float64(d) * avD
+		p.MeanFavAlleleFit += float64(f) * avF
+	}
+	size := float64(p.GetCurrentSize())
+	if size > 0 {
+		p.MeanNumDelAllele = float64(delet) / size
+		p.MeanNumNeutAllele = float64(neut) / size
+		p.MeanNumFavAllele = float64(fav) / size
+	}
+	if delet > 0 { p.MeanDelAlleleFit = p.MeanDelAlleleFit / float64(delet) }
+	if fav > 0 { p.MeanFavAlleleFit = p.MeanFavAlleleFit / float64(fav) }
+	return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele, p.MeanDelAlleleFit, p.MeanFavAlleleFit
 }
 
 
@@ -365,9 +428,12 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
+		//d, n, f, avDelFit, avFavFit = p.GetMutationStats()  // <- just testing that the caching works properly
 		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
+			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
+			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
 		}
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {

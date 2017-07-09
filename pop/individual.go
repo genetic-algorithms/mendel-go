@@ -20,6 +20,9 @@ type Individual struct {
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
 	MeanDelFit, MeanFavFit float64
 
+	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
+	MeanDelAlleleFit, MeanFavAlleleFit float64
+
 	ChromosomesFromDad []*dna.Chromosome
 	ChromosomesFromMom []*dna.Chromosome
 	//LinkagesFromDad []*dna.LinkageBlock
@@ -138,6 +141,49 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 }
 
 
+// AddInitialContrastingAlleles add numAlleles pairs of contrasting alleles to this individual
+func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRandom *rand.Rand) (uint32, uint32) {
+	// Spread the allele pairs throughout the LBs as evenly as possible: if numAlleles < num_linkage_subunits then skip some LBs to
+	// space the allele pairs evenly. If numAlleles == num_linkage_subunits then 1 allele pair per LB. If numAlleles > num_linkage_subunits then
+	// every LB gets some allele pairs and space the rest out evenly.
+	allelesPerLB := numAlleles / config.Cfg.Population.Num_linkage_subunits		// every LB gets this many allele pairs
+	allelesRemainder := numAlleles % config.Cfg.Population.Num_linkage_subunits		// spread this many allele pairs evenly over the LBs
+	config.Verbose(9, " Intending to give %v allele pairs to each LB, and spread %v allele pairs among all LBs", allelesPerLB, allelesRemainder)
+
+	// Use the same approach as pop.GenerateInitialAlleles() for spreading allelesRemainder: keep a running ratio of LBs with alleles / LBs processed
+	desiredRemainderRatio := float64(allelesRemainder) / float64(config.Cfg.Population.Num_linkage_subunits)
+	var numWithAllelesRemainder uint32 = 0		// used to calc the running ratio of the number of remainers we've passed out
+	var numWithAllelesEvenly uint32 = 0		// keep track of the number of allele pairs we evenly give out to every LB
+	var numProcessedLBs uint32 = 0		// start at 0 because it is the number from the previous iteration of the loop
+
+	for c := range ind.ChromosomesFromDad {
+		for lb := range ind.ChromosomesFromDad[c].LinkageBlocks {
+			// If there are some allele pairs on every LB
+			for i:=1; i<=int(allelesPerLB); i++ {
+				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
+				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], uniformRandom)
+				numWithAllelesEvenly++
+			}
+
+			// Decide if this LB should get 1 of the remaining alleles
+			var ratioSoFar float64
+			if numProcessedLBs > 0 { ratioSoFar = float64(numWithAllelesRemainder) / float64(numProcessedLBs) }
+			// else ratioSoFar = 0
+			if ratioSoFar <= desiredRemainderRatio && numWithAllelesRemainder < allelesRemainder {
+				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
+				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], uniformRandom)
+				numWithAllelesRemainder++
+			}
+
+			numProcessedLBs++
+		}
+	}
+
+	//config.Verbose(5, " Initial alleles given to %v faction of LBs in the individual ((%v+%v)/%v)", float64(numWithAllelesRemainder + numWithAllelesEvenly) / float64(numProcessedLBs), numWithAllelesEvenly, numWithAllelesRemainder, numProcessedLBs)
+	return numWithAllelesRemainder + numWithAllelesEvenly, numProcessedLBs
+}
+
+
 // Various algorithms for determining the random number of offspring for a mating pair of individuals
 type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) uint32
 
@@ -227,9 +273,10 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of deleterious and favorable
 func (ind *Individual) GetMutationStats() (uint32, uint32, uint32, float64, float64) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDeleterious > 0 && ind.MeanDelFit > 0.0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit	}
+	if ind.NumDeleterious > 0 && ind.MeanDelFit < 0.0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit	}
+	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0;  ind.MeanDelFit=0.0;  ind.MeanFavFit=0.0
 
-	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
+	// Calc the average of each type of mutation: multiply the average from each chromosome and num mutns from each chromosome, then at the end divide by total num mutns
 	for _, c := range ind.ChromosomesFromDad {
 		delet, neut, fav, avD, avF := c.GetMutationStats()
 		ind.NumDeleterious += delet
@@ -252,7 +299,36 @@ func (ind *Individual) GetMutationStats() (uint32, uint32, uint32, float64, floa
 }
 
 
-// GatherAlleles adds all of this individual's alleles to the given struct
+// GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of deleterious and favorable
+func (ind *Individual) GetInitialAlleleStats() (uint32, uint32, uint32, float64, float64) {
+	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
+	if ind.NumDelAllele > 0 && ind.MeanDelAlleleFit < 0.0 { return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit }
+	ind.NumDelAllele=0;  ind.NumNeutAllele=0;  ind.NumFavAllele=0;  ind.MeanDelAlleleFit=0.0;  ind.MeanFavAlleleFit=0.0
+
+	// Calc the average of each type of allele: multiply the average from each chromosome and num alleles from each chromosome, then at the end divide by total num alleles
+	for _, c := range ind.ChromosomesFromDad {
+		delet, neut, fav, avD, avF := c.GetInitialAlleleStats()
+		ind.NumDelAllele += delet
+		ind.NumNeutAllele += neut
+		ind.NumFavAllele += fav
+		ind.MeanDelAlleleFit += (float64(delet) * avD)
+		ind.MeanFavAlleleFit += (float64(fav) * avF)
+	}
+	for _, c := range ind.ChromosomesFromMom {
+		delet, neut, fav, avD, avF := c.GetInitialAlleleStats()
+		ind.NumDelAllele += delet
+		ind.NumNeutAllele += neut
+		ind.NumFavAllele += fav
+		ind.MeanDelAlleleFit += (float64(delet) * avD)
+		ind.MeanFavAlleleFit += (float64(fav) * avF)
+	}
+	if ind.NumDelAllele > 0 { ind.MeanDelAlleleFit = ind.MeanDelAlleleFit / float64(ind.NumDelAllele) }
+	if ind.NumFavAllele > 0 { ind.MeanFavAlleleFit = ind.MeanFavAlleleFit / float64(ind.NumFavAllele) }
+	return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit
+}
+
+
+// GatherAlleles adds all of this individual's alleles (both mutations and initial alleles) to the given struct
 func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 	for _, c := range ind.ChromosomesFromDad { c.GatherAlleles(alleles) }
 	for _, c := range ind.ChromosomesFromMom { c.GatherAlleles(alleles) }

@@ -4,6 +4,7 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"math"
 	"math/rand"
+	"log"
 )
 
 type MutationType uint8
@@ -11,6 +12,10 @@ const (
 	DELETERIOUS MutationType = iota
 	NEUTRAL MutationType = iota
 	FAVORABLE MutationType = iota
+	/* do not think we need these...
+	DEL_ALLELE MutationType = iota
+	FAV_ALLELE MutationType = iota
+	*/
 )
 
 // Mutation is the base class for all mutation types. It represents 1 mutation in 1 individual.
@@ -32,12 +37,14 @@ type Mutator interface {
 	GetFitnessEffect() float64
 }
 
-// All the alleles for 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
+// All the alleles (both mutations and initial alleles) for 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type Alleles struct {
 	GenerationNumber     uint32     `json:"generationNumber"`
 	Deleterious         []uintptr `json:"deleterious"`
 	Neutral         []uintptr `json:"neutral"`
 	Favorable         []uintptr `json:"favorable"`
+	DelInitialAlleles         []uintptr `json:"delInitialAlleles"`
+	FavInitialAlleles         []uintptr `json:"favInitialAlleles"`
 }
 
 
@@ -123,6 +130,21 @@ func CalcWeibullFavMutationFitness(_ Mutator, uniformRandom *rand.Rand) float64 
 }
 
 
+// These are the different algorithms for assigning a fitness factor to an initial allele. Pointers to 2 of them are chosen at initialization time.
+type CalcAlleleFitnessType func(uniformRandom *rand.Rand) float64
+
+func CalcUniformAlleleFitness(uniformRandom *rand.Rand) float64 {
+	if config.Cfg.Population.Num_contrasting_alleles == 0 { log.Fatalln("System Error: CalcUniformAlleleFitness() called when Num_contrasting_alleles==0") }
+	initial_alleles_mean_effect := config.Cfg.Population.Max_total_fitness_increase / float64(config.Cfg.Population.Num_contrasting_alleles)
+	if config.Cfg.Population.Num_contrasting_alleles <= 10 {
+		return initial_alleles_mean_effect		// the number of alleles is small enough that using uniformRandom probably won't give us a good average
+	} else {
+		return 2.0 * initial_alleles_mean_effect * uniformRandom.Float64()		// so the average works out to be initial_alleles_mean_effect
+	}
+}
+
+
+
 /* To switch on Mutation subclass, do something like this:
 	switch _ := m.(type) {
 	case DeleteriousMutation:
@@ -157,8 +179,7 @@ type NeutralMutation struct {
 }
 
 func NeutralMutationFactory(_ *rand.Rand) *NeutralMutation {
-	m := &NeutralMutation{Mutation{}}
-	return m
+	return &NeutralMutation{Mutation{}}
 }
 
 // FavorableMutation represents 1 favorable mutation in 1 individual.
@@ -175,4 +196,34 @@ func FavorableMutationFactory(uniformRandom *rand.Rand) *FavorableMutation {
 		m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression
 	}
 	return m
+}
+
+
+// DeleteriousAllele represents 1 deleterious allele in 1 individual.
+type DeleteriousAllele struct {
+	Mutation 		// this anonymous reference includes the base class's struct here
+}
+
+func DeleteriousAlleleFactory(fitnessEffect float64) *DeleteriousAllele {
+	return &DeleteriousAllele{Mutation{fitnessEffect: fitnessEffect}}
+}
+
+
+// NeutralAllele represents 1 neutral allele in 1 individual.
+type NeutralAllele struct {
+	Mutation 		// this anonymous reference includes the base class's struct here
+}
+
+func NeutralAlleleFactory() *NeutralAllele {
+	return &NeutralAllele{Mutation{}}
+}
+
+
+// DeleteriousAllele represents 1 deleterious allele in 1 individual.
+type FavorableAllele struct {
+	Mutation 		// this anonymous reference includes the base class's struct here
+}
+
+func FavorableAlleleFactory(fitnessEffect float64) *FavorableAllele {
+	return &FavorableAllele{Mutation{fitnessEffect: fitnessEffect}}
 }

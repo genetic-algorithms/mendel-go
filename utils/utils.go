@@ -51,11 +51,16 @@ func MaxFloat64(a, b float64) float64 {
 
 // RoundIntDiv divides a/b and returns the nearest int result. To get more exact, look at https://github.com/a-h/round
 func RoundIntDiv(a, b float64) int {
-	div := a / b
-	if div < 0 {
-		return int(math.Ceil(div - 0.5))
+	return RoundInt(a / b)
+}
+
+
+// RoundInt returns the nearest int result. To get more exact, look at https://github.com/a-h/round
+func RoundInt(f float64) int {
+	if f < 0 {
+		return int(math.Ceil(f - 0.5))
 	}
-	return int(math.Floor(div + 0.5))
+	return int(math.Floor(f + 0.5))
 }
 
 func NotImplementedYet(what string) { log.Fatalf("Not implemented yet: %v", what) }
