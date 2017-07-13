@@ -41,12 +41,12 @@ func MinFloat64(a, b float64) float64 {
 	if a < b { return a }
 	return b
 }
+*/
 
 func MaxFloat64(a, b float64) float64 {
 	if a > b { return a }
 	return b
 }
-*/
 
 
 // RoundIntDiv divides a/b and returns the nearest int result. To get more exact, look at https://github.com/a-h/round

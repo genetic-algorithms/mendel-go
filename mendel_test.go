@@ -20,7 +20,7 @@ func TestMendelCase2(t *testing.T) {
 	mendelCase(t, 2, 1)
 }
 
-// Same as TestMendelCase2 except crossover_model=partial and crossover_fraction=0.2
+// Same as TestMendelCase2 except crossover_model=partial and mean_num_crossovers=2
 func TestMendelCase3(t *testing.T) {
 	mendelCase(t, 3, 3)
 }
@@ -28,6 +28,21 @@ func TestMendelCase3(t *testing.T) {
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase4(t *testing.T) {
 	mendelCase(t, 4, 4)
+}
+
+// Same as TestMendelCase3 except with selection_model=ups, and heritability and non_scaling_noise back to default
+func TestMendelCase5(t *testing.T) {
+	mendelCase(t, 5, 5)
+}
+
+// Same as TestMendelCase5 except with selection_model=spps
+func TestMendelCase6(t *testing.T) {
+	mendelCase(t, 6, 6)
+}
+
+// Same as TestMendelCase5 except with selection_model=partialtrunc
+func TestMendelCase7(t *testing.T) {
+	mendelCase(t, 7, 7)
 }
 
 

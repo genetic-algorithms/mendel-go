@@ -94,6 +94,7 @@ func SetModels(c *config.Config) {
 		Mdl.ApplySelectionNoise = ApplyProportProbNoise
 		mdlNames = append(mdlNames, "ApplyProportProbNoise")
 	case PARTIAL_TRUNC_SELECTION:
+		if c.Selection.Partial_truncation_value <= 0.0 { log.Fatalln("partial_truncation_value must be > 0") }	// we end up dividing by it
 		Mdl.ApplySelectionNoise = ApplyPartialTruncationNoise
 		mdlNames = append(mdlNames, "ApplyPartialTruncationNoise")
 	default:

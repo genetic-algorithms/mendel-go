@@ -215,35 +215,54 @@ func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *ra
 	directly related to phenotypic fitness and also for the correct number of individuals to be eliminated to maintain a constant
 	population size.
 	*/
+	//config.Verbose(2, "Using ApplyUnrestrictProbNoise...")
 	for _, ind := range p.Indivs {
-		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
+		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
 		ind.PhenoFitness = ind.PhenoFitness / (uniformRandom.Float64() + 1.0e-15)
+		//ind.PhenoFitness = ind.PhenoFitness * uniformRandom.Float64()  // this has also been suggested instead of the line above, the results are pretty similar
 	}
 }
 
 // ApplyProportProbNoise adds environmental noise and strict proportionality probability selection noise
-func ApplyProportProbNoise(_ *Population, _ float64, _ *rand.Rand) {
+func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.Rand) {
 	/*
-	For strict proportionality probability selection, rescale the phenotypic fitness values such that the maximum value is one.
+	For strict proportionality probability selection, rescale (normalize) the phenotypic fitness values such that the maximum value is one.
 	Then divide the scaled phenotypic fitness by a uniformly distributed random number prior to ranking and truncation.
 	Allow only those individuals to reproduce whose resulting ratio of scaled phenotypic fitness to the random number value
 	exceeds one.  This approach ensures that no individual automatically survives to reproduce regardless of the value
 	of the random number.  But it restricts the fraction of the offspring that can survive.  Therefore, when the reproduction
 	rate is low, the number of surviving offspring may not be large enough to sustain a constant population size.
 	 */
-	utils.NotImplementedYet("ApplyProportProbNoise not implemented yet")
+	//config.Verbose(2, "Using ApplyProportProbNoise...")
+
+	// First find max individual fitness
+	var maxFitness float64 = 0.0
+	for _, ind := range p.Indivs {
+		maxFitness = utils.MaxFloat64(maxFitness, ind.GenoFitness)
+	}
+	// Verify maxFitness is not zero so we can divide by it below
+	if maxFitness <= 0.0 { log.Fatalf("Max individual fitness is < 0 (%v), so whole population must be dead. Exiting.", maxFitness) }
+
+	for _, ind := range p.Indivs {
+		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+		ind.PhenoFitness = ind.PhenoFitness / maxFitness / (uniformRandom.Float64() + 1.0e-15)
+		if ind.PhenoFitness < 1.0 { ind.Dead = true }
+	}
 }
 
 // ApplyPartialTruncationNoise adds environmental noise and partial truncation selection noise
-func ApplyPartialTruncationNoise(_ *Population, _ float64, _ *rand.Rand) {
+func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom *rand.Rand) {
 	/*
 	For partial truncation selection, divide the phenotypic fitness by the sum of theta and (1. - theta) times a random
 	number distributed uniformly between 0.0 and 1.0 prior to ranking and truncation, where theta is the parameter
-	partial_truncation_value.  This selection scheme is intermediate between truncation selection and unrestricted
+	partial_truncation_value.  This selection scheme is intermediate between full truncation selection and unrestricted
 	probability selection.  The procedure allows for the correct number of individuals to be eliminated to maintain a constant
 	population size.
 	*/
-	utils.NotImplementedYet("ApplyPartialTruncationNoise not implemented yet")
+	for _, ind := range p.Indivs {
+		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+		ind.PhenoFitness = ind.PhenoFitness / (config.Cfg.Selection.Partial_truncation_value + ((1. - config.Cfg.Selection.Partial_truncation_value) * uniformRandom.Float64()))
+	}
 }
 
 

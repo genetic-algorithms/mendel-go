@@ -3,17 +3,14 @@
 
 /* Order of todos:
 - (bruce) selection_model spps and partialtrunc and compare runs with mendel-f90
-- (bruce) Initial alleles and track, deleterious and favorable, send data to bucket-brigade for plotting
-- (bruce) Increase number of automated tests
+- (bruce) Add more automated tests
 - (jon) Population growth
-- (jon) Tribe
 - (jon) Bottleneck
-- Multiple threads
+- (jon) Tribes
+- Multiple threads (go routines)
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
-- cache averages in pop and ind objects for reuse
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
-- Read forsim_complex_example.pdf to make mendel more flexible/customizable
  */
 package main
 
