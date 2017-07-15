@@ -2,8 +2,7 @@
 // It handles cmd line args, reads input files, handles restarts, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) selection_model spps and partialtrunc and compare runs with mendel-f90
-- (bruce) Add more automated tests
+- (bruce) compare run results with mendel-f90
 - (jon) Population growth
 - (jon) Bottleneck
 - (jon) Tribes

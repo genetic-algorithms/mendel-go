@@ -51,15 +51,27 @@ func FileMgrFactory(dataFilePath, filesToOutput string) {
 }
 
 
+// IsFile returns true if the specified file name was specified in the files_to_output config parameter and is open.
+func (fMgr *FileMgr) IsFile(fileName string) bool {
+	if file, ok := fMgr.Files[fileName]; ok && file != nil { return true }
+	return false
+}
+
+
 // GetFile returns the specified file descriptor if we have it open.
 func (fMgr *FileMgr) GetFile(fileName string) *os.File {
 	if file, ok := fMgr.Files[fileName]; ok && file != nil { return file }
 	return nil
 }
-//func (fMgr *FileMgr) GetFileWriter(fileName string) *bufio.Writer {
-//	if file, ok := fMgr.Files[fileName]; ok && file.Writer != nil { return file.Writer }
-//	return nil
-//}
+
+
+/* Not currently used...
+// GetFileBuffer returns a buffered file descriptor if we have it open
+func (fMgr *FileMgr) GetFileBuffer(fileName string) *bufio.Writer {
+	if file, ok := fMgr.Files[fileName]; ok && file.Writer != nil { return file.Writer }
+	return nil
+}
+*/
 
 
 // CloseFiles closes all of the open files.
