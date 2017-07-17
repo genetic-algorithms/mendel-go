@@ -243,3 +243,36 @@ func (lb *LinkageBlock) GatherAlleles(alleles *Alleles) {
 		alleles.FavInitialAlleles = append(alleles.FavInitialAlleles, id)
 	}
 }
+
+
+// CountAlleles counts all of this LB's alleles (both mutations and initial alleles) and adds them to the given struct
+func (lb *LinkageBlock) CountAlleles(alleles *AlleleCount) {
+	for _, m := range lb.DMutn {
+		// Use the ptr to the mutation object as the key in the map.
+		id := uintptr(unsafe.Pointer(m))
+		// Map returns the zero value of the value type for keys which are not yet in the map (zero value for int is 0 – properly telling no allele yet),
+		// so we do not need to check if it is there.
+		//if count, ok := alleles.Deleterious[id]; ok {
+		//	alleles.Deleterious[id] += 1
+		//} else {
+		//	alleles.Deleterious[id] = 1
+		//}
+		alleles.Deleterious[id] += 1
+	}
+	for _, m := range lb.NMutn {
+		id := uintptr(unsafe.Pointer(m))
+		alleles.Neutral[id] += 1
+	}
+	for _, m := range lb.FMutn {
+		id := uintptr(unsafe.Pointer(m))
+		alleles.Favorable[id] += 1
+	}
+	for _, a := range lb.DAllele {
+		id := uintptr(unsafe.Pointer(a))
+		alleles.DelInitialAlleles[id] += 1
+	}
+	for _, a := range lb.FAllele {
+		id := uintptr(unsafe.Pointer(a))
+		alleles.FavInitialAlleles[id] += 1
+	}
+}

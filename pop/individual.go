@@ -335,6 +335,13 @@ func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 }
 
 
+// CountAlleles counts all of this individual's alleles (both mutations and initial alleles) and adds them to the given struct
+func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
+	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(alleles) }
+	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(alleles) }
+}
+
+
 // Report prints out statistics of this individual. If final==true is prints more details.
 func (ind *Individual) Report(_ bool) {
 	deleterious, neutral, favorable, avDelFit, avFavFit := ind.GetMutationStats()

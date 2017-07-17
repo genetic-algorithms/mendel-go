@@ -10,6 +10,7 @@ import (
 const (
 	HISTORY_FILENAME string = "mendel.hst"
 	ALLELES_FILENAME string = "alleles.json"
+	ALLELES_COUNT_FILENAME string = "alleles-count.json"
 )
 
 // Not using buffered io because we need write to be flushed every generation to support restart
