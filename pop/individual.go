@@ -30,7 +30,7 @@ type Individual struct {
 }
 
 
-func IndividualFactory(pop *Population, initialize bool) *Individual{
+func IndividualFactory(pop *Population, initialize bool) *Individual {
 	ind := &Individual{
 		Pop: pop,
 		ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),

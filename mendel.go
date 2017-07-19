@@ -31,6 +31,8 @@ import (
 func initialize() *rand.Rand {
 	config.Verbose(5, "Initializing...\n")
 
+	utils.MeasurerFactory(config.Cfg.Computation.Verbosity)
+
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
 	pop.SetModels(config.Cfg)

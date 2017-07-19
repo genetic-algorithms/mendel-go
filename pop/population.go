@@ -82,6 +82,7 @@ func (p *Population) Append(indivs ...*Individual) {
 // GenerateInitialAlleles creates the initial contrasting allele pairs (if specified by the config file) and adds them to the population
 func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
+	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
 	//numIndivs := utils.RoundInt(float64(p.GetCurrentSize()) * config.Cfg.Population.Initial_alleles_pop_frac)
 
@@ -117,6 +118,7 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 //   - add new mutations to random LBs
 //   - add offspring to new population
 func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
+	defer utils.Measure.Start("Mate").Stop("Mate")
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
@@ -148,6 +150,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 // Select removes the least fit individuals in the population
 func (p *Population) Select(uniformRandom *rand.Rand) {
+	defer utils.Measure.Start("Select").Stop("Select")
 	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
 
 	// Calculate noise factor to get pheno fitness of each individual
@@ -459,6 +462,7 @@ func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
 
 // Report prints out statistics of this population
 func (p *Population) ReportEachGen(genNum uint32) {
+	utils.Measure.Start("ReportEachGen")
 	lastGen := genNum == config.Cfg.Basic.Num_generations
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
@@ -543,6 +547,9 @@ func (p *Population) ReportEachGen(genNum uint32) {
 		}
 
 	}
+
+	utils.Measure.Stop("ReportEachGen")
+	if lastGen { utils.Measure.LogSummary() } 		// it checks the verbosity level itself
 }
 
 
