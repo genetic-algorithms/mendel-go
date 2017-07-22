@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"runtime"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -95,12 +96,13 @@ type Config struct {
 	Computation struct {
 		Tracking_threshold float64
 		Extinction_threshold float64
+		Track_neutrals bool
 		Max_del_mutn_per_indiv uint32
 		Max_neu_mutn_per_indiv uint32
 		Max_fav_mutn_per_indiv uint32
+		Num_threads uint32
 		Random_number_seed int64
 		Reseed_rng bool			// not used. If Random_number_seed==0 we use a truly random seed
-		Track_neutrals bool
 		Write_dump bool
 		Write_vcf bool
 		Restart_case bool
@@ -144,12 +146,12 @@ func ReadFromFile(filename string) error {
 	// Do this before validate, because we need to know what output files have been requested for some of the validation testing
 	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 
-	if err := Cfg.Validate(); err != nil { log.Fatalln(err) }
+	if err := Cfg.validateAndAdjust(); err != nil { log.Fatalln(err) }
 	return nil
 }
 
 // Validate checks the config values to make sure they are valid.
-func (c *Config) Validate() error {
+func (c *Config) validateAndAdjust() error {
 	// Check and adjust certain config values
 	if c.Basic.Pop_size % 2 != 0 { return errors.New("Error: basic.pop_size must be an even number") }
 	c.Selection.Heritability = math.Max(1.e-20, c.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
@@ -163,6 +165,8 @@ func (c *Config) Validate() error {
 	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Error: Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
 
 	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("Error: If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
+
+	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
 
 	return nil
 }

@@ -1,5 +1,7 @@
 package config
 
+// Note: this file is not currently used
+
 import "log"
 
 type RestartValues struct {

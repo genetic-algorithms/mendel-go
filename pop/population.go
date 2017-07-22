@@ -20,36 +20,50 @@ const (
 	FULL_SEXUAL RecombinationType = 3
 )
 
+
+// Used as the elements for the Sort routine used for selection, and as indirection to point to individuals in PopulationPart objects
+type IndivRef struct {
+	//Index uint32
+	//Fitness float64
+	Indiv *Individual
+}
+type ByFitness []IndivRef
+func (a ByFitness) Len() int           { return len(a) }
+func (a ByFitness) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+//func (a ByFitness) Less(i, j int) bool { return a[i].Fitness < a[j].Fitness }
+func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].Indiv.PhenoFitness }
+
+
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
 // like mating and selection.
 type Population struct {
-	Indivs []*Individual		// Note: we currently don't track males vs. females. Eventually we should: assign each offspring a sex, maintaining a prescribed sex ratio for the population. Only allow opposite sex individuals to mate.
+	indivs []*Individual 	// The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
+	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
-	Size uint32                       // the target size of this population after selection
-	//Num_offspring float64             // Average number of offspring each mating pair should have. Calculated from config values Fraction_random_death and Reproductive_rate. Note: Reproductive_rate and ActualAvgOffspring are per individual and Num_offspring is per pair.
-	Num_offspring float64             // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
-	ActualAvgOffspring        float64 // The average number of offspring each individual from last generation actually had in this generation
-	PreSelGenoFitnessMean     float64 // The average fitness of all of the individuals (before selection) due to their genomic mutations
-	PreSelGenoFitnessVariance float64 //
-	PreSelGenoFitnessStDev    float64 // The standard deviation from the GenoFitnessMean
-	EnvironNoise              float64 // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
-	LBsPerChromosome uint32		// How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
+	TargetSize uint32        // the target size of this population after selection
+	Num_offspring float64       // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
+	ActualAvgOffspring float64       // The average number of offspring each individual from last generation actually had in this generation
+	PreSelGenoFitnessMean float64                                       // The average fitness of all of the individuals (before selection) due to their genomic mutations
+	PreSelGenoFitnessVariance float64                                   //
+	PreSelGenoFitnessStDev    float64                                   // The standard deviation from the GenoFitnessMean
+	EnvironNoise              float64                                   // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
+	LBsPerChromosome uint32                                             // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
 
-	MeanFitness, MinFitness, MaxFitness float64		// cache summary info about the individuals
+	MeanFitness, MinFitness, MaxFitness float64                         // cache summary info about the individuals
 
-	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable float64		// cache some of the stats we usually gather
-	MeanDelFit, MeanFavFit float64
+	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable  float64       // cache some of the stats we usually gather
+	MeanDelFit, MeanFavFit                                float64
 
-	MeanNumDelAllele, MeanNumNeutAllele, MeanNumFavAllele float64		// cache some of the stats we usually gather
-	MeanDelAlleleFit, MeanFavAlleleFit float64
+	MeanNumDelAllele, MeanNumNeutAllele, MeanNumFavAllele float64       // cache some of the stats we usually gather
+	MeanDelAlleleFit, MeanFavAlleleFit                    float64
 }
 
 
 // PopulationFactory creates a new population (either the initial pop, or the next generation).
-func PopulationFactory(initialSize uint32, initialize bool) *Population {
+func PopulationFactory(estimatedSize uint32, initialize bool) *Population {
 	p := &Population{
-		Indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
-		Size: config.Cfg.Basic.Pop_size,
+		indivs: make([]*Individual, 0, estimatedSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
+		TargetSize: config.Cfg.Basic.Pop_size,
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
@@ -60,7 +74,8 @@ func PopulationFactory(initialSize uint32, initialize bool) *Population {
 
 	if initialize {
 		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
-		for i:=uint32(1); i<=initialSize; i++ { p.Append(IndividualFactory(p, true)) }
+		for i:=uint32(1); i<= estimatedSize; i++ { p.Append(IndividualFactory(p, true)) }
+		p.makeAndFillIndivRefs()
 	}
 
 	return p
@@ -68,14 +83,14 @@ func PopulationFactory(initialSize uint32, initialize bool) *Population {
 
 
 // Size returns the current number of individuals in this population
-func (p *Population) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
+func (p *Population) GetCurrentSize() uint32 { return /*uint32(len(p.indivs))*/  uint32(len(p.IndivRefs)) }
 
 
 // Append adds a person to this population. This is our function (instead of using append() directly), in case in
 // the future we want to allocate additional individuals in bigger chunks for efficiency. See https://blog.golang.org/go-slices-usage-and-internals
 func (p *Population) Append(indivs ...*Individual) {
 	// Note: the initial make of the Indivs array is approximately big enough avoid append having to copy the array in most cases
-	p.Indivs = append(p.Indivs, indivs ...)
+	p.indivs = append(p.indivs, indivs ...)
 }
 
 
@@ -84,14 +99,14 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
 	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
-	//numIndivs := utils.RoundInt(float64(p.GetCurrentSize()) * config.Cfg.Population.Initial_alleles_pop_frac)
-
 	// Loop thru individuals, and skipping or choosing individuals to maintain a ratio close to Initial_alleles_pop_frac
 	// Note: config.Validate() already confirms Initial_alleles_pop_frac is > 0 and <= 1.0
 	var numWithAlleles uint32 = 0 		// so we can calc the ratio so far of indivs we've given alleles to vs. number of indivs we've processed
 	var numLBsWithAlleles uint32
 	var numProcessedLBs uint32
-	for i, ind := range p.Indivs {
+	//for i, ind := range p.indivs {
+	for i, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		var ratioSoFar float64
 		if i > 0 { ratioSoFar = float64(numWithAlleles) / float64(i) }
 		// else ratioSoFar = 0
@@ -123,21 +138,25 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
 	// size a little, because we will add individuals with p.Append() anyway.
-	//newGenerationSize := uint32((float64(p.GetCurrentSize()) / 2) * p.Num_offspring)
-	newGenerationSize := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
-	newP := PopulationFactory(newGenerationSize, false)
+	newGenerationEstimate := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
+	newP := PopulationFactory(newGenerationEstimate, false)
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
 	//config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
+	//todo: create instances of PopulationPart, run the mating for each of them in parallel, and then recombine the Indivs array
+	// Note: runtime.GOMAXPROCS(runtime.NumCPU()) is the default, but this statement can be modified to set a different number of CPUs to use
+
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
 		dadI := parentIndices[i]
 		momI := parentIndices[i+1]
-		newIndivs := p.Indivs[dadI].Mate(p.Indivs[momI], uniformRandom)
+		//newIndivs := p.indivs[dadI].Mate(p.indivs[momI], uniformRandom)
+		newIndivs := p.IndivRefs[dadI].Indiv.Mate(p.IndivRefs[momI].Indiv, uniformRandom)
 		newP.Append(newIndivs...)
 	}
+	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
 
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
@@ -151,7 +170,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 // Select removes the least fit individuals in the population
 func (p *Population) Select(uniformRandom *rand.Rand) {
 	defer utils.Measure.Start("Select").Stop("Select")
-	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.Size, p.Size)
+	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.TargetSize, p.TargetSize)
 
 	// Calculate noise factor to get pheno fitness of each individual
 	herit := config.Cfg.Selection.Heritability
@@ -159,45 +178,60 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	Mdl.ApplySelectionNoise(p, p.EnvironNoise, uniformRandom) 		// this sets PhenoFitness in each of the individuals
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
-	indexes := p.sortIndexByPhenoFitness()
-	numDead := p.numAlreadyDead(indexes)
+	p.sortIndexByPhenoFitness()		// this sorts p.IndivRefs
+	//numDead := p.numAlreadyDead(p.IndivRefs)
+	numAlreadyDead := p.getNumDead()
 
-	if numDead > 0 {
-		config.Verbose(3, "%d individuals died (fitness < 0, or < 1 when using spps) as a result of mutations added during mating", numDead)
+	if numAlreadyDead > 0 {
+		config.Verbose(3, "%d individuals died (fitness < 0, or < 1 when using spps) as a result of mutations added during mating", numAlreadyDead)
 	}
 
-	currentSize := uint32(len(indexes))
+	currentSize := uint32(len(p.IndivRefs))
 
-	if currentSize > p.Size {
-		numEliminate := currentSize - p.Size
+	if currentSize > p.TargetSize {
+		numEliminate := currentSize - p.TargetSize
 
-		if numDead < numEliminate {
+		if numAlreadyDead < numEliminate {
 			// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
 			for i := uint32(0); i < numEliminate; i++ {
-				p.Indivs[indexes[i].Index].Dead = true
+				//p.Indivs[indexes[i].Index].Dead = true
+				p.IndivRefs[i].Indiv.Dead = true
 			}
 		}
 	}
-
+	numDead := p.getNumDead()		// under certain circumstances this could be > the number we wanted to select out
 	p.ReportDeadStats()
+	p.IndivRefs = p.IndivRefs[numDead:]		// re-slice IndivRefs to eliminate the dead individuals
+	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness) } }	//todo: comment out
 
+	/* We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs.
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
 	nextIndex := 0
-	for i := 0; i < len(p.Indivs); i++ {
-		ind := p.Indivs[i]
+	for i := 0; i < len(p.indivs); i++ {
+		ind := p.indivs[i]
 		if !ind.Dead {
 			if i > nextIndex {
 				// copy it into the next open spot
-				p.Indivs[nextIndex] = ind 		// I think a shallow copy is ok, we only copy the pointers to the LB arrays
+				p.indivs[nextIndex] = ind 		// I think a shallow copy is ok, we only copy the pointers to the LB arrays
 			}
 			// else there are no open slots yet, because we have not encountered dead ones yet
 			nextIndex++
 		}
 	}
-
-	p.Indivs = p.Indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
+	p.indivs = p.indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
+	*/
 
 	return
+}
+
+
+// getNumDead returns the current number of dead individuals in this population
+func (p *Population) getNumDead() uint32 {
+	// We assume at this point p.IndivRefs is sorted by ascending fitness, so only need to count until we hit a non-dead individual
+	for i, indRef := range p.IndivRefs {
+		if !indRef.Indiv.Dead { return uint32(i) }
+	}
+	return uint32(len(p.IndivRefs))
 }
 
 
@@ -211,7 +245,9 @@ func ApplyFullTruncationNoise(p *Population, envNoise float64, uniformRandom *ra
 	Then the individuals are ordered by the resulting PhenoFitness, and the least fit are eliminated to achieve the desired population size.
 	This makes full truncation the most efficient selection model, and unrealistic unless envNoise is set rather high.
 	*/
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
 	}
 }
@@ -232,7 +268,9 @@ func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *ra
 	}
 	*/
 
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		//rnd1 := uniformRandom.Float64()
 		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
 		//rnd2 := uniformRandom.Float64()
@@ -256,14 +294,18 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 
 	// First find max individual fitness (after applying the environmental noise)
 	var maxFitness float64 = 0.0
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
 		maxFitness = utils.MaxFloat64(maxFitness, ind.PhenoFitness)
 	}
 	// Verify maxFitness is not zero so we can divide by it below
 	if maxFitness <= 0.0 { log.Fatalf("Max individual fitness is < 0 (%v), so whole population must be dead. Exiting.", maxFitness) }
 
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		// The 1st division below produces values in the range (minFitness/maxFitness) - 1. The 2nd division gets the ratio of the
 		// result and a random num 0 - 1. Since minFitness-maxFitness tends to be small (typically about 0.1), on average most results
 		// will be > than the random num, therefore the ratio of most will be > 1.0, so few will get marked dead.
@@ -281,7 +323,9 @@ func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom 
 	probability selection.  The procedure allows for the correct number of individuals to be eliminated to maintain a constant
 	population size.
 	*/
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
 		ind.PhenoFitness = ind.PhenoFitness / (config.Cfg.Selection.Partial_truncation_value + ((1. - config.Cfg.Selection.Partial_truncation_value) * uniformRandom.Float64()))
 	}
@@ -291,12 +335,16 @@ func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom 
 // CalcFitnessStats returns the mean geno fitness and std deviation
 func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
 	// Calc mean (average)
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		genoFitnessMean += ind.GenoFitness
 	}
 	genoFitnessMean = genoFitnessMean / float64(p.GetCurrentSize())
 
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		genoFitnessVariance += math.Pow(ind.GenoFitness-genoFitnessMean, 2)
 	}
 	genoFitnessVariance = genoFitnessVariance / float64(p.GetCurrentSize())
@@ -313,7 +361,10 @@ func (p *Population) ReportDeadStats() {
 	minFitness = 99.0
 	maxFitness = -99.0
 	var numDead, numDel, numNeut, numFav uint32
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
+		//todo: stop when i hit the 1st non-dead individual
 		if ind.Dead {
 			// This is a dead individual. Capture some stats before we overwrite it.
 			numDead++
@@ -346,15 +397,18 @@ func (p *Population) ReportDeadStats() {
 }
 
 
+/*
 // numAlreadyDead finds how many individuals (if any) have already been marked dead due to their fitness falling below the
 // allowed threshold when mutations were added during mating. They will be at the beginning.
-func (p *Population) numAlreadyDead(sortedIndexes []IndivFit) (numDead uint32) {
+func (p *Population) numAlreadyDead(sortedIndexes []IndivRef) (numDead uint32) {
 	for _, index := range sortedIndexes {
-		if ! p.Indivs[index.Index].Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
+		//if ! p.Indivs[index.Index].Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
+		if ! index.Indiv.Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
 		numDead++
 	}
 	return
 }
+*/
 
 
 // GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max
@@ -364,7 +418,9 @@ func (p *Population) GetFitnessStats() (float64, float64, float64) {
 	p.MinFitness = 99.0
 	p.MaxFitness = -99.0
 	p.MeanFitness = 0.0
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		p.MeanFitness += ind.GenoFitness
 		if ind.GenoFitness > p.MaxFitness { p.MaxFitness = ind.GenoFitness
 		}
@@ -385,7 +441,9 @@ func (p *Population) GetMutationStats() (float64, float64, float64,  float64, fl
 
 	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		d, n, f, avD, avF := ind.GetMutationStats()
 		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
@@ -414,7 +472,9 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float6
 
 	// For each type of allele, get the average fitness factor and number of alleles for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
-	for _, ind := range p.Indivs {
+	//for _, ind := range p.indivs {
+	for _, indRef := range p.IndivRefs {
+		ind := indRef.Indiv
 		d, n, f, avD, avF := ind.GetInitialAlleleStats()
 		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
@@ -436,8 +496,8 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float6
 
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
-func (p *Population) ReportInitial(genNum, maxGenNum uint32) {
-	config.Verbose(3, "Starting mendel simulation with a population size of %d at generation %d and continuing to generation %d", p.GetCurrentSize(), genNum, maxGenNum)
+func (p *Population) ReportInitial(maxGenNum uint32) {
+	config.Verbose(3, "Starting mendel simulation with a population size of %d  and continuing to generation %d", p.GetCurrentSize(), maxGenNum)
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
@@ -487,7 +547,11 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
-		for _, ind := range p.Indivs { ind.Report(lastGen) }
+		//for _, ind := range p.indivs { ind.Report(lastGen) }
+		for _, indRef := range p.IndivRefs {
+			ind := indRef.Indiv
+			ind.Report(lastGen)
+		}
 	}
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
@@ -518,7 +582,9 @@ func (p *Population) ReportEachGen(genNum uint32) {
 		if allelesFilename == config.ALLELES_COUNT_FILENAME {
 			// Count the alleles from all individuals
 			alleles := dna.AlleleCountFactory(genNum)
-			for _, ind := range p.Indivs {
+			//for _, ind := range p.indivs {
+			for _, indRef := range p.IndivRefs {
+				ind := indRef.Indiv
 				ind.CountAlleles(alleles)
 			}
 			//newJson, err := json.MarshalIndent(alleles, "", "  ")
@@ -528,7 +594,9 @@ func (p *Population) ReportEachGen(genNum uint32) {
 		} else {
 			// Gather the alleles from all individuals
 			alleles := &dna.Alleles{GenerationNumber: genNum}
-			for _, ind := range p.Indivs {
+			//for _, ind := range p.indivs {
+			for _, indRef := range p.IndivRefs {
+				ind := indRef.Indiv
 				ind.GatherAlleles(alleles)
 			}
 			var err error
@@ -583,35 +651,25 @@ func (p *Population) ReportFinal(genNum uint32) {
 */
 
 
-// Used as the elements to be sorted for selection
-type IndivFit struct {
-	Index uint32
-	Fitness float64
-}
-type ByFitness []IndivFit
-func (a ByFitness) Len() int           { return len(a) }
-func (a ByFitness) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByFitness) Less(i, j int) bool { return a[i].Fitness < a[j].Fitness }
-
-
-// sortIndexByFitness sorts the indexes of the individuals according to fitness (in ascending order)
-func (p *Population) sortIndexByPhenoFitness() []IndivFit {
+// fillIndivRefs fills in the p.IndivRefs array from the p.indivs array
+func (p *Population) makeAndFillIndivRefs() {
 	// Initialize the index array
-	indexes := make([]IndivFit, p.GetCurrentSize())
-	for i := range indexes {
-		indexes[i].Index = uint32(i)
-		indexes[i].Fitness = p.Indivs[i].PhenoFitness
+	p.IndivRefs = make([]IndivRef, len(p.indivs))
+	for i := range p.IndivRefs {
+		p.IndivRefs[i].Indiv = p.indivs[i]
 	}
+}
 
-	sort.Sort(ByFitness(indexes)) 		// sort the indexes according to fitness
 
-	// Output the fitnesses to check them
+// sortIndexByFitness sorts the references to the individuals (p.IndivRefs) according to the individual's fitness (in ascending order)
+func (p *Population) sortIndexByPhenoFitness() {
+	sort.Sort(ByFitness(p.IndivRefs)) 		// sort the p.IndivRefs according to fitness
+
+	// Output the fitnesses to check them, if verbosity is high enough
 	if config.IsVerbose(9) {
-		fitSlice := make([]float64, len(indexes)) 	// create an array of the sorted individual fitness values so we can print them compactly
-		for i,ind := range indexes { fitSlice[i] = p.Indivs[ind.Index].PhenoFitness
+		fitSlice := make([]float64, len(p.IndivRefs)) 	// create an array of the sorted individual fitness values so we can print them compactly
+		for i,ind := range p.IndivRefs { fitSlice[i] = ind.Indiv.PhenoFitness
 		}
-		//config.Verbose(9, "fitSlice: %v", fitSlice)
+		config.Verbose(9, "fitSlice: %v", fitSlice)
 	}
-
-	return indexes
 }
