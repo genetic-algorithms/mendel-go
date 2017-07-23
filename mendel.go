@@ -87,7 +87,7 @@ func main() {
 		log.Fatalf("Error: unrecognized value for performance_profile: %v", config.Cfg.Computation.Performance_profile)
 	}
 	uniformRandom := initialize()
-	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size, true) 		// time 0 population
+	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 	population.GenerateInitialAlleles(uniformRandom)
 	population.ReportInitial(config.Cfg.Basic.Num_generations)
 

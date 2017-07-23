@@ -37,7 +37,8 @@ func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].I
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
 // like mating and selection.
 type Population struct {
-	indivs []*Individual 	// The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
+	indivs []*Individual 	//todo: delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
+	Part *PopulationPart
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
 	TargetSize uint32        // the target size of this population after selection
@@ -60,9 +61,9 @@ type Population struct {
 
 
 // PopulationFactory creates a new population (either the initial pop, or the next generation).
-func PopulationFactory(estimatedSize uint32, initialize bool) *Population {
+func PopulationFactory(initialSize uint32) *Population {
 	p := &Population{
-		indivs: make([]*Individual, 0, estimatedSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
+		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: config.Cfg.Basic.Pop_size,
 	}
 
@@ -72,10 +73,13 @@ func PopulationFactory(estimatedSize uint32, initialize bool) *Population {
 
 	p.LBsPerChromosome = uint32(config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number)	// main.initialize() already confirmed it was a clean multiple
 
-	if initialize {
+	if initialSize > 0 {
 		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
-		for i:=uint32(1); i<= estimatedSize; i++ { p.Append(IndividualFactory(p, true)) }
+		//for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
+		p.Part = PopulationPartFactory(initialSize, p)
 		p.makeAndFillIndivRefs()
+	} else {
+		p.Part = PopulationPartFactory(0, p)
 	}
 
 	return p
@@ -138,8 +142,9 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
 	// size a little, because we will add individuals with p.Append() anyway.
-	newGenerationEstimate := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
-	newP := PopulationFactory(newGenerationEstimate, false)
+	//newGenerationEstimate := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
+	//newP := PopulationFactory(newGenerationEstimate, false)
+	newP := PopulationFactory(0)
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
@@ -147,7 +152,8 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	//todo: create instances of PopulationPart, run the mating for each of them in parallel, and then recombine the Indivs array
 	// Note: runtime.GOMAXPROCS(runtime.NumCPU()) is the default, but this statement can be modified to set a different number of CPUs to use
-
+	p.Part.Mate(parentIndices, uniformRandom)
+	/*
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
 		dadI := parentIndices[i]
@@ -156,6 +162,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 		newIndivs := p.IndivRefs[dadI].Indiv.Mate(p.IndivRefs[momI].Indiv, uniformRandom)
 		newP.Append(newIndivs...)
 	}
+	*/
 	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
 
 	// Save off the average num offspring for stats, before we select out individuals
