@@ -45,6 +45,11 @@ func TestMendelCase7(t *testing.T) {
 	mendelCase(t, 7, 7)
 }
 
+// Same as TestMendelCase5 except with 4 threads
+func TestMendelCase8(t *testing.T) {
+	mendelCase(t, 8, 8)
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

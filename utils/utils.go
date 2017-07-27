@@ -49,7 +49,7 @@ func MaxFloat64(a, b float64) float64 {
 }
 
 
-// RoundIntDiv divides a/b and returns the nearest int result. To get more exact, look at https://github.com/a-h/round
+// RoundIntDiv divides a/b and returns the nearest int result.
 func RoundIntDiv(a, b float64) int {
 	return RoundInt(a / b)
 }
@@ -61,6 +61,20 @@ func RoundInt(f float64) int {
 		return int(math.Ceil(f - 0.5))
 	}
 	return int(math.Floor(f + 0.5))
+}
+
+
+// RoundToEven returns the nearest even integer. Note: only works for positive numbers
+func RoundToEven(f float64) int {
+	remainder := math.Mod(f, 2.0)
+	switch {
+	case remainder > 1.0:
+		return int(math.Ceil(f))
+	case remainder == 1.0:
+		return int(f) + 1
+	default: 	// remainder < 1.0
+		return int(math.Floor(f))
+	}
 }
 
 func NotImplementedYet(what string) { log.Fatalf("Not implemented yet: %v", what) }

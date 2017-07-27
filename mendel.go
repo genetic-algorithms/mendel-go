@@ -2,11 +2,11 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Multiple threads (go routines)
+- (bruce) Test large multiple threads run on M4
 - (bruce) Add a new key `populationSize` to alleles-count.json, and stop supporting alleles.json
 - (bruce) Upgrade go on ec2 machines, run large runs, and compare results with mendel-f90
 - (bruce) Improve initial alleles: 1) don't count twice in same individual, 2) imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
-- (jon) Population growth
+- (jon) Population growth. From Wes on slack: "We originally implemented founder's effect so you could do both initial growth from 2 individuals up to about 1000, or 1000, and then a bottleneck (Flood event) at generation 10 or so and then split the tribes at generation 15 to model the tower of Babel event.  Maybe John would be most interest in this early on, in order to compare with our current results.  But, I think the carrying capacity is one of the more realistic general models, as it levels off to a max value.  If I remember correctly it involves solving an Ordinary Differential Equation, but you can look at the help menu and my coding.  The exponential growth model is there, but it’s a bit problematic because it has no max bound, so it grows until it runs out of memory and crashes."
 - (jon) Bottleneck
 - (jon) Tribes
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
@@ -73,7 +73,7 @@ func main() {
 
 	} else { config.Usage(0) }
 
-	// Initialize
+	// Initialize profiling, if requested
 	switch strings.ToLower(config.Cfg.Computation.Performance_profile) {
 	case "":
 		// no profiling, do nothing
@@ -86,7 +86,9 @@ func main() {
 	default:
 		log.Fatalf("Error: unrecognized value for performance_profile: %v", config.Cfg.Computation.Performance_profile)
 	}
+
 	uniformRandom := initialize()
+
 	population := pop.PopulationFactory(config.Cfg.Basic.Pop_size) 		// time 0 population
 	population.GenerateInitialAlleles(uniformRandom)
 	population.ReportInitial(config.Cfg.Basic.Num_generations)

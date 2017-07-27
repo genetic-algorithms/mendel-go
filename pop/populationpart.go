@@ -2,6 +2,7 @@ package pop
 
 import (
 	"math/rand"
+	"sync"
 )
 
 // PopulationPart is a construct used to partition the population for the purpose mating parts of the population
@@ -25,17 +26,22 @@ func PopulationPartFactory(initialSize uint32, pop *Population) *PopulationPart 
 
 	if initialSize > 0 {
 		p.Indivs = make([]*Individual, 0, initialSize)
-		for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
+		for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p.Pop, true)) }
 	}
 
 	return p
 }
 
 
+// Size returns the current number of individuals in this part of the population
+func (p *PopulationPart) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) }
+
+
 // Mate mates the parents passed in (which is a slice of the individuals in the population) and collects the children
 // in this PopulationPart object. This function is called in a go routine so it must be thread-safe.
 //todo: i think passing the parents slice does not copy all of the elements?
-func (p *PopulationPart) Mate(parentIndices []int, uniformRandom *rand.Rand) {
+func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, uniformRandom *rand.Rand, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
 	if len(parentIndices) == 0 { return }
 	// Note: the caller already shuffled the parents
 
@@ -48,7 +54,7 @@ func (p *PopulationPart) Mate(parentIndices []int, uniformRandom *rand.Rand) {
 		momI := parentIndices[i+1]
 		// dadI and momI are just indices into the combined Indivs array in the Population object, so we index into that.
 		// Each PopulationPart has a distinct subset of indices, so this is thread-safe.
-		newChildren := p.Pop.indivs[dadI].Mate(p.Pop.indivs[momI], uniformRandom)
+		newChildren := parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, uniformRandom)
 		p.Append(newChildren...)
 	}
 }

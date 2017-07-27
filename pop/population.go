@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"bitbucket.org/geneticentropy/mendel-go/dna"
 	"os"
+	"bitbucket.org/geneticentropy/mendel-go/random"
+	"sync"
 )
 
 type RecombinationType uint8
@@ -37,8 +39,8 @@ func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].I
 // Population tracks the tribes and global info about the population. It also handles population-wide actions
 // like mating and selection.
 type Population struct {
-	indivs []*Individual 	//todo: delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
-	Part *PopulationPart
+	//indivs []*Individual 	// delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
+	Parts []*PopulationPart
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
 	TargetSize uint32        // the target size of this population after selection
@@ -64,6 +66,7 @@ type Population struct {
 func PopulationFactory(initialSize uint32) *Population {
 	p := &Population{
 		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
+		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: config.Cfg.Basic.Pop_size,
 	}
 
@@ -76,10 +79,11 @@ func PopulationFactory(initialSize uint32) *Population {
 	if initialSize > 0 {
 		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
 		//for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
-		p.Part = PopulationPartFactory(initialSize, p)
+		p.Parts = append(p.Parts, PopulationPartFactory(initialSize, p))	// for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
 		p.makeAndFillIndivRefs()
 	} else {
-		p.Part = PopulationPartFactory(0, p)
+		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
+		// Mate() will populate PopulationPart with Individuals and run makeAndFillIndivRefs()
 	}
 
 	return p
@@ -87,15 +91,19 @@ func PopulationFactory(initialSize uint32) *Population {
 
 
 // Size returns the current number of individuals in this population
-func (p *Population) GetCurrentSize() uint32 { return /*uint32(len(p.indivs))*/  uint32(len(p.IndivRefs)) }
+func (p *Population) GetCurrentSize() uint32 {
+	//return uint32(len(p.indivs))
+	config.Verbose(9, "Population.GetCurrentSize(): %v", len(p.IndivRefs))
+	return uint32(len(p.IndivRefs)) }
 
-
+/*
 // Append adds a person to this population. This is our function (instead of using append() directly), in case in
 // the future we want to allocate additional individuals in bigger chunks for efficiency. See https://blog.golang.org/go-slices-usage-and-internals
 func (p *Population) Append(indivs ...*Individual) {
 	// Note: the initial make of the Indivs array is approximately big enough avoid append having to copy the array in most cases
 	p.indivs = append(p.indivs, indivs ...)
 }
+*/
 
 
 // GenerateInitialAlleles creates the initial contrasting allele pairs (if specified by the config file) and adds them to the population
@@ -150,10 +158,47 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
 	//config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
-	//todo: create instances of PopulationPart, run the mating for each of them in parallel, and then recombine the Indivs array
+	//newP.Part.Mate(p, parentIndices, uniformRandom)
+	// Divide parentIndices into segments (whose size is an even number) and schedule a go routine to mate each segment
 	// Note: runtime.GOMAXPROCS(runtime.NumCPU()) is the default, but this statement can be modified to set a different number of CPUs to use
-	p.Part.Mate(parentIndices, uniformRandom)
-	/*
+	segmentSize := utils.RoundToEven( float64(len(parentIndices)) / float64(len(newP.Parts)) )
+	if segmentSize <= 0 { segmentSize = 2 }
+	segmentStart := 0
+	highestIndex := len(parentIndices) - 1
+	config.Verbose(4, "Scheduling %v population parts concurrently with segmentSize=%v, highestIndex=%v", len(newP.Parts), segmentSize, highestIndex)
+	var waitGroup sync.WaitGroup
+	for i, part := range newP.Parts {
+		if segmentStart <= highestIndex {
+			// We still have more elements in parentIndices to mate
+			var newRandom *rand.Rand
+			if i == 0 {
+				// Let the 1st thread use the main uniformRandom generator. This has the effect that if there is only 1 thread, we will have the same
+				// sequence of random numbers that we had before concurrency was added (so we can verify the results).
+				newRandom = uniformRandom
+			} else if config.Cfg.Computation.Random_number_seed != 0 {
+				newRandom = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed+int64(i)))
+			} else {
+				newRandom = rand.New(rand.NewSource(random.GetSeed()))
+			}
+
+			var lastIndex int
+			if i < len(newP.Parts) - 1 {
+				lastIndex = utils.MinInt(segmentStart + segmentSize - 1, highestIndex)
+			} else {
+				// the last partition, so do everything that is left
+				lastIndex = highestIndex
+			}
+			waitGroup.Add(1)
+			go part.Mate(p, parentIndices[segmentStart:lastIndex+1], newRandom, &waitGroup)
+			segmentStart = lastIndex + 1
+		}
+		// else we are out of elements in parentIndices so do not do anything
+	}
+
+	// Wait for all of the Mate functions to complete
+	waitGroup.Wait()
+
+	/* this was before concurrency...
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
 		dadI := parentIndices[i]
@@ -504,7 +549,7 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float6
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (p *Population) ReportInitial(maxGenNum uint32) {
-	config.Verbose(3, "Starting mendel simulation with a population size of %d  and continuing to generation %d", p.GetCurrentSize(), maxGenNum)
+	config.Verbose(2, "Running with a population size of %d for %d generations with %d threads", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads)
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
@@ -628,42 +673,20 @@ func (p *Population) ReportEachGen(genNum uint32) {
 }
 
 
-/* combined this with ReportEachGen()...
-// ReportFinal prints out summary statistics of this population.
-func (p *Population) ReportFinal(genNum uint32) {
-	perGenVerboseLevel := uint32(2)            // level at which we already printed this info for each gen
-	finalVerboseLevel := uint32(1)            // level at which we will print population info
-	perGenIndSumVerboseLevel := uint32(3)            // level at which we already printed this info for each gen
-	finalIndSumVerboseLevel := uint32(2)            // level at which we will print individuals summary info
-	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will already printed this info for each gen
-	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual
-	popSize := p.GetCurrentSize()
-
-	if !config.IsVerbose(perGenVerboseLevel) && config.IsVerbose(finalVerboseLevel) {
-		log.Println("Final report:")
-		aveFit, minFit, maxFit := p.GetFitnessStats()
-		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		log.Printf("After %d generations: Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
-		if !config.IsVerbose(perGenIndSumVerboseLevel) && config.IsVerbose(finalIndSumVerboseLevel) {
-			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", d, n, f, avDelFit, avFavFit)
-		}
-	}
-	if !config.IsVerbose(perGenIndDetailVerboseLevel) && config.IsVerbose(finalIndDetailVerboseLevel) {
-		log.Println(" Individual Detail:")
-		for _, i := range p.Indivs {
-			i.Report(true)
-		}
-	}
-}
-*/
-
-
-// fillIndivRefs fills in the p.IndivRefs array from the p.indivs array
+// makeAndFillIndivRefs fills in the p.IndivRefs array from all of the p.Part.Indivs array
 func (p *Population) makeAndFillIndivRefs() {
-	// Initialize the index array
-	p.IndivRefs = make([]IndivRef, len(p.indivs))
-	for i := range p.IndivRefs {
-		p.IndivRefs[i].Indiv = p.indivs[i]
+	// Find the total num of individuals so we can initialize the refs array
+	size := 0
+	for _, part := range p.Parts { size += int(part.GetCurrentSize()) }
+	p.IndivRefs = make([]IndivRef, size)
+
+	// Now populate the refs array
+	i := 0
+	for _, part := range p.Parts {
+		for _, ind := range part.Indivs {
+			p.IndivRefs[i].Indiv = ind
+			i++
+		}
 	}
 }
 
