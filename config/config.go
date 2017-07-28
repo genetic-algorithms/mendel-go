@@ -160,7 +160,7 @@ func (c *Config) validateAndAdjust() error {
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
 
-	if c.Computation.Tracking_threshold >= 1.0 && (FMgr.IsFile(ALLELES_FILENAME) || FMgr.IsFile(ALLELES_COUNT_FILENAME)) { return errors.New("Error: "+ALLELES_FILENAME+" or "+ALLELES_COUNT_FILENAME+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
+	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsFile(ALLELES_COUNT_FILENAME) { return errors.New("Error: "+ALLELES_COUNT_FILENAME+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
 
 	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Error: Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
 

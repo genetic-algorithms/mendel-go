@@ -328,17 +328,29 @@ func (ind *Individual) GetInitialAlleleStats() (uint32, uint32, uint32, float64,
 }
 
 
+/*
 // GatherAlleles adds all of this individual's alleles (both mutations and initial alleles) to the given struct
 func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 	for _, c := range ind.ChromosomesFromDad { c.GatherAlleles(alleles) }
 	for _, c := range ind.ChromosomesFromMom { c.GatherAlleles(alleles) }
 }
+*/
 
 
 // CountAlleles counts all of this individual's alleles (both mutations and initial alleles) and adds them to the given struct
 func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
-	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(alleles) }
-	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(alleles) }
+	// Get the alleles for this individual
+	allelesForThisIndiv := dna.AlleleCountFactory(0, 0)		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
+	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(allelesForThisIndiv) }
+	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(allelesForThisIndiv) }
+
+	// Add the alleles found for this individual to the alleles map for the whole population
+	// Note: map returns the zero value of the value type for keys which are not yet in the map (zero value for int is 0), so we do not need to check if it is there with: if count, ok := alleles.Deleterious[id]; ok {
+	for id := range allelesForThisIndiv.Deleterious { alleles.Deleterious[id] += 1 }
+	for id := range allelesForThisIndiv.Neutral { alleles.Neutral[id] += 1 }
+	for id := range allelesForThisIndiv.Favorable { alleles.Favorable[id] += 1 }
+	for id := range allelesForThisIndiv.DelInitialAlleles { alleles.DelInitialAlleles[id] += 1 }
+	for id := range allelesForThisIndiv.FavInitialAlleles { alleles.FavInitialAlleles[id] += 1 }
 }
 
 

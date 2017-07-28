@@ -37,6 +37,7 @@ type Mutator interface {
 	GetFitnessEffect() float64
 }
 
+/*
 // All the alleles (both mutations and initial alleles) for 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type Alleles struct {
 	GenerationNumber     uint32     `json:"generationNumber"`
@@ -46,10 +47,12 @@ type Alleles struct {
 	DelInitialAlleles         []uintptr `json:"delInitialAlleles"`
 	FavInitialAlleles         []uintptr `json:"favInitialAlleles"`
 }
+*/
 
 // The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type AlleleCount struct {
 	GenerationNumber     uint32     `json:"generationNumber"`
+	PopulationSize uint32 `json:"populationSize"`
 	Deleterious         map[uintptr]uint32 `json:"deleterious"`
 	Neutral         map[uintptr]uint32 `json:"neutral"`
 	Favorable         map[uintptr]uint32 `json:"favorable"`
@@ -57,8 +60,8 @@ type AlleleCount struct {
 	FavInitialAlleles         map[uintptr]uint32 `json:"favInitialAlleles"`
 }
 
-func AlleleCountFactory(genNum uint32) *AlleleCount {
-	ac := &AlleleCount{GenerationNumber: genNum}
+func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
+	ac := &AlleleCount{GenerationNumber: genNum, PopulationSize: popSize}
 	ac.Deleterious = make(map[uintptr]uint32)
 	ac.Neutral = make(map[uintptr]uint32)
 	ac.Favorable = make(map[uintptr]uint32)

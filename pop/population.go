@@ -10,7 +10,6 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/utils"
 	"encoding/json"
 	"bitbucket.org/geneticentropy/mendel-go/dna"
-	"os"
 	"bitbucket.org/geneticentropy/mendel-go/random"
 	"sync"
 )
@@ -556,6 +555,7 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
 	}
 
+	/*
 	var allelesFilename string
 	var alleleWriter *os.File
 	if alleleWriter = config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
@@ -564,9 +564,11 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 		allelesFilename = config.ALLELES_FILENAME
 	}
 	if alleleWriter != nil {
+	*/
+	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
 		// Write the outer json object and the array that will contain the output of each generation
 		if _, err := alleleWriter.Write([]byte(`{"allelesForEachGen":[`)); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", allelesFilename, err)
+			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
 		}
 	}
 }
@@ -622,6 +624,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 
 	// Note: this allele json objects in wrapped in an outer json object and array, which we form manually so we don't have to gather the alleles from
 	//		all generations into a single huge json object
+	/*
 	var allelesFilename string
 	var alleleWriter *os.File
 	if alleleWriter = config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
@@ -629,20 +632,24 @@ func (p *Population) ReportEachGen(genNum uint32) {
 	} else if alleleWriter = config.FMgr.GetFile(config.ALLELES_FILENAME); alleleWriter != nil {
 		allelesFilename = config.ALLELES_FILENAME
 	}
-	if alleleWriter != nil && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
-		var newJson []byte
-		if allelesFilename == config.ALLELES_COUNT_FILENAME {
-			// Count the alleles from all individuals
-			alleles := dna.AlleleCountFactory(genNum)
-			//for _, ind := range p.indivs {
-			for _, indRef := range p.IndivRefs {
-				ind := indRef.Indiv
-				ind.CountAlleles(alleles)
-			}
-			//newJson, err := json.MarshalIndent(alleles, "", "  ")
-			var err error
-			newJson, err = json.Marshal(alleles)
-			if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
+	*/
+	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+		//var newJson []byte
+		//if allelesFilename == config.ALLELES_COUNT_FILENAME {
+
+		// Count the alleles from all individuals
+		alleles := dna.AlleleCountFactory(genNum, popSize)
+		//for _, ind := range p.indivs {
+		for _, indRef := range p.IndivRefs {
+			ind := indRef.Indiv
+			ind.CountAlleles(alleles)
+		}
+		//newJson, err := json.MarshalIndent(alleles, "", "  ")
+		//var err error
+		newJson, err := json.Marshal(alleles)
+		if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
+
+		/*
 		} else {
 			// Gather the alleles from all individuals
 			alleles := &dna.Alleles{GenerationNumber: genNum}
@@ -655,6 +662,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 			newJson, err = json.Marshal(alleles)
 			if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
 		}
+		*/
 
 		// Wrap the json in an outer json object and write it to the file
 		if lastGen {
@@ -663,7 +671,7 @@ func (p *Population) ReportEachGen(genNum uint32) {
 			newJson = append(newJson, ","...)		// more json objects to come in the array so append a comma
 		}
 		if _, err := alleleWriter.Write(newJson); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", allelesFilename, err)
+			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
 		}
 
 	}

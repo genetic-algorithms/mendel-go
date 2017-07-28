@@ -9,7 +9,7 @@ import (
 // Supported file names. Do we need to make this a literal map to be able to check inputted file names??
 const (
 	HISTORY_FILENAME string = "mendel.hst"
-	ALLELES_FILENAME string = "alleles.json"
+	//ALLELES_FILENAME string = "alleles.json"  <- no longer supporting this
 	ALLELES_COUNT_FILENAME string = "alleles-count.json"
 )
 

@@ -248,13 +248,15 @@ func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable ui
 }
 
 
+/*
 // GatherAlleles counts all of this chromosome's alleles (both mutations and initial alleles) and adds them to the given struct
 func (c *Chromosome) GatherAlleles(alleles *Alleles) {
 	for _, lb := range c.LinkageBlocks { lb.GatherAlleles(alleles) }
 }
+*/
 
 
 // CountAlleles adds all of this chromosome's alleles (both mutations and initial alleles) to the given struct
-func (c *Chromosome) CountAlleles(alleles *AlleleCount) {
-	for _, lb := range c.LinkageBlocks { lb.CountAlleles(alleles) }
+func (c *Chromosome) CountAlleles(allelesForThisIndiv *AlleleCount) {
+	for _, lb := range c.LinkageBlocks { lb.CountAlleles(allelesForThisIndiv) }
 }
