@@ -28,7 +28,7 @@ type LinkageBlock struct {
 	FAllele []*FavorableAllele
 	AlleleDelFitnessEffect float64 // keep a running sum of the fitness so we can calc the LB fitness quickly
 	AlleleFavFitnessEffect float64
-	NAllele []*NeutralAllele
+	//NAllele []*NeutralAllele   // do not know of any reason to have these
 
 	Owner *Chromosome		// keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
@@ -93,10 +93,12 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 		copy(newLb.DAllele, lb.DAllele)
 	}
 	newLb.AlleleDelFitnessEffect = lb.AlleleDelFitnessEffect
+	/*
 	if len(lb.NAllele) > 0 {
 		newLb.NAllele = make([]*NeutralAllele, len(lb.NAllele))
 		copy(newLb.NAllele, lb.NAllele)
 	}
+	*/
 	if len(lb.FAllele) > 0 {
 		newLb.FAllele = make([]*FavorableAllele, len(lb.FAllele))
 		copy(newLb.FAllele, lb.FAllele)
@@ -208,7 +210,8 @@ func (lb *LinkageBlock) GetInitialAlleleStats() (deleterious, neutral, favorable
 	deleterious = uint32(len(lb.DAllele))
 	if deleterious > 0 { avDelFit = lb.AlleleDelFitnessEffect / float64(deleterious) } 		// else avDelFit is already 0.0
 
-	neutral = uint32(len(lb.NAllele))
+	//neutral = uint32(len(lb.NAllele))
+	neutral = 0
 
 	favorable = uint32(len(lb.FAllele))
 	if favorable > 0 { avFavFit = lb.AlleleFavFitnessEffect / float64(favorable) } 		// else avFavFit is already 0.0

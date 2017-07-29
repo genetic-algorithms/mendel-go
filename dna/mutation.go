@@ -22,18 +22,16 @@ const (
 // We depend on mutations being immutable, once created, because we pass them from parent to child.
 // To enforce that, the members are only available thru getter functions.
 type Mutation struct {
-	//mType         MutationType
-	//dominant      bool    // dominant or recessive mutation <- i do not think i need to save this, because its effect is embodied in expressed. Do we need to save this info??
-	//expressed     bool    // whether or not this allele is expressed, based on Dominant_hetero_expression and Recessive_hetero_expression
-	fitnessEffect float64 // consider making this float32 to save space
+    //fitnessEffect float64 // consider making this float32 to save space
+	fitnessEffect float32 // this is float32 to save space. When it is combined with others we save that result as a float64
+	//mType         MutationType	// do not need to store this because it is represented by the Mutation subclasses
+	//dominant      bool    // do not need to store this because we apply this influence during mutation factory
+	//expressed     bool    // do not need to store this because we apply this influence during mutation factory
 	//generation uint16	// the generation number in which this mutation was created. Used for statistics of how long the mutations survive in the pop.
 }
 
 // This interface enables us to hold subclasses of Mutation in a variable of the base class
 type Mutator interface {
-	//GetMType() MutationType
-	//GetDominant() bool
-	//GetExpressed() bool
 	GetFitnessEffect() float64
 }
 
@@ -72,11 +70,7 @@ func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
 
 
 // Member access methods
-//func (m *Mutation) GetMType() MutationType { return m.mType }
-//func (m *Mutation) GetDominant() bool { return m.dominant }
-//func (m *Mutation) GetExpressed() bool { return m.expressed }
-func (m *Mutation) GetFitnessEffect() float64 { return m.fitnessEffect
-}
+func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
 
 
 // CalcMutationType determines if the next mutation should be deleterious/neutral/favorable based on a random number and the various relevant rates for this population.
@@ -104,8 +98,6 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 // This is used in the subclass factories to initialize the base Mutation class members.
 //func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
 func calcMutationAttrs(uniformRandom *rand.Rand) (dominant bool) {
-	//m.fitnessEffect = CalcFitnessEffect(*m, uniformRandom)
-
 	// Determine if this mutation is dominant or recessive
 	dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
 
@@ -189,9 +181,9 @@ func DeleteriousMutationFactory(uniformRandom *rand.Rand) *DeleteriousMutation {
 	m := &DeleteriousMutation{Mutation{}}
 	dominant := calcMutationAttrs(uniformRandom)
 	if (dominant) {
-		m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression
+		m.fitnessEffect = float32(Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
-		m.fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression
+		m.fitnessEffect = float32(Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
 	}
 	return m
 }
@@ -214,9 +206,9 @@ func FavorableMutationFactory(uniformRandom *rand.Rand) *FavorableMutation {
 	m := &FavorableMutation{Mutation{}}
 	dominant := calcMutationAttrs(uniformRandom)
 	if (dominant) {
-		m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression
+		m.fitnessEffect = float32(Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
-		m.fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression
+		m.fitnessEffect = float32(Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
 	}
 	return m
 }
@@ -228,18 +220,19 @@ type DeleteriousAllele struct {
 }
 
 func DeleteriousAlleleFactory(fitnessEffect float64) *DeleteriousAllele {
-	return &DeleteriousAllele{Mutation{fitnessEffect: fitnessEffect}}
+	return &DeleteriousAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
 }
 
 
+/* do know of any reason to have these...
 // NeutralAllele represents 1 neutral allele in 1 individual.
 type NeutralAllele struct {
 	Mutation 		// this anonymous reference includes the base class's struct here
 }
-
 func NeutralAlleleFactory() *NeutralAllele {
 	return &NeutralAllele{Mutation{}}
 }
+*/
 
 
 // DeleteriousAllele represents 1 deleterious allele in 1 individual.
@@ -248,5 +241,5 @@ type FavorableAllele struct {
 }
 
 func FavorableAlleleFactory(fitnessEffect float64) *FavorableAllele {
-	return &FavorableAllele{Mutation{fitnessEffect: fitnessEffect}}
+	return &FavorableAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
 }

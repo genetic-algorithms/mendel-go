@@ -66,11 +66,8 @@ type Config struct {
 		Initial_alleles_pop_frac float64
 		Initial_allele_fitness_model string
 		Max_total_fitness_increase float64
-		Initial_alleles_amp_factor int
 		Crossover_model string
 		Mean_num_crossovers uint32
-		Crossover_fraction float64
-		Dynamic_linkage bool
 		Haploid_chromosome_number uint32
 		Num_linkage_subunits uint32
 		Pop_growth_model int
@@ -97,14 +94,8 @@ type Config struct {
 		Tracking_threshold float64
 		Extinction_threshold float64
 		Track_neutrals bool
-		Max_del_mutn_per_indiv uint32
-		Max_neu_mutn_per_indiv uint32
-		Max_fav_mutn_per_indiv uint32
 		Num_threads uint32
 		Random_number_seed int64
-		Reseed_rng bool			// not used. If Random_number_seed==0 we use a truly random seed
-		Write_dump bool
-		Write_vcf bool
 		Restart_case bool
 		Restart_dump_number uint32
 		Plot_allele_gens uint32
