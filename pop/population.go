@@ -166,7 +166,8 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 	highestIndex := len(parentIndices) - 1
 	config.Verbose(4, "Scheduling %v population parts concurrently with segmentSize=%v, highestIndex=%v", len(newP.Parts), segmentSize, highestIndex)
 	var waitGroup sync.WaitGroup
-	for i, part := range newP.Parts {
+	for i := range newP.Parts {
+		newPart := newP.Parts[i] 		// part can't be declared in the for stmt because it would change before some of the go routines start. See https://github.com/golang/go/wiki/CommonMistakes
 		if segmentStart <= highestIndex {
 			// We still have more elements in parentIndices to mate
 			var newRandom *rand.Rand
@@ -180,16 +181,17 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 				newRandom = rand.New(rand.NewSource(random.GetSeed()))
 			}
 
-			var lastIndex int
+			beginIndex := segmentStart		// just to be careful, copying segmentStart to a local var so it is different from each go routine invocation
+			var endIndex int
 			if i < len(newP.Parts) - 1 {
-				lastIndex = utils.MinInt(segmentStart + segmentSize - 1, highestIndex)
+				endIndex = utils.MinInt(segmentStart + segmentSize - 1, highestIndex)
 			} else {
 				// the last partition, so do everything that is left
-				lastIndex = highestIndex
+				endIndex = highestIndex
 			}
 			waitGroup.Add(1)
-			go part.Mate(p, parentIndices[segmentStart:lastIndex+1], newRandom, &waitGroup)
-			segmentStart = lastIndex + 1
+			go newPart.Mate(p, parentIndices[beginIndex:endIndex +1], newRandom, &waitGroup)
+			segmentStart = endIndex + 1
 		}
 		// else we are out of elements in parentIndices so do not do anything
 	}
@@ -548,7 +550,7 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float6
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (p *Population) ReportInitial(maxGenNum uint32) {
-	config.Verbose(2, "Running with a population size of %d for %d generations with %d threads", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads)
+	config.Verbose(1, "Running with a population size of %d for %d generations with %d threads", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads)
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
@@ -578,10 +580,11 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 func (p *Population) ReportEachGen(genNum uint32) {
 	utils.Measure.Start("ReportEachGen")
 	lastGen := genNum == config.Cfg.Basic.Num_generations
+	perGenMinimalVerboseLevel := uint32(1)            // level at which we will print only the info that is very quick to gather
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
-	perGenIndSumVerboseLevel := uint32(3)            // level at which we will print individuals summary info each generation
-	finalIndSumVerboseLevel := uint32(2)            // level at which we will print individuals summary info at the end of the run
+	perGenIndSumVerboseLevel := uint32(3) 		// level at which we will print individuals summary info each generation
+	finalIndSumVerboseLevel := uint32(2) // Note: if you change this value, change the verbose level used to calc the values in Mate(). Level at which we will print individuals summary info at the end of the run
 	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print info about each individual each generation
 	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
@@ -598,6 +601,8 @@ func (p *Population) ReportEachGen(genNum uint32) {
 			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
 			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
 		}
+	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
+		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v", genNum, popSize, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
@@ -689,11 +694,12 @@ func (p *Population) makeAndFillIndivRefs() {
 	p.IndivRefs = make([]IndivRef, size)
 
 	// Now populate the refs array
-	i := 0
+	irIndex := 0
 	for _, part := range p.Parts {
-		for _, ind := range part.Indivs {
-			p.IndivRefs[i].Indiv = ind
-			i++
+		for j := range part.Indivs {
+			p.IndivRefs[irIndex].Indiv = part.Indivs[j]
+			part.Indivs[j] = nil 	// eliminate this reference to the individual so garbage collection can delete the individual as soon as we use and eliminate the reference in IndivRefs in Mate() of next gen
+			irIndex++
 		}
 	}
 }

@@ -21,7 +21,7 @@ var Measure *Measurer
 func MeasurerFactory(verbosity uint32) {
 	Measure = &Measurer{}
 
-	if verbosity >= 2 { Measure.Track = true }		// don't bother tracking the times if we are not going to print them
+	if verbosity >= 1 { Measure.Track = true }		// don't bother tracking the times if we are not going to print them
 	Measure.DeltaTime = make(map[string]time.Time)
 	Measure.TotalTime = make(map[string]int64)
 }

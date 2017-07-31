@@ -30,7 +30,8 @@ var FMgr *FileMgr
 
 // FileMgrFactory creates FMgr and initializes it. filesToOutput comes from the input file.
 func FileMgrFactory(dataFilePath, filesToOutput string) {
-	FMgr = &FileMgr{}
+	FMgr = &FileMgr{Files: make(map[string]*os.File)}
+	if filesToOutput == "" { return }
 
 	// Open all of the files and put in the map
 	fileNames := regexp.MustCompile(`,\s*`).Split(filesToOutput, -1)
@@ -39,7 +40,7 @@ func FileMgrFactory(dataFilePath, filesToOutput string) {
 		// Make sure output directory exists
 		if err := os.MkdirAll(dataFilePath, 0755); err != nil { log.Fatalf("Error creating data_file_path %v: %v", dataFilePath, err) }
 	}
-	FMgr.Files = make(map[string]*os.File)
+	//FMgr.Files = make(map[string]*os.File)
 	for _, f := range fileNames {
 		//todo: check the input file name against the const/enum at the top of this file
 		filePath := dataFilePath + "/" + f

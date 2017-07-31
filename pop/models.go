@@ -101,5 +101,5 @@ func SetModels(c *config.Config) {
 		log.Fatalf("Error: unrecognized value for selection_model: %v", c.Selection.Selection_model)
 	}
 
-	config.Verbose(2, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
+	config.Verbose(1, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
 }

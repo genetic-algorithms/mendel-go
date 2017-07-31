@@ -39,7 +39,7 @@ func (p *PopulationPart) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) 
 
 // Mate mates the parents passed in (which is a slice of the individuals in the population) and collects the children
 // in this PopulationPart object. This function is called in a go routine so it must be thread-safe.
-//todo: i think passing the parents slice does not copy all of the elements?
+// Note: since parentIndices is a slice (not the actual array), passing it as a param does not copy all of the elements.
 func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, uniformRandom *rand.Rand, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
 	if len(parentIndices) == 0 { return }
@@ -56,6 +56,10 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unifor
 		// Each PopulationPart has a distinct subset of indices, so this is thread-safe.
 		newChildren := parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, uniformRandom)
 		p.Append(newChildren...)
+
+		// Eliminate the reference to these parents so gc can reclaim them because we don't need them any more
+		parentPop.IndivRefs[dadI].Indiv = nil
+		parentPop.IndivRefs[momI].Indiv = nil
 	}
 }
 

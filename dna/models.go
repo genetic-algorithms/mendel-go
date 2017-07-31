@@ -90,5 +90,5 @@ func SetModels(c *config.Config) {
 		log.Fatalf("Error: unrecognized value for crossover_model: %v", c.Population.Crossover_model)
 	}
 
-	config.Verbose(2, "Running with these dna models: %v", strings.Join(mdlNames, ", "))
+	config.Verbose(1, "Running with these dna models: %v", strings.Join(mdlNames, ", "))
 }
