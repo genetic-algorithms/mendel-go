@@ -2,6 +2,7 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
+- (bruce) Automatically don't track mutations when alleles-count.json is not output
 - (bruce) Test large multiple threads run on M4
 - (bruce) Upgrade go on ec2 machines, run large runs, and compare results with mendel-f90
 - (bruce) Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90

@@ -17,8 +17,12 @@ type LinkageBlock struct {
 	//TrackedFavFitnessEffect float64
 	//UntrackedDelFitnessEffect float64 // these 4 members are used instead of some or all of the individual mutations if Tracking_threshold is set
 	//UntrackedFavFitnessEffect float64
-	delFitnessEffect        float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
-	favFitnessEffect        float64
+
+	// This is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 11th decimal place. It saves approx 160MB for a 10,000 pop, plus the time for allocating and copying the extra mem
+	//delFitnessEffect        float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
+	//favFitnessEffect        float64
+	delFitnessEffect        float32              // keep a running sum of the fitness so we can calc the LB fitness quickly.
+	favFitnessEffect        float32
 
 	numUntrackedDeleterious uint16
 	numUntrackedFavorable   uint16
@@ -28,8 +32,10 @@ type LinkageBlock struct {
 
 	dAllele                 []*DeleteriousAllele // initial alleles
 	fAllele                 []*FavorableAllele
-	alleleDelFitnessEffect  float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
-	alleleFavFitnessEffect  float64
+	//alleleDelFitnessEffect  float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
+	//alleleFavFitnessEffect  float64
+	alleleDelFitnessEffect  float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
+	alleleFavFitnessEffect  float32
 	//NAllele []*NeutralAllele   // do not know of any reason to have these
 
 	owner                   *Chromosome          // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
@@ -128,16 +134,16 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 	mType := CalcMutationType(uniformRandom)
 	switch mType {
 	case DELETERIOUS:
-		mutn := DeleteriousMutationFactory(uniformRandom)
-		if config.Cfg.Computation.Tracking_threshold == 0.0 || mutn.GetFitnessEffect() < -config.Cfg.Computation.Tracking_threshold {
+		fitnessEffect := calcDelMutationAttrs(uniformRandom)
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < float32(-config.Cfg.Computation.Tracking_threshold) {
+			// We are tracking this mutation, so create it and append
+			mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
 			lb.dMutn = append(lb.dMutn, mutn)
-			//lb.TrackedDelFitnessEffect += mutn.GetFitnessEffect()
 		} else {
-			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
-			//lb.UntrackedDelFitnessEffect += mutn.GetFitnessEffect()
 			lb.numUntrackedDeleterious++
 		}
-		lb.delFitnessEffect += mutn.GetFitnessEffect()
+		// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive, so this is appropriate
+		lb.delFitnessEffect += fitnessEffect
 	case NEUTRAL:
 		if config.Cfg.Computation.Track_neutrals {
 			//config.Verbose(3, "adding a neutral mutation")
@@ -147,16 +153,16 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 			lb.numUntrackedNeutrals++
 		}
 	case FAVORABLE:
-		mutn := FavorableMutationFactory(uniformRandom)
-		if config.Cfg.Computation.Tracking_threshold == 0.0 || mutn.GetFitnessEffect() > config.Cfg.Computation.Tracking_threshold {
+		fitnessEffect := calcFavMutationAttrs(uniformRandom)
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > float32(config.Cfg.Computation.Tracking_threshold) {
+			// We are tracking this mutation, so create it and append
+			mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
 			lb.fMutn = append(lb.fMutn, mutn)
-			//lb.TrackedFavFitnessEffect += mutn.GetFitnessEffect()
 		} else {
-			// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive
-			//lb.UntrackedFavFitnessEffect += mutn.GetFitnessEffect()
 			lb.numUntrackedFavorable++
 		}
-		lb.favFitnessEffect += mutn.GetFitnessEffect()
+		// Currently the code that checks the input file only allows a Tracking_threshold if the combination model is additive, so this is appropriate
+		lb.favFitnessEffect += fitnessEffect
 	}
 }
 
@@ -170,11 +176,12 @@ func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniformRandom *rand
 	fitnessEffect := Mdl.CalcAlleleFitness(uniformRandom) * expression
 
 	// Add a favorable allele to the 1st LB
+	// Note: we assume that if initial alleles are being created, they are being tracked
 	favAllele := FavorableAlleleFactory(fitnessEffect)
 	lb1.fAllele = append(lb1.fAllele, favAllele)
 	lb1.alleleFavFitnessEffect += favAllele.GetFitnessEffect()
 
-	// Add a deleterious allele to the 1st LB
+	// Add a deleterious allele to the 2nd LB
 	delAllele := DeleteriousAlleleFactory(-fitnessEffect)
 	lb2.dAllele = append(lb2.dAllele, delAllele)
 	lb2.alleleDelFitnessEffect += delAllele.GetFitnessEffect()
@@ -189,7 +196,7 @@ func (lb *LinkageBlock) SumFitness() (fitness float64) {
 	//for _, m := range lb.FMutn { fitness += m.GetFitnessEffect() }
 	// If there are no untracked mutations, this is still ok
 	//fitness = lb.UntrackedDelFitnessEffect + lb.UntrackedFavFitnessEffect + lb.TrackedDelFitnessEffect + lb.TrackedFavFitnessEffect + lb.AlleleDelFitnessEffect + lb.AlleleFavFitnessEffect
-	fitness = lb.delFitnessEffect + lb.favFitnessEffect + lb.alleleDelFitnessEffect + lb.alleleFavFitnessEffect
+	fitness = float64(lb.delFitnessEffect + lb.favFitnessEffect + lb.alleleDelFitnessEffect + lb.alleleFavFitnessEffect)
 	return
 }
 
@@ -200,14 +207,14 @@ func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint
 	// Note: this is only valid for the additive combination method
 	deleterious = uint32(len(lb.dMutn)) + uint32(lb.numUntrackedDeleterious)
 	//avDelFit = lb.UntrackedDelFitnessEffect + lb.TrackedDelFitnessEffect
-	avDelFit = lb.delFitnessEffect
+	avDelFit = float64(lb.delFitnessEffect)
 	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) } 		// else avDelFit is already 0.0
 
 	neutral = uint32(len(lb.nMutn)) + uint32(lb.numUntrackedNeutrals)
 
 	favorable = uint32(len(lb.fMutn)) + uint32(lb.numUntrackedFavorable)
 	//avFavFit = lb.UntrackedFavFitnessEffect + lb.TrackedFavFitnessEffect
-	avFavFit = lb.favFitnessEffect
+	avFavFit = float64(lb.favFitnessEffect)
 	if favorable > 0 { avFavFit = avFavFit / float64(favorable) } 		// else avFavFit is already 0.0
 	return
 }
@@ -217,46 +224,15 @@ func (lb *LinkageBlock) GetMutationStats() (deleterious, neutral, favorable uint
 func (lb *LinkageBlock) GetInitialAlleleStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
 	// Note: this is only valid for the additive combination method
 	deleterious = uint32(len(lb.dAllele))
-	if deleterious > 0 { avDelFit = lb.alleleDelFitnessEffect / float64(deleterious) } 		// else avDelFit is already 0.0
+	if deleterious > 0 { avDelFit = float64(lb.alleleDelFitnessEffect) / float64(deleterious) } 		// else avDelFit is already 0.0
 
 	//neutral = uint32(len(lb.NAllele))
 	neutral = 0
 
 	favorable = uint32(len(lb.fAllele))
-	if favorable > 0 { avFavFit = lb.alleleFavFitnessEffect / float64(favorable) } 		// else avFavFit is already 0.0
+	if favorable > 0 { avFavFit = float64(lb.alleleFavFitnessEffect) / float64(favorable) } 		// else avFavFit is already 0.0
 	return
 }
-
-
-/*
-// GatherAlleles adds all of this LB's alleles (both mutations and initial alleles) to the given struct
-func (lb *LinkageBlock) GatherAlleles(alleles *Alleles) {
-	for _, m := range lb.DMutn {
-		// Use the ptr to the mutation object as its unique identifier for the allele bin data file.
-		// Note: Go calls this pkg unsafe because is can be used to avoid type safety and access arbitrary memory. But we aren't doing
-		// any of those bad things. We are just converting the mutation object ptr to an int so that printing it to the alleles bin
-		// data file is in a format easier to consume.
-		id := uintptr(unsafe.Pointer(m))
-		alleles.Deleterious = append(alleles.Deleterious, id)
-	}
-	for _, m := range lb.NMutn {
-		id := uintptr(unsafe.Pointer(m))
-		alleles.Neutral = append(alleles.Neutral, id)
-	}
-	for _, m := range lb.FMutn {
-		id := uintptr(unsafe.Pointer(m))
-		alleles.Favorable = append(alleles.Favorable, id)
-	}
-	for _, a := range lb.DAllele {
-		id := uintptr(unsafe.Pointer(a))
-		alleles.DelInitialAlleles = append(alleles.DelInitialAlleles, id)
-	}
-	for _, a := range lb.FAllele {
-		id := uintptr(unsafe.Pointer(a))
-		alleles.FavInitialAlleles = append(alleles.FavInitialAlleles, id)
-	}
-}
-*/
 
 
 // CountAlleles counts all of this LB's alleles (both mutations and initial alleles) and adds them to the given struct

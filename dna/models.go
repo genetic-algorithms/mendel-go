@@ -70,8 +70,6 @@ func SetModels(c *config.Config) {
 		if c.Population.Num_contrasting_alleles > 0 && c.Population.Max_total_fitness_increase <= 0.0 { log.Fatal("Error: if initial_allele_fitness_model==uniform, then max_total_fitness_increase must be > 0.") }
 		Mdl.CalcAlleleFitness = CalcUniformAlleleFitness
 		mdlNames = append(mdlNames, "CalcUniformAlleleFitness")
-		//Mdl.CalcFavAlleleFitness = CalcUniformFavAlleleFitness
-		//mdlNames = append(mdlNames, "CalcUniformFavAlleleFitness")
 	default:
 		log.Fatalf("Error: unrecognized value for initial_allele_fitness_model: %v", c.Population.Initial_allele_fitness_model)
 	}

@@ -22,8 +22,8 @@ const (
 // We depend on mutations being immutable, once created, because we pass them from parent to child.
 // To enforce that, the members are only available thru getter functions.
 type Mutation struct {
-    //fitnessEffect float64 // consider making this float32 to save space
-	fitnessEffect float32 // this is float32 to save space. When it is combined with others we save that result as a float64
+    //fitnessEffect float64
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
 	//mType         MutationType	// do not need to store this because it is represented by the Mutation subclasses
 	//dominant      bool    // do not need to store this because we apply this influence during mutation factory
 	//expressed     bool    // do not need to store this because we apply this influence during mutation factory
@@ -32,7 +32,8 @@ type Mutation struct {
 
 // This interface enables us to hold subclasses of Mutation in a variable of the base class
 type Mutator interface {
-	GetFitnessEffect() float64
+	//GetFitnessEffect() float64
+	GetFitnessEffect() float32
 }
 
 /*
@@ -70,7 +71,8 @@ func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
 
 
 // Member access methods
-func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
+//func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
+func (m *Mutation) GetFitnessEffect() float32 { return m.fitnessEffect }
 
 
 // CalcMutationType determines if the next mutation should be deleterious/neutral/favorable based on a random number and the various relevant rates for this population.
@@ -94,20 +96,32 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 }
 
 
-// calcMutationAttrs determines the dominant and expressed attributes of a new mutation, based on a random number and the config params.
-// This is used in the subclass factories to initialize the base Mutation class members.
-//func calcMutationAttrs(uniformRandom *rand.Rand) (expressed bool) {
-func calcMutationAttrs(uniformRandom *rand.Rand) (dominant bool) {
-	// Determine if this mutation is dominant or recessive
-	dominant = (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
+// calcDelMutationAttrs determines the attributes of a new mutation, based on a random number and the config params.
+// This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
+func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+	// Determine if this mutation is dominant or recessive and use that to calc the fitness
+	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
+	if (dominant) {
+		fitnessEffect = float32(Mdl.CalcDelMutationFitness(nil, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
+	} else {
+		fitnessEffect = float32(Mdl.CalcDelMutationFitness(nil, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
+	}
 
-	// Determine if this mutated allele is expressed or not (whether if affects the fitness)
-	//rnd := uniformRandom.Float64()
-	//if (dominant) {
-	//	expressed = (rnd < config.Cfg.Mutations.Dominant_hetero_expression)
-	//} else {
-	//	expressed = (rnd < config.Cfg.Mutations.Recessive_hetero_expression)
-	//}
+	return
+}
+
+
+// calcFavMutationAttrs determines the attributes of a new mutation, based on a random number and the config params.
+// This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
+func calcFavMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+	// Determine if this mutation is dominant or recessive and use that to calc the fitness
+	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
+	if (dominant) {
+		fitnessEffect = float32(Mdl.CalcFavMutationFitness(nil, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
+	} else {
+		fitnessEffect = float32(Mdl.CalcFavMutationFitness(nil, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
+	}
+
 	return
 }
 
@@ -177,14 +191,8 @@ type DeleteriousMutation struct {
 	Mutation 		// this anonymous reference includes the base class's struct here
 }
 
-func DeleteriousMutationFactory(uniformRandom *rand.Rand) *DeleteriousMutation {
-	m := &DeleteriousMutation{Mutation{}}
-	dominant := calcMutationAttrs(uniformRandom)
-	if (dominant) {
-		m.fitnessEffect = float32(Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
-	} else {
-		m.fitnessEffect = float32(Mdl.CalcDelMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
-	}
+func DeleteriousMutationFactory(fitnessEffect float32, _ *rand.Rand) *DeleteriousMutation {
+	m := &DeleteriousMutation{Mutation{fitnessEffect: fitnessEffect}}
 	return m
 }
 
@@ -202,14 +210,8 @@ type FavorableMutation struct {
 	Mutation 		// this anonymous reference includes the base class's struct here
 }
 
-func FavorableMutationFactory(uniformRandom *rand.Rand) *FavorableMutation {
-	m := &FavorableMutation{Mutation{}}
-	dominant := calcMutationAttrs(uniformRandom)
-	if (dominant) {
-		m.fitnessEffect = float32(Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
-	} else {
-		m.fitnessEffect = float32(Mdl.CalcFavMutationFitness(m, uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
-	}
+func FavorableMutationFactory(fitnessEffect float32, _ *rand.Rand) *FavorableMutation {
+	m := &FavorableMutation{Mutation{fitnessEffect: fitnessEffect}}
 	return m
 }
 

@@ -17,9 +17,10 @@ type Individual struct {
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
 
+	//todo: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
+	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
 	MeanDelFit, MeanFavFit float64
-
 	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
 	MeanDelAlleleFit, MeanFavAlleleFit float64
 
@@ -354,7 +355,7 @@ func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 }
 
 
-// Report prints out statistics of this individual. If final==true is prints more details.
+// Report prints out statistics of this individual. If final==true it could print more details.
 func (ind *Individual) Report(_ bool) {
 	deleterious, neutral, favorable, avDelFit, avFavFit := ind.GetMutationStats()
 	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
