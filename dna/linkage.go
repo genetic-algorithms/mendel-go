@@ -135,7 +135,7 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 	switch mType {
 	case DELETERIOUS:
 		fitnessEffect := calcDelMutationAttrs(uniformRandom)
-		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < float32(-config.Cfg.Computation.Tracking_threshold) {
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
 			mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
 			lb.dMutn = append(lb.dMutn, mutn)
@@ -154,7 +154,7 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 		}
 	case FAVORABLE:
 		fitnessEffect := calcFavMutationAttrs(uniformRandom)
-		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > float32(config.Cfg.Computation.Tracking_threshold) {
+		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
 			mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
 			lb.fMutn = append(lb.fMutn, mutn)
