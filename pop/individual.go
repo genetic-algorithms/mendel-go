@@ -205,7 +205,7 @@ func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32
 
 /* This turns out to be functionally equivalent to CalcSemiFixedNumOffspring, except in CalcSemiFixedNumOffspring if ind.Pop.Num_offspring is a whole number (common case) it
   doesn't invoke uniformRandom.Float64(). That results in different results between CalcFortranNumOffspring and CalcSemiFixedNumOffspring simply due to different
-  random number sequences. */
+  random number sequences.
 // An algorithm taken from the fortran mendel for calculating the number of offspring.
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// This logic is from lines 64-73 of mating.f90
@@ -217,7 +217,7 @@ func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	//actual_offspring = utils.MinUint32(uint32(offspring_per_pair+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(offspring_per_pair)+1 or uint32(offspring_per_pair)
 	return actual_offspring
 }
-/**/
+*/
 
 
 // Randomly choose a number of offspring that is, on average, proportional to the individual's fitness
