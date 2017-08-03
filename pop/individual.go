@@ -203,16 +203,21 @@ func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32
 }
 
 
-// An algorithm taken from the fortran mendel for calculating the number of offspring
+/* This turns out to be functionally equivalent to CalcSemiFixedNumOffspring, except in CalcSemiFixedNumOffspring if ind.Pop.Num_offspring is a whole number (common case) it
+  doesn't invoke uniformRandom.Float64(). That results in different results between CalcFortranNumOffspring and CalcSemiFixedNumOffspring simply due to different
+  random number sequences. */
+// An algorithm taken from the fortran mendel for calculating the number of offspring.
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
-	// I am still not sure about the rationale of some of this logic, it is from lines 64-73 of mating.f90
+	// This logic is from lines 64-73 of mating.f90
 	offspring_per_pair := ind.Pop.Num_offspring * 2
 	actual_offspring := uint32(offspring_per_pair)		// truncate num offspring to integer
-	if offspring_per_pair - float64(uint32(offspring_per_pair)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
+	if offspring_per_pair - float64(actual_offspring) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
+	//if offspring_per_pair - float64(uint32(offspring_per_pair)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if indivIndex == 1 { actual_offspring = utils.Max(1, actual_offspring) } 	// assuming this was some special case specific to the fortran implementation
-	actual_offspring = utils.MinUint32(uint32(offspring_per_pair+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(offspring_per_pair)+1 or uint32(offspring_per_pair)
+	//actual_offspring = utils.MinUint32(uint32(offspring_per_pair+1), actual_offspring) 	// does not seem like this line does anything, because actual_offspring will always be uint32(offspring_per_pair)+1 or uint32(offspring_per_pair)
 	return actual_offspring
 }
+/**/
 
 
 // Randomly choose a number of offspring that is, on average, proportional to the individual's fitness

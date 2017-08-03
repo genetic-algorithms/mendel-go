@@ -10,7 +10,7 @@ type NumOffSpringModelType string
 const (
 	UNIFORM_NUM_OFFSPRING NumOffSpringModelType = "uniform"
 	FIXED_NUM_OFFSPRING NumOffSpringModelType = "fixed"
-	FORTRAN_NUM_OFFSPRING NumOffSpringModelType = "fortran"
+	//FORTRAN_NUM_OFFSPRING NumOffSpringModelType = "fortran" // this ended up giving the same results as FIXED_NUM_OFFSPRING
 	FITNESS_NUM_OFFSPRING NumOffSpringModelType = "fitness"
 )
 
@@ -46,7 +46,7 @@ func SetModels(c *config.Config) {
 	Mdl = &Models{} 		// create and set the singleton object
 	var mdlNames []string 		// gather the models we use so we can print it out
 
-	// uniform (even distribution), fixed (rounded to nearest int), fortran (what mendel-f90 used), fitness (weighted according to fitness)
+	// uniform (even distribution), fixed (rounded to nearest int), fitness (weighted according to fitness)
 	switch NumOffSpringModelType(strings.ToLower(c.Population.Num_offspring_model)) {
 	case UNIFORM_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcUniformNumOffspring
@@ -54,9 +54,9 @@ func SetModels(c *config.Config) {
 	case FIXED_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcSemiFixedNumOffspring
 		mdlNames = append(mdlNames, "CalcFixedNumOffspring")
-	case FORTRAN_NUM_OFFSPRING:
-		Mdl.CalcNumOffspring = CalcFortranNumOffspring
-		mdlNames = append(mdlNames, "CalcFortranNumOffspring")
+	//case FORTRAN_NUM_OFFSPRING:
+	//	Mdl.CalcNumOffspring = CalcFortranNumOffspring
+	//	mdlNames = append(mdlNames, "CalcFortranNumOffspring")
 	case FITNESS_NUM_OFFSPRING:
 		Mdl.CalcNumOffspring = CalcFitnessNumOffspring
 		mdlNames = append(mdlNames, "CalcFitnessNumOffspring")
