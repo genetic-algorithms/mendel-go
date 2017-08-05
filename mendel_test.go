@@ -55,6 +55,11 @@ func TestMendelCase9(t *testing.T) {
 	mendelCase(t, 9, 9)
 }
 
+// Same as TestMendelCase8 except with carrying capacity pop growth
+func TestMendelCase10(t *testing.T) {
+	mendelCase(t, 10, 10)
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

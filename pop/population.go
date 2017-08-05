@@ -404,10 +404,11 @@ func ExponentialPopulationGrowth(prevPop *Population, _ uint32) uint32 {
 	return uint32(math.Ceil(config.Cfg.Population.Pop_growth_rate * float64(prevPop.TargetSize)))
 }
 
-// CapacityPopulationGrowth returns ?
+// CapacityPopulationGrowth uses an equation in which the pop size approaches the carrying capacity
 func CapacityPopulationGrowth(prevPop *Population, _ uint32) uint32 {
-	utils.NotImplementedYet("pop_growth_model=capacity is not implemented yet")
-	return prevPop.TargetSize
+	// mendel-f90 calculates the new pop target size as ceiling(pop_size * (1. + pop_growth_rate * (1. - pop_size/carrying_capacity) ) )
+	newTargetSize := uint32(math.Ceil( float64(prevPop.TargetSize) * (1.0 + config.Cfg.Population.Pop_growth_rate * (1.0 - float64(prevPop.TargetSize)/float64(config.Cfg.Population.Carrying_capacity)) ) ))
+	return newTargetSize
 }
 
 // CalcFitnessStats returns the mean geno fitness and std deviation

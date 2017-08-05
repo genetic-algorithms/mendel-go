@@ -116,17 +116,14 @@ func SetModels(c *config.Config) {
 	case EXPONENTIAL_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = ExponentialPopulationGrowth
 		mdlNames = append(mdlNames, "ExponentialPopulationGrowth")
+		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==exponential pop_growth_rate must be > 0.0") }
+		if c.Basic.Num_generations == 0 && c.Population.Max_pop_size == 0 { log.Fatalln("For pop_growth_model==exponential at least 1 of num_generations and max_pop_size must be non-zero") }
 	case CAPACITY_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = CapacityPopulationGrowth
 		mdlNames = append(mdlNames, "CapacityPopulationGrowth")
+		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==capacity pop_growth_rate must be > 0.0") }
 	default:
 		log.Fatalf("Error: unrecognized value for pop_growth_model: %v", c.Population.Pop_growth_model)
-	}
-
-	// This can't be in config.validateAndAdjust() due to import cycle
-	if PopulationGrowthModelType(strings.ToLower(c.Population.Pop_growth_model)) == EXPONENTIAL_POPULATON_GROWTH {
-		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==exponential pop_growth_rate must be > 0.0") }
-		if c.Basic.Num_generations == 0 && c.Population.Max_pop_size == 0 { log.Fatalln("For pop_growth_model==exponential at least 1 of num_generations and max_pop_size must be non-zero") }
 	}
 
 	config.Verbose(1, "Running with these pop models: %v", strings.Join(mdlNames, ", "))
