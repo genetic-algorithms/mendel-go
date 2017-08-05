@@ -70,8 +70,9 @@ type Config struct {
 		Mean_num_crossovers uint32
 		Haploid_chromosome_number uint32
 		Num_linkage_subunits uint32
-		Pop_growth_model int
+		Pop_growth_model string
 		Pop_growth_rate float64
+		Max_pop_size uint32
 		Carrying_capacity int
 		Bottleneck_yes bool
 		Bottleneck_generation uint32

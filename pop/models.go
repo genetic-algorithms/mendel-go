@@ -28,6 +28,13 @@ const (
 	PARTIAL_TRUNC_SELECTION SelectionNoiseModelType = "partialtrunc"
 )
 
+type PopulationGrowthModelType string
+const (
+	NO_POPULATON_GROWTH PopulationGrowthModelType = "none"
+	EXPONENTIAL_POPULATON_GROWTH PopulationGrowthModelType = "exponential"
+	CAPACITY_POPULATON_GROWTH PopulationGrowthModelType = "capacity"
+)
+
 
 // Models holds pointers to functions that implement the various algorithms chosen by the input file.
 type Models struct {
@@ -35,6 +42,7 @@ type Models struct {
 	CalcIndivFitness CalcIndivFitnessType
 	CalcNumMutations CalcNumMutationsType
 	ApplySelectionNoise ApplySelectionNoiseType
+	PopulationGrowth PopulationGrowthType
 }
 
 // Mdl is the singleton instance of Models that can be accessed throughout the dna package. It gets set in SetModels().
@@ -99,6 +107,26 @@ func SetModels(c *config.Config) {
 		mdlNames = append(mdlNames, "ApplyPartialTruncationNoise")
 	default:
 		log.Fatalf("Error: unrecognized value for selection_model: %v", c.Selection.Selection_model)
+	}
+
+	switch PopulationGrowthModelType(strings.ToLower(c.Population.Pop_growth_model)) {
+	case NO_POPULATON_GROWTH:
+		Mdl.PopulationGrowth = NoPopulationGrowth
+		mdlNames = append(mdlNames, "NoPopulationGrowth")
+	case EXPONENTIAL_POPULATON_GROWTH:
+		Mdl.PopulationGrowth = ExponentialPopulationGrowth
+		mdlNames = append(mdlNames, "ExponentialPopulationGrowth")
+	case CAPACITY_POPULATON_GROWTH:
+		Mdl.PopulationGrowth = CapacityPopulationGrowth
+		mdlNames = append(mdlNames, "CapacityPopulationGrowth")
+	default:
+		log.Fatalf("Error: unrecognized value for pop_growth_model: %v", c.Population.Pop_growth_model)
+	}
+
+	// This can't be in config.validateAndAdjust() due to import cycle
+	if PopulationGrowthModelType(strings.ToLower(c.Population.Pop_growth_model)) == EXPONENTIAL_POPULATON_GROWTH {
+		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==exponential pop_growth_rate must be > 0.0") }
+		if c.Basic.Num_generations == 0 && c.Population.Max_pop_size == 0 { log.Fatalln("For pop_growth_model==exponential at least 1 of num_generations and max_pop_size must be non-zero") }
 	}
 
 	config.Verbose(1, "Running with these pop models: %v", strings.Join(mdlNames, ", "))

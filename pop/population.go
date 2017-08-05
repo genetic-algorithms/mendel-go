@@ -62,11 +62,19 @@ type Population struct {
 
 
 // PopulationFactory creates a new population (either the initial pop, or the next generation).
-func PopulationFactory(initialSize uint32) *Population {
+//func PopulationFactory(initialSize uint32) *Population {
+func PopulationFactory(prevPop *Population, genNum uint32) *Population {
+	var targetSize uint32
+	if prevPop != nil {
+		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
+	} else {
+		// This is the 1st generation, so set the size from the config param
+		targetSize = config.Cfg.Basic.Pop_size
+	}
 	p := &Population{
 		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
-		TargetSize: config.Cfg.Basic.Pop_size,
+		TargetSize: targetSize,
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
@@ -75,10 +83,10 @@ func PopulationFactory(initialSize uint32) *Population {
 
 	p.LBsPerChromosome = uint32(config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number)	// main.initialize() already confirmed it was a clean multiple
 
-	if initialSize > 0 {
+	if genNum == 0 {
 		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
 		//for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
-		p.Parts = append(p.Parts, PopulationPartFactory(initialSize, p))	// for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
+		p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))	// for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
 		p.makeAndFillIndivRefs()
 	} else {
 		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
@@ -143,15 +151,13 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 //   - for each LB position, choose 1 LB from dad (from either his dad or mom) and 1 LB from mom (from either her dad or mom)
 //   - add new mutations to random LBs
 //   - add offspring to new population
-func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
+//func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
+func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	defer utils.Measure.Start("Mate").Stop("Mate")
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
-	// Create the next generation population object that we will fill in as a result of mating. It is ok if we underestimate the
-	// size a little, because we will add individuals with p.Append() anyway.
-	//newGenerationEstimate := uint32(float64(p.GetCurrentSize()) * p.Num_offspring)
-	//newP := PopulationFactory(newGenerationEstimate, false)
-	newP := PopulationFactory(0)
+	// Create the next generation population object that we will fill in as a result of mating.
+	//newP := PopulationFactory(0)
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
@@ -216,7 +222,7 @@ func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 
 	newP.PreSelGenoFitnessMean, newP.PreSelGenoFitnessVariance, newP.PreSelGenoFitnessStDev = newP.CalcFitnessStats()
 
-	return newP
+	//return newP
 }
 
 
@@ -384,6 +390,25 @@ func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom 
 	}
 }
 
+
+// PopulationGrowthType takes in the current population and generation number and returns the target pop size for the next gen
+type PopulationGrowthType func(prevPop *Population, genNum uint32) uint32
+
+// NoPopulationGrowth returns the same pop size as the previous generation
+func NoPopulationGrowth(prevPop *Population, _ uint32) uint32 {
+	return prevPop.TargetSize
+}
+
+// ExponentialPopulationGrowth returns the previous pop size times the growth rate
+func ExponentialPopulationGrowth(prevPop *Population, _ uint32) uint32 {
+	return uint32(math.Ceil(config.Cfg.Population.Pop_growth_rate * float64(prevPop.TargetSize)))
+}
+
+// CapacityPopulationGrowth returns ?
+func CapacityPopulationGrowth(prevPop *Population, _ uint32) uint32 {
+	utils.NotImplementedYet("pop_growth_model=capacity is not implemented yet")
+	return prevPop.TargetSize
+}
 
 // CalcFitnessStats returns the mean geno fitness and std deviation
 func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
@@ -577,9 +602,9 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 
 
 // Report prints out statistics of this population
-func (p *Population) ReportEachGen(genNum uint32) {
+func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	utils.Measure.Start("ReportEachGen")
-	lastGen := genNum == config.Cfg.Basic.Num_generations
+	//lastGen := genNum == config.Cfg.Basic.Num_generations
 	perGenMinimalVerboseLevel := uint32(1)            // level at which we will print only the info that is very quick to gather
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run

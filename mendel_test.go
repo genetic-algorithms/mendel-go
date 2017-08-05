@@ -45,9 +45,14 @@ func TestMendelCase7(t *testing.T) {
 	mendelCase(t, 7, 7)
 }
 
-// Same as TestMendelCase5 except with 4 threads
+// Same as TestMendelCase6 except with 4 threads
 func TestMendelCase8(t *testing.T) {
 	mendelCase(t, 8, 8)
+}
+
+// Same as TestMendelCase8 except with exponential pop growth
+func TestMendelCase9(t *testing.T) {
+	mendelCase(t, 9, 9)
 }
 
 
