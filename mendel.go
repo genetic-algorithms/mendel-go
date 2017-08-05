@@ -2,8 +2,7 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Population growth. From Wes on slack: "We originally implemented founder's effect so you could do both initial growth from 2 individuals up to about 1000, or 1000, and then a bottleneck (Flood event) at generation 10 or so and then split the tribes at generation 15 to model the tower of Babel event.  Maybe John would be most interest in this early on, in order to compare with our current results.  But, I think the carrying capacity is one of the more realistic general models, as it levels off to a max value.  If I remember correctly it involves solving an Ordinary Differential Equation, but you can look at the help menu and my coding.  The exponential growth model is there, but it’s a bit problematic because it has no max bound, so it grows until it runs out of memory and crashes."
-- (jon) Bottleneck
+- (bruce) Implement bottleneck and founder's effect pop growth
 - (bruce) Test large multiple threads run on M4 (install go) and compare results with mendel-f90
 - (bruce) Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - (jon) Tribes
