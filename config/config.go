@@ -137,7 +137,9 @@ func ReadFromFile(filename string) error {
 	}
 
 	// Do this before validate, because we need to know what output files have been requested for some of the validation testing
-	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
+	dataPath := Cfg.Computation.Data_file_path
+	if dataPath == "" { dataPath = "./test/output/" + Cfg.Basic.Case_id }
+	FileMgrFactory(dataPath, Cfg.Computation.Files_to_output)
 
 	if err := Cfg.validateAndAdjust(); err != nil { log.Fatalln(err) }
 	return nil

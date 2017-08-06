@@ -2,7 +2,6 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Implement bottleneck and founder's effect pop growth
 - (bruce) Test large multiple threads run on M4 (install go) and compare results with mendel-f90
 - (bruce) Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - (jon) Tribes
