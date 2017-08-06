@@ -72,9 +72,10 @@ type Config struct {
 		Num_linkage_subunits uint32
 		Pop_growth_model string
 		Pop_growth_rate float64
+		Pop_growth_rate2 float64
 		Max_pop_size uint32
-		Carrying_capacity int
-		Bottleneck_yes bool
+		Carrying_capacity uint32
+		//Bottleneck_yes bool
 		Bottleneck_generation uint32
 		Bottleneck_pop_size uint32
 		Num_bottleneck_generations uint32

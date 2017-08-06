@@ -411,6 +411,23 @@ func CapacityPopulationGrowth(prevPop *Population, _ uint32) uint32 {
 	return newTargetSize
 }
 
+// FoundersPopulationGrowth increases the pop size exponentially until it reaches the carrying capacity
+func FoundersPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
+	var newTargetSize uint32
+	if config.Cfg.Population.Bottleneck_generation == 0 || genNum < config.Cfg.Population.Bottleneck_generation {
+		// We are before the bottleneck so use 1st growth rate
+		newTargetSize = uint32(math.Ceil(config.Cfg.Population.Pop_growth_rate * float64(prevPop.TargetSize)))
+	} else if genNum >= config.Cfg.Population.Bottleneck_generation && genNum < config.Cfg.Population.Bottleneck_generation + config.Cfg.Population.Num_bottleneck_generations {
+		// We are in the bottleneck range
+		newTargetSize = config.Cfg.Population.Bottleneck_pop_size
+	} else {
+		// We are after the bottleneck so use 2nd growth rate
+		newTargetSize = uint32(math.Ceil(config.Cfg.Population.Pop_growth_rate2 * float64(prevPop.TargetSize)))
+	}
+	newTargetSize = utils.MinUint32(newTargetSize, config.Cfg.Population.Carrying_capacity) 	// do not want it exceeding the carrying capacity
+	return newTargetSize
+}
+
 // CalcFitnessStats returns the mean geno fitness and std deviation
 func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
 	// Calc mean (average)

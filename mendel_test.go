@@ -60,6 +60,11 @@ func TestMendelCase10(t *testing.T) {
 	mendelCase(t, 10, 10)
 }
 
+// Same as TestMendelCase8 except with founders pop growth with bottleneck, and weibull
+func TestMendelCase11(t *testing.T) {
+	mendelCase(t, 11, 11)
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

@@ -33,6 +33,7 @@ const (
 	NO_POPULATON_GROWTH PopulationGrowthModelType = "none"
 	EXPONENTIAL_POPULATON_GROWTH PopulationGrowthModelType = "exponential"
 	CAPACITY_POPULATON_GROWTH PopulationGrowthModelType = "capacity"
+	FOUNDERS_POPULATON_GROWTH PopulationGrowthModelType = "founders"
 )
 
 
@@ -122,6 +123,11 @@ func SetModels(c *config.Config) {
 		Mdl.PopulationGrowth = CapacityPopulationGrowth
 		mdlNames = append(mdlNames, "CapacityPopulationGrowth")
 		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==capacity pop_growth_rate must be > 0.0") }
+	case FOUNDERS_POPULATON_GROWTH:
+		Mdl.PopulationGrowth = FoundersPopulationGrowth
+		mdlNames = append(mdlNames, "FoundersPopulationGrowth")
+		if c.Population.Pop_growth_rate <= 0.0 || c.Population.Pop_growth_rate2 <= 0.0 { log.Fatalln("For pop_growth_model==founders pop_growth_rate and pop_growth_rate2 must be > 0.0") }
+		if c.Population.Bottleneck_generation > 0 && (c.Population.Bottleneck_pop_size == 0 | c.Population.Num_bottleneck_generations) { log.Fatalln("For pop_growth_model==founders and bottleneck_generation > then bottleneck_pop_size and num_bottleneck_generations must be > 0.0") }
 	default:
 		log.Fatalf("Error: unrecognized value for pop_growth_model: %v", c.Population.Pop_growth_model)
 	}
