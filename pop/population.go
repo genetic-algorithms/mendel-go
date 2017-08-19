@@ -262,7 +262,7 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	numDead := p.getNumDead()		// under certain circumstances this could be > the number we wanted to select out
 	p.ReportDeadStats()
 	p.IndivRefs = p.IndivRefs[numDead:]		// re-slice IndivRefs to eliminate the dead individuals
-	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness) } }	//todo: comment out
+	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	//todo: comment out
 
 	/* We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs.
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
@@ -308,7 +308,11 @@ func ApplyFullTruncationNoise(p *Population, envNoise float64, uniformRandom *ra
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
+		if ind.Dead {
+			ind.PhenoFitness = 0.0
+		} else {
+			ind.PhenoFitness = ind.GenoFitness + uniformRandom.Float64() * envNoise
+		}
 	}
 }
 
@@ -331,10 +335,14 @@ func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *ra
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		//rnd1 := uniformRandom.Float64()
-		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
-		//rnd2 := uniformRandom.Float64()
-		ind.PhenoFitness = ind.PhenoFitness / (uniformRandom.Float64() + 1.0e-15)
+		if ind.Dead {
+			ind.PhenoFitness = 0.0
+		} else {
+			//rnd1 := uniformRandom.Float64()
+			ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+			//rnd2 := uniformRandom.Float64()
+			ind.PhenoFitness = ind.PhenoFitness / (uniformRandom.Float64() + 1.0e-15)
+		}
 		//config.Verbose(9, " Individual %v: %v + (%v * %v) = %v, UnrestrictProbNoise: %v / (%v + 1.0e-15) = %v", i, ind.GenoFitness, rnd1, envNoise, fit, fit, rnd2, ind.PhenoFitness)
 		//ind.PhenoFitness = fit * uniformRandom.Float64()  // this has also been suggested instead of the line above, the results are pretty similar
 	}
@@ -357,12 +365,17 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+		if ind.Dead {
+			ind.PhenoFitness = 0.0
+		} else {
+			ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+		}
 		maxFitness = utils.MaxFloat64(maxFitness, ind.PhenoFitness)
 	}
 	// Verify maxFitness is not zero so we can divide by it below
 	if maxFitness <= 0.0 { log.Fatalf("Max individual fitness is < 0 (%v), so whole population must be dead. Exiting.", maxFitness) }
 
+	// Normalize the pheno fitness
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
@@ -386,8 +399,12 @@ func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom 
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
-		ind.PhenoFitness = ind.PhenoFitness / (config.Cfg.Selection.Partial_truncation_value + ((1. - config.Cfg.Selection.Partial_truncation_value) * uniformRandom.Float64()))
+		if ind.Dead {
+			ind.PhenoFitness = 0.0
+		} else {
+			ind.PhenoFitness = ind.GenoFitness + (uniformRandom.Float64() * envNoise)
+			ind.PhenoFitness = ind.PhenoFitness / (config.Cfg.Selection.Partial_truncation_value + ((1. - config.Cfg.Selection.Partial_truncation_value) * uniformRandom.Float64()))
+		}
 	}
 }
 
@@ -601,6 +618,11 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
 	}
 
+	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
+		// Write header for this file
+		fmt.Fprintln(fitWriter, "# Generation  Pop-size  Avg Offspring  Avg-fitness  Min-fitness  Max-fitness  Noise")
+	}
+
 	/*
 	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
 		// Write the outer json object and the array that will contain the output of each generation
@@ -615,7 +637,6 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 // Report prints out statistics of this population
 func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	utils.Measure.Start("ReportEachGen")
-	//lastGen := genNum == config.Cfg.Basic.Num_generations
 	perGenMinimalVerboseLevel := uint32(1)            // level at which we will print only the info that is very quick to gather
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
@@ -625,20 +646,19 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
 
-	//var d, n, f, avDelFit, avFavFit float64 	// if we get these values once, hold on to them
-	//var aveFit, minFit, maxFit float64
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
 		//d, n, f, avDelFit, avFavFit = p.GetMutationStats()  // <- just testing that the caching works properly
-		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, noise: %v", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, d+n+f, p.EnvironNoise)
+		log.Printf("Gen: %d, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, popSize, aveFit, minFit, maxFit, d+n+f, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
 			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
-		log.Printf("Gen: %d, Pop size: %v, Mean num offspring %v", genNum, popSize, p.ActualAvgOffspring)
+		aveFit, minFit, maxFit := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
+		log.Printf("Gen: %d, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, Mean num offspring %v", genNum, popSize, aveFit, minFit, maxFit, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
@@ -651,9 +671,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-		//if d==0.0 && n==0.0 && f==0.0 { d, n, f, avDelFit, avFavFit = p.GetMutationStats() }
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
-		//if aveFit==0.0 && minFit==0.0 && maxFit==0.0 { aveFit, minFit, maxFit = p.GetFitnessStats() }
 		aveFit, minFit, maxFit := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
 		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.EnvironNoise)
@@ -663,8 +681,17 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		}
 	}
 
-	// Note: this allele json objects in wrapped in an outer json object and array, which we form manually so we don't have to gather the alleles from
-	//		all generations into a single huge json object
+	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
+		config.Verbose(5, "Writing to file %v", config.FITNESS_FILENAME)
+		aveFit, minFit, maxFit := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		// If you change this line, you must also change the header in ReportInitial()
+		fmt.Fprintf(fitWriter, "%d  %d  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, p.EnvironNoise)
+		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
+		if lastGen {
+			//todo: put summary stats in comments at the end of the file?
+		}
+	}
+
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
 		// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
 		//alleles := dna.AlleleCountFactory(genNum, popSize)

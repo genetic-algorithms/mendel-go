@@ -2,6 +2,9 @@
 /mendel-go
 vendor/
 
+# User input files
+/input/
+
 # Test files
 /test/output/
 
