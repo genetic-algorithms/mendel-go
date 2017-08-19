@@ -50,6 +50,14 @@ type Alleles struct {
 
 // The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type AlleleCount struct {
+	Deleterious         map[uintptr]uint32
+	Neutral         map[uintptr]uint32
+	Favorable         map[uintptr]uint32
+	DelInitialAlleles         map[uintptr]uint32
+	FavInitialAlleles         map[uintptr]uint32
+}
+/*
+type AlleleCount struct {
 	GenerationNumber     uint32     `json:"generationNumber"`
 	PopulationSize uint32 `json:"populationSize"`
 	Deleterious         map[uintptr]uint32 `json:"deleterious"`
@@ -58,9 +66,12 @@ type AlleleCount struct {
 	DelInitialAlleles         map[uintptr]uint32 `json:"delInitialAlleles"`
 	FavInitialAlleles         map[uintptr]uint32 `json:"favInitialAlleles"`
 }
+*/
 
-func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
-	ac := &AlleleCount{GenerationNumber: genNum, PopulationSize: popSize}
+//func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
+func AlleleCountFactory() *AlleleCount {
+	//ac := &AlleleCount{GenerationNumber: genNum, PopulationSize: popSize}
+	ac := &AlleleCount{}
 	ac.Deleterious = make(map[uintptr]uint32)
 	ac.Neutral = make(map[uintptr]uint32)
 	ac.Favorable = make(map[uintptr]uint32)

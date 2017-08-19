@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"math"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
-	"encoding/json"
 	"bitbucket.org/geneticentropy/mendel-go/dna"
 	"bitbucket.org/geneticentropy/mendel-go/random"
 	"sync"
+	"os"
+	"strconv"
 )
 
 type RecombinationType uint8
@@ -601,21 +602,13 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 	}
 
 	/*
-	var allelesFilename string
-	var alleleWriter *os.File
-	if alleleWriter = config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
-		allelesFilename = config.ALLELES_COUNT_FILENAME
-	} else if alleleWriter = config.FMgr.GetFile(config.ALLELES_FILENAME); alleleWriter != nil {
-		allelesFilename = config.ALLELES_FILENAME
-	}
-	if alleleWriter != nil {
-	*/
 	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
 		// Write the outer json object and the array that will contain the output of each generation
 		if _, err := alleleWriter.Write([]byte(`{"allelesForEachGen":[`)); err != nil {
 			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
 		}
 	}
+	*/
 }
 
 
@@ -672,45 +665,36 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	// Note: this allele json objects in wrapped in an outer json object and array, which we form manually so we don't have to gather the alleles from
 	//		all generations into a single huge json object
-	/*
-	var allelesFilename string
-	var alleleWriter *os.File
-	if alleleWriter = config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
-		allelesFilename = config.ALLELES_COUNT_FILENAME
-	} else if alleleWriter = config.FMgr.GetFile(config.ALLELES_FILENAME); alleleWriter != nil {
-		allelesFilename = config.ALLELES_FILENAME
-	}
-	*/
-	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
-		//var newJson []byte
-		//if allelesFilename == config.ALLELES_COUNT_FILENAME {
-
-		// Count the alleles from all individuals
-		alleles := dna.AlleleCountFactory(genNum, popSize)
-		//for _, ind := range p.indivs {
+	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+		// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
+		//alleles := dna.AlleleCountFactory(genNum, popSize)
+		alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
 		for _, indRef := range p.IndivRefs {
 			ind := indRef.Indiv
 			ind.CountAlleles(alleles)
 		}
-		//newJson, err := json.MarshalIndent(alleles, "", "  ")
-		//var err error
-		newJson, err := json.Marshal(alleles)
-		if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
+
+		// Write the plot file for each type of mutation/allele
+		bucketCount := uint32(100)		// we could put this in the config file if we need to
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
+			fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
+		}
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
+			fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
+		}
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
+			fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
+		}
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
+			fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
+		}
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
+			fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
+		}
 
 		/*
-		} else {
-			// Gather the alleles from all individuals
-			alleles := &dna.Alleles{GenerationNumber: genNum}
-			//for _, ind := range p.indivs {
-			for _, indRef := range p.IndivRefs {
-				ind := indRef.Indiv
-				ind.GatherAlleles(alleles)
-			}
-			var err error
-			newJson, err = json.Marshal(alleles)
-			if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
-		}
-		*/
+		newJson, err := json.Marshal(alleles)
+		if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
 
 		// Wrap the json in an outer json object and write it to the file
 		if lastGen {
@@ -721,11 +705,49 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		if _, err := alleleWriter.Write(newJson); err != nil {
 			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
 		}
-
+		*/
 	}
 
 	utils.Measure.Stop("ReportEachGen")
 	if lastGen { utils.Measure.LogSummary() } 		// it checks the verbosity level itself
+}
+
+
+func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, file *os.File) {
+	buckets := make([]uint32, bucketCount)
+
+	for _, count := range counts {
+		percentage := float64(count) / float64(popSize)
+		var i uint32
+		floati := percentage * float64(bucketCount)
+		// At this point, if we just converted floati to uint32 (by truncating), bucket i would contain all float values: i <= floati < i+1
+		// But we really want the buckets to contain: i < floati <= i+1
+		// Remember that when we output the buckets below, we add 1 to the index of the bucket, so e.g. bucket 5 will contain: 4 < count <= 5
+		// (The issue is does a count that is exactly 5 end up in buckt 5 or 6. It should go in bucket 5.)
+		if math.Floor(floati) == floati {
+			i = uint32(floati) - 1
+		} else {
+			i = uint32(floati)
+		}
+		// The way the calcs above are done, neither of these 2 cases should ever actually happen, but just a safeguard...
+		if i < 0 {
+			log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i)
+			i = 0
+		} else if i >= bucketCount {
+			log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i)
+			i = bucketCount - 1
+		}
+
+		buckets[i] += 1
+	}
+
+	for bucketIndex, bucketValue := range buckets {
+		bucketNumberString := strconv.Itoa(bucketIndex + 1)
+		bucketValueString := strconv.FormatUint(uint64(bucketValue), 10)
+		file.WriteString(bucketNumberString + "\t" + bucketValueString + "\n")
+	}
+
+	return
 }
 
 

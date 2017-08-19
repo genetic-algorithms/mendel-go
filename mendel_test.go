@@ -26,8 +26,17 @@ func TestMendelCase3(t *testing.T) {
 }
 
 // Same as TestMendelCase3 except with initial alleles
+//todo: verify the allele bin plot files too
 func TestMendelCase4(t *testing.T) {
 	mendelCase(t, 4, 4)
+	// Also compare the allele-bins files
+	outFileDir := "test/output/testcase4"
+	expFileDir := "test/expected/testcase4"
+	subdir := "/allele-bins/"
+	files := []string{"deleterious.csv", "neutral.csv", "favorable.csv", "del_allele.csv", "fav_allele.csv"}
+	for _, f := range files {
+		compareFiles(t, outFileDir+subdir+f, expFileDir+subdir+f)
+	}
 }
 
 // Same as TestMendelCase3 except with selection_model=ups, and heritability and non_scaling_noise back to default

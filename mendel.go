@@ -2,7 +2,9 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
+- (bruce) add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
 - (bruce) Test large multiple threads run on M4 (install go) and compare results with mendel-f90
+- (bruce) Update mendel-go-spc/settings.py
 - (bruce) Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - (jon) Tribes
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
@@ -49,7 +51,7 @@ func initialize() *rand.Rand {
 // Shutdown does all the stuff necessary at the end of the run.
 func shutdown() {
 	config.Verbose(5, "Shutting down...\n")
-	config.FMgr.CloseFiles()
+	//config.FMgr.CloseAllFiles()  // <- done with defer instead
 }
 
 // Main handles cmd line args, reads input files, and contains the main generation loop.
@@ -67,7 +69,10 @@ func main() {
 		if err := config.ReadFromFile(config.CmdArgs.InputFile); err != nil { log.Fatalln(err) }
 		config.Verbose(3, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
-	} else { config.Usage(0) }
+	} else { config.Usage(0) }		// this will exit
+
+	// ReadFromFile() opened the output files, so arrange for them to be closed at the end
+	defer config.FMgr.CloseAllFiles()
 
 	// Initialize profiling, if requested
 	switch strings.ToLower(config.Cfg.Computation.Performance_profile) {

@@ -346,7 +346,7 @@ func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 // CountAlleles counts all of this individual's alleles (both mutations and initial alleles) and adds them to the given struct
 func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 	// Get the alleles for this individual
-	allelesForThisIndiv := dna.AlleleCountFactory(0, 0)		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
+	allelesForThisIndiv := dna.AlleleCountFactory()		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
 	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(allelesForThisIndiv) }
 	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(allelesForThisIndiv) }
 

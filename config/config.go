@@ -153,16 +153,21 @@ func (c *Config) validateAndAdjust() error {
 
 	c.Selection.Heritability = math.Max(1.e-20, c.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
 
-	//if c.Mutations.Fraction_neutral == 0 { c.Computation.Track_neutrals = false }   // do not actually need this
-	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Can not set both track_neutrals and a non-zero tracking_threshold.") }
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
 
-	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsFile(ALLELES_COUNT_FILENAME) { return errors.New("Error: "+ALLELES_COUNT_FILENAME+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
-	if !FMgr.IsFile(ALLELES_COUNT_FILENAME) {
-		log.Printf("Since %v was not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELES_COUNT_FILENAME)
+	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsDir(ALLELE_BINS_DIRECTORY) { return errors.New("Error: "+ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
+	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) {
+		log.Printf("Since %v was not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY)
 		c.Computation.Tracking_threshold = 9.0
 	}
+	//if c.Mutations.Fraction_neutral == 0 { c.Computation.Track_neutrals = false }   // do not actually need this
+	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 {
+		//return errors.New("Error: Does not make sense to set both track_neutrals and a non-zero tracking_threshold.")  // override Track_neutrals instead of returning error
+		c.Computation.Track_neutrals = false
+	}
+	//todo: support allele bin plots for multiple generations and remove this check
+	if c.Computation.Plot_allele_gens != 0 { return errors.New("Error: temorarily, only a value of 0 is supported for plot_allele_gens") }
 
 	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("Error: If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
 
