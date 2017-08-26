@@ -106,6 +106,7 @@ type Config struct {
 		Files_to_output string
 		Performance_profile string
 		Transfer_linkage_blocks bool
+		Force_gc bool
 	}
 }
 

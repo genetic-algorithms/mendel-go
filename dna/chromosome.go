@@ -168,21 +168,6 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 			parent.LinkageBlocks[lb].Transfer(parent, gamete, lb)
 		}
 
-		/*
-		// Copy LB section from secondary
-		begIndex = endIndex + 1
-		if begIndex > maxIndex { break }
-		if secondaryMeanSectionSize <= 0 {
-			sectionLen = 0
-		} else {
-			sectionLen = uniformRandom.Intn(2 * secondaryMeanSectionSize) + 1		// randomly choose a length for this section that on average will be meanSectionSize. Should never be 0
-		}
-		endIndex = utils.MinInt(begIndex+sectionLen-1, maxIndex)
-		if section+1 >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
-		config.Verbose(9, " Copying LBs %v-%v from secondary\n", begIndex, endIndex)
-		for lb:=begIndex; lb<=endIndex; lb++ { gamete.LinkageBlocks[lb] = secondary.LinkageBlocks[lb].Copy() }
-		*/
-
 		// For next iteration
 		begIndex = endIndex + 1
 		if parent == primary {

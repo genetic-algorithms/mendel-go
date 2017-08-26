@@ -13,6 +13,7 @@ import (
 	"sync"
 	"os"
 	"strconv"
+	"runtime"
 )
 
 type RecombinationType uint8
@@ -217,6 +218,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	}
 	*/
 	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
+	for _, part := range newP.Parts { part.FreeIndivs() }	// now that we point to all of the individuals in IndivRefs, get rid of the parts references to them, so GC can free individuals as soon as IndivRefs goes away
 
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
@@ -692,13 +694,28 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		}
 	}
 
+	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+		utils.Measure.Start("allele-count")
 		// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
 		//alleles := dna.AlleleCountFactory(genNum, popSize)
 		alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
-		for _, indRef := range p.IndivRefs {
-			ind := indRef.Indiv
+		for i := range p.IndivRefs {
+			ind := p.IndivRefs[i].Indiv
 			ind.CountAlleles(alleles)
+
+			// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
+			// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
+			// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
+			if lastGen {
+				p.IndivRefs[i].Indiv = nil
+				if config.Cfg.Computation.Force_gc && (i % 100) == 0 {
+					utils.Measure.Start("GC")
+					//config.Verbose(1, "Running GC dur allele count")
+					runtime.GC()
+					utils.Measure.Stop("GC")
+				}
+			}
 		}
 
 		// Write the plot file for each type of mutation/allele
@@ -706,17 +723,26 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
 			fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
 		}
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
-			fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
+		// Do not even write the neutrals file if we know we don't have any
+		if config.Cfg.Computation.Track_neutrals && config.Cfg.Mutations.Fraction_neutral != 0.0 {
+			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
+				fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
+			}
 		}
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
-			fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
+		// Do not even write the favorables file if we know we don't have any
+		if config.Cfg.Mutations.Frac_fav_mutn != 0.0 {
+			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
+				fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
+			}
 		}
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
-			fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
-		}
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
-			fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
+		// Do not even write the alleles files if we know we don't have any
+		if config.Cfg.Population.Num_contrasting_alleles != 0 {
+			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
+				fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
+			}
+			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
+				fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
+			}
 		}
 
 		/*
@@ -733,6 +759,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
 		}
 		*/
+		utils.Measure.Stop("allele-count")
 	}
 
 	utils.Measure.Stop("ReportEachGen")

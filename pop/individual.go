@@ -53,6 +53,17 @@ func IndividualFactory(pop *Population, initialize bool) *Individual {
 }
 
 
+// Not currently used - FreeChromosomes nils out ptrs to memory that this individual owns, so that GC can reclaim it.
+func (ind *Individual) FreeChromosomes() {
+	// The only ptrs we have are to our chromosomes, which should also free the LBs they own
+	ind.ChromosomesFromDad = []*dna.Chromosome{} 	// replacing the slice should free the previous backing array which will free all the chromosome ptrs in 1 operation
+	ind.ChromosomesFromMom = []*dna.Chromosome{}
+
+	//for i := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[i] = nil }
+	//for i := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[i] = nil }
+}
+
+
 // GetNumChromosomes returns the number of chromosomes from each parent (we assume they always have the same number from each parent)
 func (ind *Individual) GetNumChromosomes() uint32 { return uint32(len(ind.ChromosomesFromDad)) }
 

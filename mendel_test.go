@@ -26,7 +26,6 @@ func TestMendelCase3(t *testing.T) {
 }
 
 // Same as TestMendelCase3 except with initial alleles
-//todo: verify the allele bin plot files too
 func TestMendelCase4(t *testing.T) {
 	mendelCase(t, 4, 4)
 	// Also compare the allele-bins files

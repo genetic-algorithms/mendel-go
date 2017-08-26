@@ -25,6 +25,7 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/dna"
 	"github.com/pkg/profile"
 	"strings"
+	"runtime"
 )
 
 // Initialize initializes variables, objects, and settings.
@@ -102,6 +103,11 @@ func main() {
 		newP := pop.PopulationFactory(population, gen)
 		population.Mate(newP, uniformRandom)		// this fills in the next gen population object with the offspring
 		population = nil 	// give GC a chance to reclaim the previous generation
+		if config.Cfg.Computation.Force_gc {
+			utils.Measure.Start("GC")
+			runtime.GC()
+			utils.Measure.Stop("GC")
+		}
 		newP.Select(uniformRandom)
 
 		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && newP.GetCurrentSize() < 2) || newP.GetCurrentSize() == 0 {
