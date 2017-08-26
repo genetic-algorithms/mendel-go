@@ -647,12 +647,13 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print info about each individual each generation
 	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
+	totalTime := utils.Measure.GetInterimTime("Total")
 
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
 		aveFit, minFit, maxFit := p.GetFitnessStats()
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
 		//d, n, f, avDelFit, avFavFit = p.GetMutationStats()  // <- just testing that the caching works properly
-		log.Printf("Gen: %d, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, popSize, aveFit, minFit, maxFit, d+n+f, p.ActualAvgOffspring, p.EnvironNoise)
+		log.Printf("Gen: %d, Time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, popSize, aveFit, minFit, maxFit, d+n+f, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
@@ -660,7 +661,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
 		aveFit, minFit, maxFit := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
-		log.Printf("Gen: %d, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, Mean num offspring %v", genNum, popSize, aveFit, minFit, maxFit, p.ActualAvgOffspring)
+		log.Printf("Gen: %d, Time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, Mean num offspring %v", genNum, totalTime, popSize, aveFit, minFit, maxFit, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")

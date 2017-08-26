@@ -39,6 +39,18 @@ func (m *Measurer) Start(codeName string) *Measurer {
 }
 
 
+// GetInterimTime returns the total number of seconds (as a float64) so far for this codeName.
+func (m *Measurer) GetInterimTime(codeName string) float64 {
+	var delta int64
+	if !m.DeltaTime[codeName].IsZero() {
+		// We are in the middle of a measurement, so add it to the total
+		delta = int64(time.Since(m.DeltaTime[codeName]))
+	}
+	total := delta + m.TotalTime[codeName]
+	return float64(total)/float64(time.Second)
+}
+
+
 // Stop stops the time measuring of a section of code and adds this amount to the total for the run
 func (m *Measurer) Stop(codeName string) {
 	if !m.Track { return }
