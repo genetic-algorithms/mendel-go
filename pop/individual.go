@@ -16,6 +16,7 @@ type Individual struct {
 	GenoFitness     float64		// fitness due to genomic mutations
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
+	NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
 
 	//todo: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
 	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
@@ -98,9 +99,13 @@ func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
 		//config.Verbose(9, "Copying LBs from dad chromosomes %p and %p ...", dad.ChromosomesFromDad[c], dad.ChromosomesFromMom[c])
-		offspr.ChromosomesFromDad[c] = dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		chr := dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		offspr.ChromosomesFromDad[c] = chr
+		offspr.NumMutations += chr.NumMutations
 		//config.Verbose(9, "Copying LBs from mom chromosomes %p and %p ...", mom.ChromosomesFromDad[c], mom.ChromosomesFromMom[c])
-		offspr.ChromosomesFromMom[c] = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		chr = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		offspr.ChromosomesFromMom[c] = chr
+		offspr.NumMutations += chr.NumMutations
 	}
 
 	/*
@@ -143,6 +148,7 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 			child.ChromosomesFromMom[chr].AppendMutation(lbInChr, uniformRandom)
 		}
 	}
+	child.NumMutations += numMutations
 	//d, n, f := offspr.GetNumMutations()
 	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
 
@@ -153,7 +159,7 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 }
 
 
-// AddInitialContrastingAlleles add numAlleles pairs of contrasting alleles to this individual
+// AddInitialContrastingAlleles adds numAlleles pairs of contrasting alleles to this individual
 func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRandom *rand.Rand) (uint32, uint32) {
 	// Spread the allele pairs throughout the LBs as evenly as possible: if numAlleles < num_linkage_subunits then skip some LBs to
 	// space the allele pairs evenly. If numAlleles == num_linkage_subunits then 1 allele pair per LB. If numAlleles > num_linkage_subunits then
@@ -190,6 +196,7 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			numProcessedLBs++
 		}
 	}
+	ind.NumMutations += numAlleles * 2
 
 	//config.Verbose(5, " Initial alleles given to %v faction of LBs in the individual ((%v+%v)/%v)", float64(numWithAllelesRemainder + numWithAllelesEvenly) / float64(numProcessedLBs), numWithAllelesEvenly, numWithAllelesRemainder, numProcessedLBs)
 	return numWithAllelesRemainder + numWithAllelesEvenly, numProcessedLBs

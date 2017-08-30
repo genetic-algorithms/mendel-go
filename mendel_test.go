@@ -175,11 +175,26 @@ func compareFiles(t *testing.T, outputFilename, expectedFilename string) {
 			if val == expectedFile[idx] {
 				continue
 			} else {
-				t.Errorf("Found difference at index %v", idx)
-				t.Errorf("bytes around diff in output   file: %v", string(outputFile[idx-10:idx+10]))
-				t.Errorf("bytes around diff in expected file: %v", string(expectedFile[idx-10:idx+10]))
+				t.Errorf("Found difference in files at index %v", idx)
+				padding := 10
+				beginIdx := maxInt(idx-padding, 0)
+				endIdx := minInt(idx+padding, len(outputFile)-1)
+				t.Errorf("bytes around diff in output   file: %v", string(outputFile[beginIdx:endIdx]))
+				endIdx = minInt(idx+padding, len(expectedFile)-1)
+				t.Errorf("bytes around diff in expected file: %v", string(expectedFile[beginIdx:endIdx]))
 				break
 			}
 		}
 	}
+}
+
+
+func minInt(a, b int) int {
+	if a < b { return a }
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b { return a }
+	return b
 }

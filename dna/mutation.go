@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"log"
+	"unsafe"
 )
 
 type MutationType uint8
@@ -18,6 +19,8 @@ const (
 	*/
 )
 
+/* We don't get much benefit from having this as a base class (only 1 common field), and i think it is more efficient to
+	to not have it. It is really the Mutator interface that allows us to have all of the subclasses in a single array...
 // Mutation is the base class for all mutation types. It represents 1 mutation in 1 individual.
 // We depend on mutations being immutable, once created, because we pass them from parent to child.
 // To enforce that, the members are only available thru getter functions.
@@ -30,10 +33,17 @@ type Mutation struct {
 	//generation uint16	// the generation number in which this mutation was created. Used for statistics of how long the mutations survive in the pop.
 }
 
+// Member access methods
+//func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
+func (m *Mutation) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *Mutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
+*/
+
 // This interface enables us to hold subclasses of Mutation in a variable of the base class
 type Mutator interface {
 	//GetFitnessEffect() float64
 	GetFitnessEffect() float32
+	GetPointer() uintptr
 }
 
 /*
@@ -79,11 +89,6 @@ func AlleleCountFactory() *AlleleCount {
 	ac.FavInitialAlleles = make(map[uintptr]uint32)
 	return ac
 }
-
-
-// Member access methods
-//func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
-func (m *Mutation) GetFitnessEffect() float32 { return m.fitnessEffect }
 
 
 // CalcMutationType determines if the next mutation should be deleterious/neutral/favorable based on a random number and the various relevant rates for this population.
@@ -184,63 +189,69 @@ func CalcUniformAlleleFitness(uniformRandom *rand.Rand) float64 {
 }
 
 
-
-/* To switch on Mutation subclass, do something like this:
-	switch _ := m.(type) {
-	case DeleteriousMutation:
-		fitnessEffect = Mdl.CalcDelMutationFitness(m, uniformRandom)
-	case FavorableMutation:
-		fitnessEffect = Mdl.CalcFavMutationFitness(m, uniformRandom)
-	default:
-		// else neutral is 0
-	}
-*/
-
-
 // DeleteriousMutation represents 1 deleterious mutation in 1 individual.
 type DeleteriousMutation struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func DeleteriousMutationFactory(fitnessEffect float32, _ *rand.Rand) *DeleteriousMutation {
-	m := &DeleteriousMutation{Mutation{fitnessEffect: fitnessEffect}}
-	return m
+	//return &DeleteriousMutation{Mutation{fitnessEffect: fitnessEffect}}
+	return &DeleteriousMutation{fitnessEffect: fitnessEffect}
 }
+
+func (m *DeleteriousMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *DeleteriousMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
 
 // NeutralMutation represents 1 neutral mutation in 1 individual.
 type NeutralMutation struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func NeutralMutationFactory(_ *rand.Rand) *NeutralMutation {
-	return &NeutralMutation{Mutation{}}
+	//return &NeutralMutation{Mutation{}}
+	return &NeutralMutation{}
 }
+
+func (m *NeutralMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *NeutralMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
 
 // FavorableMutation represents 1 favorable mutation in 1 individual.
 type FavorableMutation struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func FavorableMutationFactory(fitnessEffect float32, _ *rand.Rand) *FavorableMutation {
-	m := &FavorableMutation{Mutation{fitnessEffect: fitnessEffect}}
-	return m
+	//return &FavorableMutation{Mutation{fitnessEffect: fitnessEffect}}
+	return &FavorableMutation{fitnessEffect: fitnessEffect}
 }
+
+func (m *FavorableMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *FavorableMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
 
 
 // DeleteriousAllele represents 1 deleterious allele in 1 individual.
 type DeleteriousAllele struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func DeleteriousAlleleFactory(fitnessEffect float64) *DeleteriousAllele {
-	return &DeleteriousAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
+	//return &DeleteriousAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
+	return &DeleteriousAllele{fitnessEffect: float32(fitnessEffect)}
 }
+
+func (m *DeleteriousAllele) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *DeleteriousAllele) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
 
 
 /* do know of any reason to have these...
 // NeutralAllele represents 1 neutral allele in 1 individual.
 type NeutralAllele struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 func NeutralAlleleFactory() *NeutralAllele {
 	return &NeutralAllele{Mutation{}}
@@ -250,9 +261,14 @@ func NeutralAlleleFactory() *NeutralAllele {
 
 // DeleteriousAllele represents 1 deleterious allele in 1 individual.
 type FavorableAllele struct {
-	Mutation 		// this anonymous reference includes the base class's struct here
+	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
+	//Mutation 		// this anonymous reference includes the base class's struct here
 }
 
 func FavorableAlleleFactory(fitnessEffect float64) *FavorableAllele {
-	return &FavorableAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
+	//return &FavorableAllele{Mutation{fitnessEffect: float32(fitnessEffect)}}
+	return &FavorableAllele{fitnessEffect: float32(fitnessEffect)}
 }
+
+func (m *FavorableAllele) GetFitnessEffect() float32 { return m.fitnessEffect }
+func (m *FavorableAllele) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }

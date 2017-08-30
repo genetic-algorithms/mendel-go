@@ -10,6 +10,7 @@ import (
 // Chromosome represents 1 chromosome in an individual's genome.
 type Chromosome struct {
 	LinkageBlocks []*LinkageBlock
+	NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
 }
 
 // This only creates an empty chromosome for gen 0 as part of Meiosis(). Meiosis() creates a populated chromosome.
@@ -19,7 +20,7 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 	}
 
 	if initialize {			// first generation
-		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c)	}
+		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c, nil)	}
 	}
 
 	return c
@@ -29,9 +30,10 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 // Makes a semi-deep copy (everything but the mutations) of a chromosome
 func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
-	for lb := range c.LinkageBlocks {
-		//newChr.LinkageBlocks[lb] = c.LinkageBlocks[lb].Copy()
-		c.LinkageBlocks[lb].Transfer(c, newChr, lb)
+	newChr.NumMutations = c.NumMutations
+	for lbIndex, lb := range c.LinkageBlocks {
+		//c.LinkageBlocks[lbIndex].Transfer(c, newChr, lbIndex)
+		newChr.LinkageBlocks[lbIndex] = LinkageBlockFactory(newChr, lb)
 	}
 	return
 }
@@ -76,14 +78,8 @@ func NoCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, unif
 	// Copy all of the LBs from the one or the other
 	if uniformRandom.Intn(2) == 0 {
 		gamete = dad.Copy(lBsPerChromosome)
-		//for lb := uint32(0); lb < dad.GetNumLinkages(); lb++ {
-		//	gamete.LinkageBlocks[lb] = dad.LinkageBlocks[lb].Copy()
-		//}
 	} else {
 		gamete = mom.Copy(lBsPerChromosome)
-		//for lb := uint32(0); lb < mom.GetNumLinkages(); lb++ {
-		//	gamete.LinkageBlocks[lb] = mom.LinkageBlocks[lb].Copy()
-		//}
 	}
 	return
 }
@@ -93,13 +89,17 @@ func NoCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, unif
 func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
 	gamete = ChromosomeFactory(lBsPerChromosome, false)
 	// Each LB can come from either dad or mom
-	for lb:=0; lb<int(dad.GetNumLinkages()); lb++ {
+	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
 		if uniformRandom.Intn(2) == 0 {
-			//gamete.LinkageBlocks[lb] = dad.LinkageBlocks[lb].Copy()
-			dad.LinkageBlocks[lb].Transfer(dad, gamete, lb)
+			//dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
+			lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
+			gamete.LinkageBlocks[lbIndex] = lb
+			gamete.NumMutations += lb.GetNumMutations()
 		} else {
-			//gamete.LinkageBlocks[lb] = mom.LinkageBlocks[lb].Copy()
-			mom.LinkageBlocks[lb].Transfer(mom, gamete, lb)
+			//mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
+			lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
+			gamete.LinkageBlocks[lbIndex] = lb
+			gamete.NumMutations += lb.GetNumMutations()
 		}
 	}
 	return
@@ -163,9 +163,12 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		endIndex := utils.MinInt(begIndex+sectionLen-1, maxIndex)
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
-		for lb:=begIndex; lb<=endIndex; lb++ {
+		for lbIndex :=begIndex; lbIndex <=endIndex; lbIndex++ {
 			//gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
-			parent.LinkageBlocks[lb].Transfer(parent, gamete, lb)
+			//parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
+			lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
+			gamete.LinkageBlocks[lbIndex] = lb
+			gamete.NumMutations += lb.GetNumMutations()
 		}
 
 		// For next iteration
@@ -185,6 +188,7 @@ func (c *Chromosome) AppendMutation(lbInChr int, uniformRandom *rand.Rand) {
 	// Note: to try to save time, we could accumulate the chromosome fitness as we go, but doing so would bypass the LB method
 	//		of calculating its own fitness, so we won't do that.
 	c.LinkageBlocks[lbInChr].AppendMutation(uniformRandom)
+	c.NumMutations++
 }
 
 // SumFitness combines the fitness effect of all of its LBs in the additive method

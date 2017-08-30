@@ -13,6 +13,9 @@ $(BINARY): mendel.go */*.go
 run: $(BINARY)
 	time ./$? -f test/input/mendel-case1.ini
 
+runlong: $(BINARY)
+	time ./$? -f test/input/mendel-long.ini
+
 cpu.pprof: run
 	go tool pprof -text ./$(BINARY) ./pprof/$@
 

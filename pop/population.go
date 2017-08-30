@@ -54,6 +54,8 @@ type Population struct {
 	LBsPerChromosome uint32                                             // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
 
 	MeanFitness, MinFitness, MaxFitness float64                         // cache summary info about the individuals
+	TotalNumMutations uint32
+	MeanNumMutations float64
 
 	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable  float64       // cache some of the stats we usually gather
 	MeanDelFit, MeanFavFit                                float64
@@ -527,13 +529,16 @@ func (p *Population) numAlreadyDead(sortedIndexes []IndivRef) (numDead uint32) {
 */
 
 
-// GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max
-func (p *Population) GetFitnessStats() (float64, float64, float64) {
+// GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max, and total and mean mutations.
+// Note: this function should only get stats that the individuals already have, because it is called in a minimal verbose level that is meant to be fast.
+func (p *Population) GetFitnessStats() (float64, float64, float64, uint32, float64) {
 	// See if we already calculated and cached the values
-	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness }
+	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness, p.TotalNumMutations, p.MeanNumMutations }
 	p.MinFitness = 99.0
 	p.MaxFitness = -99.0
 	p.MeanFitness = 0.0
+	p.TotalNumMutations = 0
+	p.MeanNumMutations = 0.0
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
@@ -542,9 +547,12 @@ func (p *Population) GetFitnessStats() (float64, float64, float64) {
 		}
 		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness
 		}
+		p.TotalNumMutations += ind.NumMutations
 	}
-	p.MeanFitness = p.MeanFitness / float64(p.GetCurrentSize())
-	return p.MeanFitness, p.MinFitness, p.MaxFitness
+	popSize := p.GetCurrentSize()
+	p.MeanFitness = p.MeanFitness / float64(popSize)
+	p.MeanNumMutations = float64(p.TotalNumMutations) / float64(popSize)
+	return p.MeanFitness, p.MinFitness, p.MaxFitness, p.TotalNumMutations, p.MeanNumMutations
 }
 
 
@@ -617,12 +625,12 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Noise")
+		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
 	}
 
 	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(fitWriter, "# Generation  Pop-size  Avg Offspring  Avg-fitness  Min-fitness  Max-fitness  Noise")
+		fmt.Fprintln(fitWriter, "# Generation  Pop-size  Avg Offspring  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
 	}
 
 	/*
@@ -648,20 +656,20 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
 	totalTime := utils.Measure.GetInterimTime("Total")
+	genTime := utils.Measure.Stop("Generations")
 
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
-		aveFit, minFit, maxFit := p.GetFitnessStats()
-		d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-		//d, n, f, avDelFit, avFavFit = p.GetMutationStats()  // <- just testing that the caching works properly
-		log.Printf("Gen: %d, Time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, popSize, aveFit, minFit, maxFit, d+n+f, p.ActualAvgOffspring, p.EnvironNoise)
+		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()
+		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
+			d, n, f, avDelFit, avFavFit := p.GetMutationStats()
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
 			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
-		aveFit, minFit, maxFit := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
-		log.Printf("Gen: %d, Time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, Mean num offspring %v", genNum, totalTime, popSize, aveFit, minFit, maxFit, p.ActualAvgOffspring)
+		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
+		log.Printf("Gen: %d, Time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
@@ -675,9 +683,9 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
 		d, n, f, avDelFit, avFavFit := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
-		aveFit, minFit, maxFit := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, p.EnvironNoise)
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
 		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
 		if lastGen {
 			//todo: put summary stats in comments at the end of the file?
@@ -686,9 +694,9 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.FITNESS_FILENAME)
-		aveFit, minFit, maxFit := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
-		fmt.Fprintf(fitWriter, "%d  %d  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, p.EnvironNoise)
+		fmt.Fprintf(fitWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
 		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
 		if lastGen {
 			//todo: put summary stats in comments at the end of the file?
@@ -764,7 +772,10 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 
 	utils.Measure.Stop("ReportEachGen")
-	if lastGen { utils.Measure.LogSummary() } 		// it checks the verbosity level itself
+	if lastGen {
+		utils.Measure.Stop("Total")
+		utils.Measure.LogSummary() 		// it checks the verbosity level itself
+	}
 }
 
 

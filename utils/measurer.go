@@ -52,16 +52,18 @@ func (m *Measurer) GetInterimTime(codeName string) float64 {
 
 
 // Stop stops the time measuring of a section of code and adds this amount to the total for the run
-func (m *Measurer) Stop(codeName string) {
+func (m *Measurer) Stop(codeName string) (delta float64) {
 	if !m.Track { return }
 	if m.DeltaTime[codeName].IsZero() {
 		// We did not start a measurement
 		log.Fatalf("Error: Measurer.Stop(%v) called without previously calling Start.", codeName)
 	}
 	// DeltaTime[codeName] currently holds the start time
-	m.TotalTime[codeName] += int64(time.Since(m.DeltaTime[codeName]))
-	//config.Verbose(2, " TotalTime[%v] = %v", codeName, m.TotalTime[codeName])
+	deltaInt := int64(time.Since(m.DeltaTime[codeName]))
+	m.TotalTime[codeName] += deltaInt
 	delete(m.DeltaTime, codeName)		// zero it out so we know we are not in the middle of a measurement
+	delta = float64(deltaInt)/float64(time.Second)
+	return
 }
 
 
