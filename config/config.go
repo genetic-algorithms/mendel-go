@@ -138,9 +138,8 @@ func ReadFromFile(filename string) error {
 	}
 
 	// Do this before validate, because we need to know what output files have been requested for some of the validation testing
-	dataPath := Cfg.Computation.Data_file_path
-	if dataPath == "" { dataPath = "./test/output/" + Cfg.Basic.Case_id }
-	FileMgrFactory(dataPath, Cfg.Computation.Files_to_output)
+	if Cfg.Computation.Data_file_path == "" { Cfg.Computation.Data_file_path = "./test/output/" + Cfg.Basic.Case_id }
+	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 
 	if err := Cfg.validateAndAdjust(); err != nil { log.Fatalln(err) }
 	return nil
@@ -167,8 +166,6 @@ func (c *Config) validateAndAdjust() error {
 		//return errors.New("Error: Does not make sense to set both track_neutrals and a non-zero tracking_threshold.")  // override Track_neutrals instead of returning error
 		c.Computation.Track_neutrals = false
 	}
-	//todo: support allele bin plots for multiple generations and remove this check
-	if c.Computation.Plot_allele_gens != 0 { return errors.New("Error: temorarily, only a value of 0 is supported for plot_allele_gens") }
 
 	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("Error: If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
 

@@ -54,15 +54,14 @@ type LinkageBlock struct {
 	//alleleFavFitnessEffect  float64
 	alleleDelFitnessEffect float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
 	alleleFavFitnessEffect float32
-	//NAllele []*NeutralAllele   // do not know of any reason to have these
 
-	//owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
+	owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
 
 
 // LinkageBlockFactory creates an LB for an individual with a ptr back to the LBMutations object of the parent this LB was inherited from.
 // It also starts with all of the cumulative stats from its parent's LB.
-func LinkageBlockFactory(_ *Chromosome, parentLB *LinkageBlock) (lb *LinkageBlock) {
+func LinkageBlockFactory(owner *Chromosome, parentLB *LinkageBlock) (lb *LinkageBlock) {
 	// Initially there are no mutations in this generation.
 	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
 	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
@@ -83,12 +82,27 @@ func LinkageBlockFactory(_ *Chromosome, parentLB *LinkageBlock) (lb *LinkageBloc
 			numFavAllele: parentLB.numFavAllele,
 			alleleDelFitnessEffect: parentLB.alleleDelFitnessEffect,
 			alleleFavFitnessEffect: parentLB.alleleFavFitnessEffect,
+			owner: owner,		// this is to support the LB transfer case
 		}
 	} else {
-		lb = &LinkageBlock{mutations: mutations}
+		lb = &LinkageBlock{
+			mutations: mutations,
+			owner: owner,		// this is to support the LB transfer case
+		}
 	}
 	return
 }
+
+
+/*
+// This version of the LB factory is used with the config.Cfg.Computation.Transfer_linkage_blocks option
+func LinkageBlockFactory2(owner *Chromosome) *LinkageBlock {
+	// Initially there are no mutations.
+	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
+	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
+	return &LinkageBlock{owner: owner, mutations: &LBMutations{}}
+}
+*/
 
 
 // GetNumMutations returns the current total number of mutations and initial alleles
@@ -97,79 +111,75 @@ func (lb *LinkageBlock) GetNumMutations() uint32 {
 }
 
 
-/* Not currently used, but not deleting yet because this method is a little faster and less memory for lower mutation rates...
+// Note: this method is a little faster and less memory for lower mutation rates...
 // Transfer will give the "to" chromosome (of the child) the equivalent LB, by just transferring ownership of this LB instance (if it has not already given it
 // to another child), or by copying the LB if it must. The reason transfer of ownership to a child is ok is once this function is called, the "from" chromosome (the parent) will
 // never do anything with this LB again, except maybe copy the contents to another child. From this perspective, it is also important that
 // the children of these parents not do anything with their LBs until the parents are done creating all of their children.
-func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) {
-	if lb.owner == from && config.Cfg.Computation.Transfer_linkage_blocks {
+func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) *LinkageBlock {
+	//if lb.owner == from && config.Cfg.Computation.Transfer_linkage_blocks {
+	if lb.owner == from {
 		// "From" still owns this LB, so it is his to give away
 		//config.Verbose(9, " Transferring ownership of LB %p from %p to %p", lb, from, to)
 		to.LinkageBlocks[lbIndex] = lb
+		//to.NumMutations += lb.GetNumMutations()
 		lb.owner = to
+		return lb
 	} else {
 		// This LB has already been given away to another offspring, so need to make a copy
-		//config.Verbose(2, "copying LB")
-		to.LinkageBlocks[lbIndex] = lb.Copy(to)
-		// maybe try moving Copy() contents here to avoid another function call
+		newLB := lb.Copy(to)
+		to.LinkageBlocks[lbIndex] = newLB
+		//to.NumMutations += newLB.GetNumMutations()
+		return newLB
 	}
 }
 
 
 // Copy makes a semi-deep copy (makes a copy of the array of pointers to mutations, but does *not* copy the mutations themselves, because they are immutable) and returns it
 func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
-	newLb := LinkageBlockFactory(owner)
+	newLb := LinkageBlockFactory(owner, nil)
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
-	if len(lb.dMutn) > 0 {
-		newLb.dMutn = make([]*DeleteriousMutation, len(lb.dMutn)) 	// allocate a new underlying array the same length as the source
-		copy(newLb.dMutn, lb.dMutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+	if len(lb.mutations.mutn) > 0 {
+		//todo: do we really need to do this make() before the copy()?
+		newLb.mutations.mutn = make([]Mutator, len(lb.mutations.mutn)) 	// allocate a new underlying array the same length as the source
+		copy(newLb.mutations.mutn, lb.mutations.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	}
+	// Assigning a slice does not copy all the array elements, so we have to make that happen
+	//if len(lb.dMutn) > 0 {
+	//	newLb.dMutn = make([]*DeleteriousMutation, len(lb.dMutn)) 	// allocate a new underlying array the same length as the source
+	//	copy(newLb.dMutn, lb.dMutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+	//}
 	newLb.numDeleterious = lb.numDeleterious
 	newLb.delFitnessEffect = lb.delFitnessEffect
 
-	if len(lb.nMutn) > 0 {
-		newLb.nMutn = make([]*NeutralMutation, len(lb.nMutn))
-		copy(newLb.nMutn, lb.nMutn)
-	}
+	//if len(lb.nMutn) > 0 {
+	//	newLb.nMutn = make([]*NeutralMutation, len(lb.nMutn))
+	//	copy(newLb.nMutn, lb.nMutn)
+	//}
 	newLb.numNeutrals = lb.numNeutrals
 
-	if len(lb.fMutn) > 0 {
-		newLb.fMutn = make([]*FavorableMutation, len(lb.fMutn))
-		copy(newLb.fMutn, lb.fMutn)
-	}
+	//if len(lb.fMutn) > 0 {
+	//	newLb.fMutn = make([]*FavorableMutation, len(lb.fMutn))
+	//	copy(newLb.fMutn, lb.fMutn)
+	//}
 	newLb.numFavorable = lb.numFavorable
 	newLb.favFitnessEffect = lb.favFitnessEffect
 
-	if len(lb.dAllele) > 0 {
-		newLb.dAllele = make([]*DeleteriousAllele, len(lb.dAllele))
-		copy(newLb.dAllele, lb.dAllele)
-	}
+	//if len(lb.dAllele) > 0 {
+	//	newLb.dAllele = make([]*DeleteriousAllele, len(lb.dAllele))
+	//	copy(newLb.dAllele, lb.dAllele)
+	//}
 	newLb.numDelAllele = lb.numDelAllele
 	newLb.alleleDelFitnessEffect = lb.alleleDelFitnessEffect
-	//if len(lb.NAllele) > 0 {
-	//	newLb.NAllele = make([]*NeutralAllele, len(lb.NAllele))
-	//	copy(newLb.NAllele, lb.NAllele)
+	//if len(lb.fAllele) > 0 {
+	//	newLb.fAllele = make([]*FavorableAllele, len(lb.fAllele))
+	//	copy(newLb.fAllele, lb.fAllele)
 	//}
-	if len(lb.fAllele) > 0 {
-		newLb.fAllele = make([]*FavorableAllele, len(lb.fAllele))
-		copy(newLb.fAllele, lb.fAllele)
-	}
 	newLb.numFavAllele = lb.numFavAllele
 	newLb.alleleFavFitnessEffect = lb.alleleFavFitnessEffect
 
 	return newLb
 }
-*/
-
-
-/* currently not used...
-// GetTotalMutnCount returns the number of mutations currently on this LB
-func (lb *LinkageBlock) GetTotalMutnCount() uint32 {
-	// Every mutation added to the LB is either in 1 of the arrays or in 1 of the Untracked vars (but not both), so it is ok to sum them all
-	return uint32(len(lb.DMutn)) + uint32(lb.NumUntrackedDeleterious) + uint32(len(lb.NMutn)) + uint32(lb.NumUntrackedNeutrals) + uint32(len(lb.FMutn)) + uint32(lb.NumUntrackedFavorable)
-}
-*/
 
 
 // AppendMutation creates and adds a mutation to this LB.
@@ -268,7 +278,6 @@ func (lb *LinkageBlock) GetInitialAlleleStats() (deleterious, neutral, favorable
 	deleterious = uint32(lb.numDelAllele)
 	if deleterious > 0 { avDelFit = float64(lb.alleleDelFitnessEffect) / float64(deleterious) } 		// else avDelFit is already 0.0
 
-	//neutral = uint32(len(lb.NAllele))
 	neutral = 0
 
 	//favorable = uint32(len(lb.fAllele))
@@ -302,7 +311,6 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 			default:
 				log.Fatalln("Error: unknown Mutator type found when counting alleles.")
 			}
-			allelesForThisIndiv.Deleterious[id] = 1
 		}
 		mutns = mutns.parentMutations
 

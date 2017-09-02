@@ -11,9 +11,10 @@ import (
 	"bitbucket.org/geneticentropy/mendel-go/dna"
 	"bitbucket.org/geneticentropy/mendel-go/random"
 	"sync"
+	"runtime"
+	"encoding/json"
 	"os"
 	"strconv"
-	"runtime"
 )
 
 type RecombinationType uint8
@@ -705,70 +706,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
-		utils.Measure.Start("allele-count")
-		// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
-		//alleles := dna.AlleleCountFactory(genNum, popSize)
-		alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
-		for i := range p.IndivRefs {
-			ind := p.IndivRefs[i].Indiv
-			ind.CountAlleles(alleles)
-
-			// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
-			// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
-			// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
-			if lastGen {
-				p.IndivRefs[i].Indiv = nil
-				if config.Cfg.Computation.Force_gc && (i % 100) == 0 {
-					utils.Measure.Start("GC")
-					//config.Verbose(1, "Running GC dur allele count")
-					runtime.GC()
-					utils.Measure.Stop("GC")
-				}
-			}
-		}
-
-		// Write the plot file for each type of mutation/allele
-		bucketCount := uint32(100)		// we could put this in the config file if we need to
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
-			fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
-		}
-		// Do not even write the neutrals file if we know we don't have any
-		if config.Cfg.Computation.Track_neutrals && config.Cfg.Mutations.Fraction_neutral != 0.0 {
-			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
-				fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
-			}
-		}
-		// Do not even write the favorables file if we know we don't have any
-		if config.Cfg.Mutations.Frac_fav_mutn != 0.0 {
-			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
-				fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
-			}
-		}
-		// Do not even write the alleles files if we know we don't have any
-		if config.Cfg.Population.Num_contrasting_alleles != 0 {
-			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
-				fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
-			}
-			if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
-				fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
-			}
-		}
-
-		/*
-		newJson, err := json.Marshal(alleles)
-		if err != nil { log.Fatalf("error marshaling alleles to json: %v", err) }
-
-		// Wrap the json in an outer json object and write it to the file
-		if lastGen {
-			newJson = append(newJson, "]}"...)		// no more allele outputs, so end the array and wrapping object
-		} else {
-			newJson = append(newJson, ","...)		// more json objects to come in the array so append a comma
-		}
-		if _, err := alleleWriter.Write(newJson); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
-		}
-		*/
-		utils.Measure.Stop("allele-count")
+		p.outputAlleles(genNum, popSize, lastGen)
 	}
 
 	utils.Measure.Stop("ReportEachGen")
@@ -778,9 +716,107 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 }
 
+type Buckets struct {
+	Deleterious         []uint32 `json:"deleterious"`
+	Neutral         []uint32 `json:"neutral"`
+	Favorable         []uint32 `json:"favorable"`
+	DelInitialAlleles         []uint32 `json:"delInitialAlleles"`
+	FavInitialAlleles         []uint32 `json:"favInitialAlleles"`
+}
 
-func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, file *os.File) {
-	buckets := make([]uint32, bucketCount)
+
+// outputAlleles gathers all of the alleles in this generation, calculates the bins, and outputs them to a file
+func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
+	utils.Measure.Start("allele-count")
+	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
+	//alleles := dna.AlleleCountFactory(genNum, popSize)
+	alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
+	for i := range p.IndivRefs {
+		ind := p.IndivRefs[i].Indiv
+		ind.CountAlleles(alleles)
+
+		// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
+		// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
+		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
+		if lastGen {
+			p.IndivRefs[i].Indiv = nil
+			if config.Cfg.Computation.Force_gc && (i % 100) == 0 {
+				utils.Measure.Start("GC")
+				//config.Verbose(1, "Running GC dur allele count")
+				runtime.GC()
+				utils.Measure.Stop("GC")
+			}
+		}
+	}
+
+	// Write the plot file for each type of mutation/allele
+	bucketCount := uint32(100)		// we could put this in the config file if we need to
+	bucketJson := &Buckets{}
+
+	bucketJson.Deleterious = make([]uint32, bucketCount)
+	fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
+	//if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
+	//	fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
+	//}
+
+	// Do not even write the neutrals file if we know we don't have any
+	if config.Cfg.Computation.Track_neutrals && config.Cfg.Mutations.Fraction_neutral != 0.0 {
+		bucketJson.Neutral = make([]uint32, bucketCount)
+		fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
+		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
+		//		fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
+		//	}
+	}
+
+	// Do not even write the favorables file if we know we don't have any
+	if config.Cfg.Mutations.Frac_fav_mutn != 0.0 {
+		bucketJson.Favorable = make([]uint32, bucketCount)
+		fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
+		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
+		//		fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
+		//	}
+	}
+
+	// Do not even write the alleles files if we know we don't have any
+	if config.Cfg.Population.Num_contrasting_alleles != 0 {
+		bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
+		fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
+		bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
+		fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
+		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
+		//		fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
+		//	}
+		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
+		//		fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
+		//	}
+	}
+
+	newJson, err := json.Marshal(bucketJson)
+	if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err) }
+
+	/*
+	// Wrap the json in an outer json object and write it to the file
+	if lastGen {
+		newJson = append(newJson, "]}"...)		// no more allele outputs, so end the array and wrapping object
+	} else {
+		newJson = append(newJson, ","...)		// more json objects to come in the array so append a comma
+	}
+	*/
+
+	genSubDir :=  "gen-" + strconv.FormatUint(uint64(genNum), 10)
+	dirPath := config.Cfg.Computation.Data_file_path + "/" + config.ALLELE_BINS_DIRECTORY + genSubDir
+	if err := os.MkdirAll(dirPath, 0755); err != nil { log.Fatalf("Error creating output directory %v: %v", dirPath, err) }
+	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, genSubDir+"/"+config.ALLELE_BINS_FILENAME); alleleWriter != nil {
+		if _, err := alleleWriter.Write(newJson); err != nil {
+			log.Fatalf("error writing alleles to %v: %v", config.ALLELE_BINS_FILENAME, err)
+		}
+	}
+	utils.Measure.Stop("allele-count")
+}
+
+//func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, file *os.File) {
+func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
+	//buckets := make([]uint32, bucketCount)
 
 	for _, count := range counts {
 		percentage := float64(count) / float64(popSize)
@@ -789,7 +825,7 @@ func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount
 		// At this point, if we just converted floati to uint32 (by truncating), bucket i would contain all float values: i <= floati < i+1
 		// But we really want the buckets to contain: i < floati <= i+1
 		// Remember that when we output the buckets below, we add 1 to the index of the bucket, so e.g. bucket 5 will contain: 4 < count <= 5
-		// (The issue is does a count that is exactly 5 end up in buckt 5 or 6. It should go in bucket 5.)
+		// (The issue is does a count that is exactly 5 end up in bucket 5 or 6. It should go in bucket 5.)
 		if math.Floor(floati) == floati {
 			i = uint32(floati) - 1
 		} else {
@@ -807,11 +843,13 @@ func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount
 		buckets[i] += 1
 	}
 
+	/*
 	for bucketIndex, bucketValue := range buckets {
 		bucketNumberString := strconv.Itoa(bucketIndex + 1)
 		bucketValueString := strconv.FormatUint(uint64(bucketValue), 10)
 		file.WriteString(bucketNumberString + "\t" + bucketValueString + "\n")
 	}
+	*/
 
 	return
 }

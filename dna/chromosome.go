@@ -27,13 +27,16 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 }
 
 
-// Makes a semi-deep copy (everything but the mutations) of a chromosome
+// Makes a semi-deep copy (everything but the mutations) of a chromosome. "Copy" means actually copy, or create a new chromosome with new LBs that point back to the LB history chain.
 func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
 	newChr.NumMutations = c.NumMutations
 	for lbIndex, lb := range c.LinkageBlocks {
-		//c.LinkageBlocks[lbIndex].Transfer(c, newChr, lbIndex)
-		newChr.LinkageBlocks[lbIndex] = LinkageBlockFactory(newChr, lb)
+		if config.Cfg.Computation.Transfer_linkage_blocks {
+			c.LinkageBlocks[lbIndex].Transfer(c, newChr, lbIndex)
+		} else {
+			newChr.LinkageBlocks[lbIndex] = LinkageBlockFactory(newChr, lb)
+		}
 	}
 	return
 }
@@ -91,15 +94,23 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 	// Each LB can come from either dad or mom
 	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
 		if uniformRandom.Intn(2) == 0 {
-			//dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
-			lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
-			gamete.LinkageBlocks[lbIndex] = lb
-			gamete.NumMutations += lb.GetNumMutations()
+			if config.Cfg.Computation.Transfer_linkage_blocks {
+				lb := dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
+				gamete.NumMutations += lb.GetNumMutations()
+			} else {
+				lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
+				gamete.LinkageBlocks[lbIndex] = lb
+				gamete.NumMutations += lb.GetNumMutations()
+			}
 		} else {
-			//mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
-			lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
-			gamete.LinkageBlocks[lbIndex] = lb
-			gamete.NumMutations += lb.GetNumMutations()
+			if config.Cfg.Computation.Transfer_linkage_blocks {
+				lb := mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
+				gamete.NumMutations += lb.GetNumMutations()
+			} else {
+				lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
+				gamete.LinkageBlocks[lbIndex] = lb
+				gamete.NumMutations += lb.GetNumMutations()
+			}
 		}
 	}
 	return
@@ -164,11 +175,14 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lbIndex :=begIndex; lbIndex <=endIndex; lbIndex++ {
-			//gamete.LinkageBlocks[lb] = parent.LinkageBlocks[lb].Copy()
-			//parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
-			lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
-			gamete.LinkageBlocks[lbIndex] = lb
-			gamete.NumMutations += lb.GetNumMutations()
+			if config.Cfg.Computation.Transfer_linkage_blocks {
+				lb := parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
+				gamete.NumMutations += lb.GetNumMutations()
+			} else {
+				lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
+				gamete.LinkageBlocks[lbIndex] = lb
+				gamete.NumMutations += lb.GetNumMutations()
+			}
 		}
 
 		// For next iteration

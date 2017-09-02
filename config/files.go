@@ -11,13 +11,15 @@ import (
 const (
 	HISTORY_FILENAME string = "mendel.hst"
 	FITNESS_FILENAME string = "mendel.fit"		// this one is faster to produce than mendel.hst
-	//ALLELES_COUNT_FILENAME string = "alleles-count.json"
 	ALLELE_BINS_DIRECTORY string = "allele-bins/"
+	ALLELE_BINS_FILENAME string = "allele-bins.json"
+	/*
 	DELETERIOUS_CSV string = "deleterious.csv"
 	NEUTRAL_CSV string = "neutral.csv"
 	FAVORABLE_CSV string = "favorable.csv"
 	DEL_ALLELE_CSV string = "del_allele.csv"
 	FAV_ALLELE_CSV string = "fav_allele.csv"
+	*/
 )
 // Apparently this can't be a const because a map literal isn't a const in go
 var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1,}

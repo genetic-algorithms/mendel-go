@@ -46,17 +46,6 @@ type Mutator interface {
 	GetPointer() uintptr
 }
 
-/*
-// All the alleles (both mutations and initial alleles) for 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
-type Alleles struct {
-	GenerationNumber     uint32     `json:"generationNumber"`
-	Deleterious         []uintptr `json:"deleterious"`
-	Neutral         []uintptr `json:"neutral"`
-	Favorable         []uintptr `json:"favorable"`
-	DelInitialAlleles         []uintptr `json:"delInitialAlleles"`
-	FavInitialAlleles         []uintptr `json:"favInitialAlleles"`
-}
-*/
 
 // The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type AlleleCount struct {

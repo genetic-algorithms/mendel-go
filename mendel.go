@@ -2,8 +2,7 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Figure out why allele output is different in test 4
-- (bruce) Add allele output for more than 1 generation (including storing hash instead of LB chain) and tell jon
+- (bruce) Optimize allele output for more than 1 generation by storing hash instead of LB chain
 - (bruce) Update mendel-go-spc/settings.py
 - (bruce) Test large multiple threads run on M4 (install go) and compare results with mendel-f90
 - (bruce) add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
