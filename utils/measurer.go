@@ -4,6 +4,7 @@ import (
 	"time"
 	"log"
 	"strconv"
+	"sort"
 )
 
 // Measure keeps track of how much execution time was spent in various parts of the code
@@ -70,9 +71,16 @@ func (m *Measurer) Stop(codeName string) (delta float64) {
 // LogSummary prints to the log all of the total times.
 func (m *Measurer) LogSummary() {
 	if !m.Track { return }
+	// We want the map output to be sorted by key to make comparisons between runs easier, so create an array of the keys
+	var codeNames []string
+	for codeName := range m.TotalTime { codeNames = append(codeNames, codeName) }
+	sort.Strings(codeNames)
+
 	separator := ""
 	var str string
-	for codeName, dur := range m.TotalTime {
+	//for codeName, dur := range m.TotalTime {
+	for _, codeName := range codeNames {
+		dur := m.TotalTime[codeName]
 		if !m.DeltaTime[codeName].IsZero() {
 			// We did not finish a measurement
 			log.Fatalf("Error: measurement for %v was not completed when Measurer.LogSummary() was called.", codeName)

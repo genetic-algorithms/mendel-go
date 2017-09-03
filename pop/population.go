@@ -750,7 +750,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
-			if config.Cfg.Computation.Force_gc && (i % 100) == 0 {
+			if config.Cfg.Computation.Force_gc && config.Cfg.Computation.Allele_count_gc_interval > 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 {
 				utils.Measure.Start("GC")
 				//config.Verbose(1, "Running GC dur allele count")
 				runtime.GC()

@@ -2,12 +2,13 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- (bruce) Optimize allele output for more than 1 generation by storing hash instead of LB chain
-- (bruce) Update mendel-go-spc/settings.py
-- (bruce) Test large multiple threads run on M4 (install go) and compare results with mendel-f90
-- (bruce) add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
-- (bruce) Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
-- (jon) Tribes
+- When copying an LB make the new one bigger by mutation rate
+- Optimize allele output for more than 1 generation by storing hash instead of LB chain
+- Update mendel-go-spc/settings.py
+- Test large multiple threads run on M4 (install go) and compare results with mendel-f90
+- add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
+- Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
+- Tribes
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv

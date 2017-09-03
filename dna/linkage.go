@@ -35,8 +35,6 @@ type LinkageBlock struct {
 	//fMutn []*FavorableMutation
 
 	// This is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 11th decimal place. It saves approx 160MB for a 10,000 pop, plus the time for allocating and copying the extra mem
-	//delFitnessEffect        float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
-	//favFitnessEffect        float64
 	delFitnessEffect       float32              // keep a running sum of the fitness so we can calc the LB fitness quickly.
 	favFitnessEffect       float32
 
@@ -50,8 +48,6 @@ type LinkageBlock struct {
 	numDelAllele uint16
 	//fAllele                []*FavorableAllele
 	numFavAllele uint16
-	//alleleDelFitnessEffect  float64              // keep a running sum of the fitness so we can calc the LB fitness quickly
-	//alleleFavFitnessEffect  float64
 	alleleDelFitnessEffect float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
 	alleleFavFitnessEffect float32
 
@@ -140,7 +136,6 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 	newLb := LinkageBlockFactory(owner, nil)
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	if len(lb.mutations.mutn) > 0 {
-		//todo: do we really need to do this make() before the copy()?
 		newLb.mutations.mutn = make([]Mutator, len(lb.mutations.mutn)) 	// allocate a new underlying array the same length as the source
 		copy(newLb.mutations.mutn, lb.mutations.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	}
