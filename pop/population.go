@@ -13,8 +13,6 @@ import (
 	"sync"
 	"runtime"
 	"encoding/json"
-	"os"
-	"strconv"
 )
 
 type RecombinationType uint8
@@ -717,11 +715,23 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 }
 
 type Buckets struct {
-	Deleterious         []uint32 `json:"deleterious"`
-	Neutral         []uint32 `json:"neutral"`
-	Favorable         []uint32 `json:"favorable"`
-	DelInitialAlleles         []uint32 `json:"delInitialAlleles"`
-	FavInitialAlleles         []uint32 `json:"favInitialAlleles"`
+	Generation uint32 `json:"generation"`
+	Bins []uint32 `json:"bins"`
+	Deleterious []uint32 `json:"deleterious"`
+	Neutral []uint32 `json:"neutral"`
+	Favorable []uint32 `json:"favorable"`
+	DelInitialAlleles []uint32 `json:"delInitialAlleles"`
+	FavInitialAlleles []uint32 `json:"favInitialAlleles"`
+}
+
+type NormalizedBuckets struct {
+	Generation uint32 `json:"generation"`
+	Bins []float64 `json:"bins"`
+	Deleterious []float64 `json:"deleterious"`
+	Neutral []float64 `json:"neutral"`
+	Favorable []float64 `json:"favorable"`
+	DelInitialAlleles []float64 `json:"delInitialAlleles"`
+	FavInitialAlleles []float64 `json:"favInitialAlleles"`
 }
 
 
@@ -753,15 +763,22 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	bucketCount := uint32(100)		// we could put this in the config file if we need to
 	bucketJson := &Buckets{}
 
+	bucketJson.Generation = genNum
+
+	bucketJson.Bins = make([]uint32, bucketCount)
+	for i := range bucketJson.Bins {
+		bucketJson.Bins[i] = uint32(i) + 1
+	}
+
 	bucketJson.Deleterious = make([]uint32, bucketCount)
 	fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
 	//if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
 	//	fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
 	//}
 
+	bucketJson.Neutral = make([]uint32, bucketCount)
 	// Do not even write the neutrals file if we know we don't have any
 	if config.Cfg.Computation.Track_neutrals && config.Cfg.Mutations.Fraction_neutral != 0.0 {
-		bucketJson.Neutral = make([]uint32, bucketCount)
 		fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
 		//		fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
@@ -803,15 +820,53 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	}
 	*/
 
-	genSubDir :=  "gen-" + strconv.FormatUint(uint64(genNum), 10)
-	dirPath := config.Cfg.Computation.Data_file_path + "/" + config.ALLELE_BINS_DIRECTORY + genSubDir
-	if err := os.MkdirAll(dirPath, 0755); err != nil { log.Fatalf("Error creating output directory %v: %v", dirPath, err) }
-	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, genSubDir+"/"+config.ALLELE_BINS_FILENAME); alleleWriter != nil {
+	fileName := fmt.Sprintf("%08d.json", genNum)
+	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
 		if _, err := alleleWriter.Write(newJson); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", config.ALLELE_BINS_FILENAME, err)
+			log.Fatalf("error writing alleles to %v: %v", fileName, err)
 		}
 	}
+
+	outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
+
 	utils.Measure.Stop("allele-count")
+}
+
+func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
+	normalizedBucketCount := bucketCount / 2
+	totalAlleles := len(alleles.Deleterious) + len(alleles.Neutral) + len(alleles.Favorable)
+	normalizedBucketJson := &NormalizedBuckets{}
+
+	normalizedBucketJson.Generation = genNum
+
+	normalizedBucketJson.Bins = make([]float64, normalizedBucketCount)
+	for i := range normalizedBucketJson.Bins {
+		normalizedBucketJson.Bins[i] = float64(i + 1) / float64(bucketCount)
+	}
+
+	normalizedBucketJson.Deleterious = make([]float64, normalizedBucketCount)
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		normalizedBucketJson.Deleterious[i] = float64(bucketJson.Deleterious[i]) / float64(totalAlleles)
+	}
+
+	normalizedBucketJson.Neutral = make([]float64, normalizedBucketCount)
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		normalizedBucketJson.Neutral[i] = float64(bucketJson.Neutral[i]) / float64(totalAlleles)
+	}
+
+	normalizedBucketJson.Favorable = make([]float64, normalizedBucketCount)
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		normalizedBucketJson.Favorable[i] = float64(bucketJson.Favorable[i]) / float64(totalAlleles)
+	}
+
+	newJson, err := json.Marshal(normalizedBucketJson)
+	if err != nil { log.Fatalf("error marshaling normalized allele bins to json: %v", err) }
+
+	if alleleWriter := config.FMgr.GetDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
+		if _, err := alleleWriter.Write(newJson); err != nil {
+			log.Fatalf("error writing alleles to %v: %v", fileName, err)
+		}
+	}
 }
 
 //func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, file *os.File) {
