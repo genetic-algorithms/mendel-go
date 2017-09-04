@@ -20,7 +20,7 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 	}
 
 	if initialize {			// first generation
-		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c, nil)	}
+		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c)	}
 	}
 
 	return c
@@ -31,12 +31,12 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
 	newChr.NumMutations = c.NumMutations
-	for lbIndex, lb := range c.LinkageBlocks {
-		if config.Cfg.Computation.Transfer_linkage_blocks {
+	for lbIndex := range c.LinkageBlocks {
+		//if config.Cfg.Computation.Transfer_linkage_blocks {
 			c.LinkageBlocks[lbIndex].Transfer(c, newChr, lbIndex)
-		} else {
-			newChr.LinkageBlocks[lbIndex] = LinkageBlockFactory(newChr, lb)
-		}
+		//} else {
+		//	newChr.LinkageBlocks[lbIndex] = LinkageBlockFactory(newChr, lb)
+		//}
 	}
 	return
 }
@@ -94,23 +94,23 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 	// Each LB can come from either dad or mom
 	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
 		if uniformRandom.Intn(2) == 0 {
-			if config.Cfg.Computation.Transfer_linkage_blocks {
+			//if config.Cfg.Computation.Transfer_linkage_blocks {
 				lb := dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
 				gamete.NumMutations += lb.GetNumMutations()
-			} else {
-				lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
-				gamete.LinkageBlocks[lbIndex] = lb
-				gamete.NumMutations += lb.GetNumMutations()
-			}
+			//} else {
+			//	lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
+			//	gamete.LinkageBlocks[lbIndex] = lb
+			//	gamete.NumMutations += lb.GetNumMutations()
+			//}
 		} else {
-			if config.Cfg.Computation.Transfer_linkage_blocks {
+			//if config.Cfg.Computation.Transfer_linkage_blocks {
 				lb := mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
 				gamete.NumMutations += lb.GetNumMutations()
-			} else {
-				lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
-				gamete.LinkageBlocks[lbIndex] = lb
-				gamete.NumMutations += lb.GetNumMutations()
-			}
+			//} else {
+			//	lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
+			//	gamete.LinkageBlocks[lbIndex] = lb
+			//	gamete.NumMutations += lb.GetNumMutations()
+			//}
 		}
 	}
 	return
@@ -175,14 +175,14 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lbIndex :=begIndex; lbIndex <=endIndex; lbIndex++ {
-			if config.Cfg.Computation.Transfer_linkage_blocks {
+			//if config.Cfg.Computation.Transfer_linkage_blocks {
 				lb := parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
 				gamete.NumMutations += lb.GetNumMutations()
-			} else {
-				lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
-				gamete.LinkageBlocks[lbIndex] = lb
-				gamete.NumMutations += lb.GetNumMutations()
-			}
+			//} else {
+			//	lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
+			//	gamete.LinkageBlocks[lbIndex] = lb
+			//	gamete.NumMutations += lb.GetNumMutations()
+			//}
 		}
 
 		// For next iteration
@@ -198,10 +198,10 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 
 
 // AppendMutation creates and adds a mutations to the LB specified
-func (c *Chromosome) AppendMutation(lbInChr int, uniformRandom *rand.Rand) {
+func (c *Chromosome) AppendMutation(lbInChr int, mutId uint64, uniformRandom *rand.Rand) {
 	// Note: to try to save time, we could accumulate the chromosome fitness as we go, but doing so would bypass the LB method
 	//		of calculating its own fitness, so we won't do that.
-	c.LinkageBlocks[lbInChr].AppendMutation(uniformRandom)
+	c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
 	c.NumMutations++
 }
 

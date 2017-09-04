@@ -4,11 +4,29 @@ import (
 	"math/rand"
 	"bitbucket.org/geneticentropy/mendel-go/config"
 	"log"
+	//"unsafe"
+	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
 // Note: with a typical 10K population (30K during mating) and 989 LBs per individual there are a lot of LBs, so saving
 //		space in them is important.
 
+// LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB and the cumulative fitness affect on the individual's fitness.
+type LinkageBlock struct {
+	mutn []Mutation		// holds deleterious, neutral, favorable, initial deleterious, initial favorable
+	delFitnessEffect       float32              // keep a running sum of the fitness so we can calc the LB fitness quickly.
+	favFitnessEffect       float32
+	numDeleterious         uint16
+	numFavorable           uint16
+	numNeutrals            uint16               // this is used instead of the array above if track_neutrals==false
+	numDelAllele uint16
+	numFavAllele uint16
+	alleleDelFitnessEffect float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
+	alleleFavFitnessEffect float32
+	owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
+}
+
+/*
 // LBMutations holds the mutations for 1 LB in 1 individual in 1 generation. As the generations progress, an LB has
 // a chain of these LBMutations back thru its ancestors. (This avoids copying ptrs to mutations during mating.)
 // The stats are not stored in this struct, because those only have to be stored in the latest generation (because they are cumulative).
@@ -17,19 +35,11 @@ import (
 type LBMutations struct {
 	parentMutations *LBMutations         // the previous generation's version of this LB
 	mutn []Mutator		// holds deleterious, neutral, favorable, initial deleterious, initial favorable
-	/* Combining these to a single list saves quite a bit of space...
-	dMutn           []*DeleteriousMutation
-	fMutn           []*FavorableMutation
-	nMutn           []*NeutralMutation
-	dAllele         []*DeleteriousAllele // initial alleles
-	fAllele         []*FavorableAllele
-	*/
 }
 
 
-// LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB
-// and the cumulative fitness affect on the individual's fitness.
-type LinkageBlock struct {
+// LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB and the cumulative fitness affect on the individual's fitness.
+type LinkageBlock2 struct {
 	mutations *LBMutations		// holds the new mutations created in this generation, plus a pointer back to the parent's mutations
 	//dMutn []*DeleteriousMutation
 	//fMutn []*FavorableMutation
@@ -53,11 +63,21 @@ type LinkageBlock struct {
 
 	owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
+*/
+
+// This version of the LB factory is used with the config.Cfg.Computation.Transfer_linkage_blocks option
+func LinkageBlockFactory(owner *Chromosome) *LinkageBlock {
+	// Initially there are no mutations.
+	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
+	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
+	return &LinkageBlock{owner: owner}
+}
 
 
+/*
 // LinkageBlockFactory creates an LB for an individual with a ptr back to the LBMutations object of the parent this LB was inherited from.
 // It also starts with all of the cumulative stats from its parent's LB.
-func LinkageBlockFactory(owner *Chromosome, parentLB *LinkageBlock) (lb *LinkageBlock) {
+func LinkageBlockFactory2(owner *Chromosome, parentLB *LinkageBlock2) (lb *LinkageBlock2) {
 	// Initially there are no mutations in this generation.
 	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
 	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
@@ -87,16 +107,6 @@ func LinkageBlockFactory(owner *Chromosome, parentLB *LinkageBlock) (lb *Linkage
 		}
 	}
 	return
-}
-
-
-/*
-// This version of the LB factory is used with the config.Cfg.Computation.Transfer_linkage_blocks option
-func LinkageBlockFactory2(owner *Chromosome) *LinkageBlock {
-	// Initially there are no mutations.
-	// Note: there is no need to allocate the mutation slices with backing arrays. That will happen automatically the 1st time they are
-	//		appended to with append(). See https://blog.golang.org/go-slices-usage-and-internals
-	return &LinkageBlock{owner: owner, mutations: &LBMutations{}}
 }
 */
 
@@ -133,43 +143,27 @@ func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) *LinkageBloc
 
 // Copy makes a semi-deep copy (makes a copy of the array of pointers to mutations, but does *not* copy the mutations themselves, because they are immutable) and returns it
 func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
-	newLb := LinkageBlockFactory(owner, nil)
+	newLb := LinkageBlockFactory(owner)
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
-	if len(lb.mutations.mutn) > 0 {
-		newLb.mutations.mutn = make([]Mutator, len(lb.mutations.mutn)) 	// allocate a new underlying array the same length as the source
-		copy(newLb.mutations.mutn, lb.mutations.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+	if len(lb.mutn) > 0 {
+		newLb.mutn = make([]Mutation, len(lb.mutn)) 	// allocate a new underlying array the same length as the source
+		copy(newLb.mutn, lb.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	}
-	// Assigning a slice does not copy all the array elements, so we have to make that happen
-	//if len(lb.dMutn) > 0 {
-	//	newLb.dMutn = make([]*DeleteriousMutation, len(lb.dMutn)) 	// allocate a new underlying array the same length as the source
-	//	copy(newLb.dMutn, lb.dMutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+	//if len(lb.mutations.mutn) > 0 {
+	//	newLb.mutations.mutn = make([]Mutator, len(lb.mutations.mutn)) 	// allocate a new underlying array the same length as the source
+	//	copy(newLb.mutations.mutn, lb.mutations.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	//}
+
 	newLb.numDeleterious = lb.numDeleterious
 	newLb.delFitnessEffect = lb.delFitnessEffect
 
-	//if len(lb.nMutn) > 0 {
-	//	newLb.nMutn = make([]*NeutralMutation, len(lb.nMutn))
-	//	copy(newLb.nMutn, lb.nMutn)
-	//}
 	newLb.numNeutrals = lb.numNeutrals
 
-	//if len(lb.fMutn) > 0 {
-	//	newLb.fMutn = make([]*FavorableMutation, len(lb.fMutn))
-	//	copy(newLb.fMutn, lb.fMutn)
-	//}
 	newLb.numFavorable = lb.numFavorable
 	newLb.favFitnessEffect = lb.favFitnessEffect
 
-	//if len(lb.dAllele) > 0 {
-	//	newLb.dAllele = make([]*DeleteriousAllele, len(lb.dAllele))
-	//	copy(newLb.dAllele, lb.dAllele)
-	//}
 	newLb.numDelAllele = lb.numDelAllele
 	newLb.alleleDelFitnessEffect = lb.alleleDelFitnessEffect
-	//if len(lb.fAllele) > 0 {
-	//	newLb.fAllele = make([]*FavorableAllele, len(lb.fAllele))
-	//	copy(newLb.fAllele, lb.fAllele)
-	//}
 	newLb.numFavAllele = lb.numFavAllele
 	newLb.alleleFavFitnessEffect = lb.alleleFavFitnessEffect
 
@@ -179,32 +173,32 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 
 // AppendMutation creates and adds a mutation to this LB.
 // Note: The implementation of golang's append() appears to be that if it has to copy the array is doubles the capacity, which is probably what we want for the Mutation arrays.
-func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
+func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) {
 	mType := CalcMutationType(uniformRandom)
 	switch mType {
 	case DELETERIOUS:
 		fitnessEffect := calcDelMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
-			//lb.mutations.dMutn = append(lb.mutations.dMutn, mutn)
-			lb.mutations.mutn = append(lb.mutations.mutn, mutn)
+			//mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
+			//lb.mutations.mutn = append(lb.mutations.mutn, mutn)
+			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: DELETERIOUS})
 		}
 		lb.numDeleterious++
 		lb.delFitnessEffect += fitnessEffect		// currently only the additive combination model is supported, so this is appropriate
 	case NEUTRAL:
 		if config.Cfg.Computation.Track_neutrals {
-			//lb.mutations.nMutn = append(lb.mutations.nMutn, NeutralMutationFactory(uniformRandom))
-			lb.mutations.mutn = append(lb.mutations.mutn, NeutralMutationFactory(uniformRandom))
+			//lb.mutations.mutn = append(lb.mutations.mutn, NeutralMutationFactory(uniformRandom))
+			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: NEUTRAL})
 		}
 		lb.numNeutrals++
 	case FAVORABLE:
 		fitnessEffect := calcFavMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
-			//lb.mutations.fMutn = append(lb.mutations.fMutn, mutn)
-			lb.mutations.mutn = append(lb.mutations.mutn, mutn)
+			//mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
+			//lb.mutations.mutn = append(lb.mutations.mutn, mutn)
+			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: FAVORABLE})
 		}
 		lb.numFavorable++
 		lb.favFitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
@@ -214,26 +208,28 @@ func (lb *LinkageBlock) AppendMutation(uniformRandom *rand.Rand) {
 
 // AppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs (favorable to 1, deleterious to the other).
 // The 2 LBs passed in are typically the same LB position on the same chromosome number, 1 from each parent.
-func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniformRandom *rand.Rand) {
+func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) {
 	// Note: for now we assume that all initial contrasting alleles are co-dominant so that in the homozygous case (2 of the same favorable
-	//		allele (or 2 of the deleterious allele) - 1 from each parent), the combineb fitness effect is 1.0 * the allele fitness.
+	//		allele (or 2 of the deleterious allele) - 1 from each parent), the combined fitness effect is 1.0 * the allele fitness.
 	expression := 0.5
 	fitnessEffect := Mdl.CalcAlleleFitness(uniformRandom) * expression
 
 	// Add a favorable allele to the 1st LB
 	// Note: we assume that if initial alleles are being created, they are being tracked
-	favAllele := FavorableAlleleFactory(fitnessEffect)
-	//lb1.mutations.fAllele = append(lb1.mutations.fAllele, favAllele)
-	lb1.mutations.mutn = append(lb1.mutations.mutn, favAllele)
+	//favAllele := FavorableAlleleFactory(fitnessEffect)
+	//lb1.mutations.mutn = append(lb1.mutations.mutn, favAllele)
+	//lb1.alleleFavFitnessEffect += favAllele.GetFitnessEffect()
+	lb1.mutn = append(lb1.mutn, Mutation{Id: uniqueInt.NextInt(), Type: FAV_ALLELE})
 	lb1.numFavAllele++
-	lb1.alleleFavFitnessEffect += favAllele.GetFitnessEffect()
+	lb1.alleleFavFitnessEffect += float32(fitnessEffect)
 
 	// Add a deleterious allele to the 2nd LB
-	delAllele := DeleteriousAlleleFactory(-fitnessEffect)
-	//lb2.mutations.dAllele = append(lb2.mutations.dAllele, delAllele)
-	lb2.mutations.mutn = append(lb2.mutations.mutn, delAllele)
+	//delAllele := DeleteriousAlleleFactory(-fitnessEffect)
+	//lb2.mutations.mutn = append(lb2.mutations.mutn, delAllele)
+	//lb2.alleleDelFitnessEffect += delAllele.GetFitnessEffect()
+	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt()+1, Type: DEL_ALLELE})
 	lb2.numDelAllele++
-	lb2.alleleDelFitnessEffect += delAllele.GetFitnessEffect()
+	lb2.alleleDelFitnessEffect += float32(-fitnessEffect)
 }
 
 
@@ -286,6 +282,27 @@ func (lb *LinkageBlock) GetInitialAlleleStats() (deleterious, neutral, favorable
 func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 	// We are getting the alleles for just this individual so we don't want to double count the same allele from both parents,
 	// so we only ever set the value to 1 for a particular allele id.
+	//config.Verbose(1, "  LB owner=%p", lb.owner)
+	for _, m := range lb.mutn {
+		id := m.Id
+		//config.Verbose(1, "    m.Id=%v, m.Type=%v", id, m.Type)
+		switch m.Type {
+		case DELETERIOUS:
+			allelesForThisIndiv.Deleterious[id] = 1
+		case NEUTRAL:
+			allelesForThisIndiv.Neutral[id] = 1
+		case FAVORABLE:
+			allelesForThisIndiv.Favorable[id] = 1
+		case DEL_ALLELE:
+			allelesForThisIndiv.DelInitialAlleles[id] = 1
+		case FAV_ALLELE:
+			allelesForThisIndiv.FavInitialAlleles[id] = 1
+		default:
+			log.Fatalf("Error: unknown Mutation type %v found when counting alleles.", m.Type)
+		}
+	}
+
+	/*
 	mutns := lb.mutations
 	for mutns != nil {		// we need to follow the chain of LBMutations objects back thru all of his ancestors
 		for _, m := range mutns.mutn {
@@ -309,7 +326,6 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 		}
 		mutns = mutns.parentMutations
 
-		/*
 		for _, m := range mutns.dMutn {
 			// Use the ptr to the mutation object as the key in the map.
 			id := uintptr(unsafe.Pointer(m))
@@ -331,6 +347,6 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 			id := uintptr(unsafe.Pointer(a))
 			allelesForThisIndiv.FavInitialAlleles[id] = 1
 		}
-		*/
 	}
+	*/
 }

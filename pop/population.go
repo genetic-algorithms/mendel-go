@@ -42,6 +42,7 @@ type Population struct {
 	//indivs []*Individual 	// delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
 	Parts []*PopulationPart
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
+	//NextMutId uint64 		// the next value this pop can use for a mutation id
 
 	TargetSize uint32        // the target size of this population after selection
 	Num_offspring float64       // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
@@ -68,8 +69,10 @@ type Population struct {
 //func PopulationFactory(initialSize uint32) *Population {
 func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 	var targetSize uint32
+	//var nextMutId uint64
 	if prevPop != nil {
 		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
+		//nextMutId = prevPop.NextMutId
 	} else {
 		// This is the 1st generation, so set the size from the config param
 		targetSize = config.Cfg.Basic.Pop_size
@@ -78,6 +81,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: targetSize,
+		//NextMutId: nextMutId,
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
@@ -190,7 +194,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 				newRandom = rand.New(rand.NewSource(random.GetSeed()))
 			}
 
-			beginIndex := segmentStart		// just to be careful, copying segmentStart to a local var so it is different from each go routine invocation
+			beginIndex := segmentStart		// just to be careful, copying segmentStart to a local var so it is different for each go routine invocation
 			var endIndex int
 			if i < len(newP.Parts) - 1 {
 				endIndex = utils.MinInt(segmentStart + segmentSize - 1, highestIndex)
@@ -198,9 +202,17 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 				// the last partition, so do everything that is left
 				endIndex = highestIndex
 			}
+
+			// Choose a range of the mutation id's for this part - have to make sure it won't exceed this
+			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.3)
+
+			// Start the concurrent routine for this part of the pop
 			waitGroup.Add(1)
-			go newPart.Mate(p, parentIndices[beginIndex:endIndex +1], newRandom, &waitGroup)
+			go newPart.Mate(p, parentIndices[beginIndex:endIndex +1], utils.GlobalUniqueInt.DonateRange(numMuts), newRandom, &waitGroup)
+
+			// Prep for next iteration
 			segmentStart = endIndex + 1
+			//p.NextMutId = p.NextMutId + numMuts
 		}
 		// else we are out of elements in parentIndices so do not do anything
 	}
@@ -869,8 +881,8 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 	}
 }
 
-//func fillAndOutputBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, file *os.File) {
-func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
+//func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
+func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
 	//buckets := make([]uint32, bucketCount)
 
 	for _, count := range counts {

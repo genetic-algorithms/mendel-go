@@ -3,6 +3,7 @@ package pop
 import (
 	"math/rand"
 	"sync"
+	"bitbucket.org/geneticentropy/mendel-go/utils"
 )
 
 // PopulationPart is a construct used to partition the population for the purpose mating parts of the population
@@ -12,6 +13,9 @@ import (
 type PopulationPart struct {
 	Indivs                    []*Individual // the offspring of this part of the population
 	Pop                       *Population   // a reference back to the whole population, but that object should only be read
+	MyUniqueInt *utils.UniqueInt		// this part gets its own range for mutation id's that can be manipulated concurrently with the gloabl one. This is set in Mate().
+	//NextMutId uint64 		// the next value this pop part can use for a mutation id. Each pop part gets its own range so they can be incremented independently and never overlap
+	//LastMutId uint64 		// the max value this pop part can use for a mutation id
 
 	/* These are saved at the Population level, not at the part level...
 	ActualAvgOffspring        float64       // The average number of offspring each parent actually had in this partition
@@ -28,7 +32,7 @@ func PopulationPartFactory(initialSize uint32, pop *Population) *PopulationPart 
 
 	if initialSize > 0 {
 		p.Indivs = make([]*Individual, 0, initialSize)
-		for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p.Pop, true)) }
+		for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
 	}
 
 	return p
@@ -46,9 +50,12 @@ func (p *PopulationPart) GetCurrentSize() uint32 { return uint32(len(p.Indivs)) 
 // Mate mates the parents passed in (which is a slice of the individuals in the population) and collects the children
 // in this PopulationPart object. This function is called in a go routine so it must be thread-safe.
 // Note: since parentIndices is a slice (not the actual array), passing it as a param does not copy all of the elements.
-func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, uniformRandom *rand.Rand, waitGroup *sync.WaitGroup) {
+func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
+	p.MyUniqueInt = uniqueInt 		// hold this for use by all of the objects i contain
 	if len(parentIndices) == 0 { return }
+	//p.NextMutId = nextMutId
+	//p.LastMutId = lastMutId
 	// Note: the caller already shuffled the parents
 
 	estimatedNumChildren := uint32(float64(len(parentIndices)) * p.Pop.Num_offspring)
@@ -60,7 +67,7 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unifor
 		momI := parentIndices[i+1]
 		// dadI and momI are just indices into the combined Indivs array in the Population object, so we index into that.
 		// Each PopulationPart has a distinct subset of indices, so this is thread-safe.
-		newChildren := parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, uniformRandom)
+		newChildren := parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, p, uniformRandom)
 		p.Append(newChildren...)
 
 		// Eliminate the reference to these parents so gc can reclaim them because we don't need them any more

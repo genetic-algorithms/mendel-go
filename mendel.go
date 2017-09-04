@@ -2,8 +2,10 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- When copying an LB make the new one bigger by mutation rate
-- Optimize allele output for more than 1 generation by storing hash instead of LB chain
+- When copying an LB make the new one bigger by mutation rate / num LBs
+- Remove per mutation type stats in LB, chromo, indiv (and stats needed for mendel.hst optional)
+- Make the Chromosome objects inline in the indivs
+- Reuse 2 populations (including the indivs, etc.) instead of a new one each generation
 - Update mendel-go-spc/settings.py
 - Test large multiple threads run on M4 (install go) and compare results with mendel-f90
 - add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
@@ -39,8 +41,10 @@ func initialize() *rand.Rand {
 		debug.SetGCPercent(-1)
 	}
 
-		utils.MeasurerFactory(config.Cfg.Computation.Verbosity)
+	utils.MeasurerFactory(config.Cfg.Computation.Verbosity)
 	utils.Measure.Start("Total")
+
+	utils.GlobalUniqueIntFactory()
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)

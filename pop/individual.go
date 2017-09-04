@@ -12,7 +12,8 @@ import (
 
 // Individual represents 1 organism in the population, tracking its mutations and alleles.
 type Individual struct {
-	Pop             *Population
+	//Pop *Population
+	popPart *PopulationPart
 	GenoFitness     float64		// fitness due to genomic mutations
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
@@ -32,9 +33,9 @@ type Individual struct {
 }
 
 
-func IndividualFactory(pop *Population, initialize bool) *Individual {
+func IndividualFactory(popPart *PopulationPart, initialize bool) *Individual {
 	ind := &Individual{
-		Pop: pop,
+		popPart: popPart,
 		ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 		ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 		//LinkagesFromDad: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
@@ -44,8 +45,8 @@ func IndividualFactory(pop *Population, initialize bool) *Individual {
 	// If this is gen 0, initialize with empty chromosomes and linkage blocks (with no mutations).
 	// Otherwise this is an offspring that will get its chromosomes and LBs later from meiosis.
 	if initialize {
-		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
-		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(pop.LBsPerChromosome, true) }
+		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, true) }
+		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, true) }
 		//for i := range ind.LinkagesFromDad { ind.LinkagesFromDad[i] = dna.LinkageBlockFactory() }
 		//for i := range ind.LinkagesFromMom { ind.LinkagesFromMom[i] = dna.LinkageBlockFactory() }
 	}
@@ -70,7 +71,7 @@ func (ind *Individual) GetNumChromosomes() uint32 { return uint32(len(ind.Chromo
 
 
 // Mate combines this person with the specified person to create a list of offspring.
-func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*Individual {
+func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) []*Individual {
 	if RecombinationType(config.Cfg.Population.Recombination_model) != FULL_SEXUAL { utils.NotImplementedYet("Recombination models other than FULL_SEXUAL are not yet supported") }
 
 	// Mate ind and otherInd to create offspring
@@ -78,13 +79,13 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 	//config.Verbose(9, " actual_offspring=%d", actual_offspring)
 	offspr := make([]*Individual, actual_offspring)
 	for child:=uint32(0); child<actual_offspring; child++ {
-		offspr[child] = ind.OneOffspring(otherInd, uniformRandom)
+		offspr[child] = ind.OneOffspring(otherInd, newPopPart, uniformRandom)
 	}
 
 	// Add mutations to each offspring. Note: this is done after mating is completed for these parents, because as an optimization some of the LBs are
 	// just transferred to the child (not copied). If we added mutations during mating, some children could get the same added mutations.
 	for _, child := range offspr {
-		child.AddMutations(ind.Pop.LBsPerChromosome, uniformRandom)
+		child.AddMutations(ind.popPart.Pop.LBsPerChromosome, uniformRandom)
 	}
 
 	return offspr
@@ -92,18 +93,18 @@ func (ind *Individual) Mate(otherInd *Individual, uniformRandom *rand.Rand) []*I
 
 
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
-func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *Individual {
-	offspr := IndividualFactory(dad.Pop, false)
+func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) *Individual {
+	offspr := IndividualFactory(newPopPart, false)
 
 	// Inherit linkage blocks
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
 		//config.Verbose(9, "Copying LBs from dad chromosomes %p and %p ...", dad.ChromosomesFromDad[c], dad.ChromosomesFromMom[c])
-		chr := dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		chr := dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.popPart.Pop.LBsPerChromosome, uniformRandom)
 		offspr.ChromosomesFromDad[c] = chr
 		offspr.NumMutations += chr.NumMutations
 		//config.Verbose(9, "Copying LBs from mom chromosomes %p and %p ...", mom.ChromosomesFromDad[c], mom.ChromosomesFromMom[c])
-		chr = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.Pop.LBsPerChromosome, uniformRandom)
+		chr = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.popPart.Pop.LBsPerChromosome, uniformRandom)
 		offspr.ChromosomesFromMom[c] = chr
 		offspr.NumMutations += chr.NumMutations
 	}
@@ -132,6 +133,7 @@ func (dad *Individual) OneOffspring(mom *Individual, uniformRandom *rand.Rand) *
 func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *rand.Rand) {
 	// Apply new mutations
 	numMutations := Mdl.CalcNumMutations(uniformRandom)
+	popPart := child.popPart
 	for m:=uint32(1); m<=numMutations; m++ {
 		// Note: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes.
 		//		Can change this in the future if you want.
@@ -142,15 +144,17 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: AppendMutation() creates a mutation with deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant input parameter rates
+		//if popPart.NextMutId > popPart.LastMutId { log.Printf("Warning: population part exceeded LastMutId %d with NextMutId %d", popPart.LastMutId, popPart.NextMutId)}
 		if uniformRandom.Intn(2) == 0 {
-			child.ChromosomesFromDad[chr].AppendMutation(lbInChr, uniformRandom)
+			child.ChromosomesFromDad[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
 		} else {
-			child.ChromosomesFromMom[chr].AppendMutation(lbInChr, uniformRandom)
+			child.ChromosomesFromMom[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
 		}
+		//popPart.NextMutId++
 	}
 	child.NumMutations += numMutations
 	//d, n, f := offspr.GetNumMutations()
-	//config.Verbose(9, "my mutations including new ones: %d, %d, %d", d, n, f)
+	//config.Verbose(1, "numMutations=%d, child.NumMutations=%d", numMutations, child.NumMutations)
 
 	child.GenoFitness = Mdl.CalcIndivFitness(child) 		// store resulting fitness
 	if child.GenoFitness <= 0.0 { child.Dead = true }
@@ -179,8 +183,10 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			// If there are some allele pairs on every LB
 			for i:=1; i<=int(allelesPerLB); i++ {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
-				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], uniformRandom)
+				// Note: we can use the global UniqueInt object because this method is called before we create go routines.
+				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesEvenly++
+				//ind.popPart.Pop.NextMutId += 2
 			}
 
 			// Decide if this LB should get 1 of the remaining alleles
@@ -189,8 +195,9 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			// else ratioSoFar = 0
 			if ratioSoFar <= desiredRemainderRatio && numWithAllelesRemainder < allelesRemainder {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
-				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], uniformRandom)
+				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesRemainder++
+				//ind.popPart.Pop.NextMutId += 2
 			}
 
 			numProcessedLBs++
@@ -209,7 +216,7 @@ type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) uint32
 // A uniform algorithm for calculating the number of offspring that gives an even distribution between 1 and 2*(Num_offspring*2)-1
 func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// If (Num_offspring*2) is 4.5, we want a range from 1-8
-	maxRange := (2 * ind.Pop.Num_offspring * 2) - 2 		// subtract 2 to get a buffer of 1 at each end
+	maxRange := (2 * ind.popPart.Pop.Num_offspring * 2) - 2 		// subtract 2 to get a buffer of 1 at each end
 	numOffspring := uniformRandom.Float64() * maxRange 		// some float between 0 and maxRange
 	return uint32(random.Round(uniformRandom, numOffspring + 1)) 	// shift it so it is between 1 and maxRange+1, then get to an uint32
 }
@@ -217,17 +224,17 @@ func CalcUniformNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 
 // Randomly rounds the desired number of offspring to the integer below or above, proportional to how close it is to each (so the resulting average should be (Num_offspring*2) )
 func CalcSemiFixedNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
-	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring*2))
+	return uint32(random.Round(uniformRandom, ind.popPart.Pop.Num_offspring*2))
 }
 
 
-/* This turns out to be functionally equivalent to CalcSemiFixedNumOffspring, except in CalcSemiFixedNumOffspring if ind.Pop.Num_offspring is a whole number (common case) it
+/* This turns out to be functionally equivalent to CalcSemiFixedNumOffspring, except in CalcSemiFixedNumOffspring if ind.popPart.Pop.Num_offspring is a whole number (common case) it
   doesn't invoke uniformRandom.Float64(). That results in different results between CalcFortranNumOffspring and CalcSemiFixedNumOffspring simply due to different
   random number sequences.
 // An algorithm taken from the fortran mendel for calculating the number of offspring.
 func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// This logic is from lines 64-73 of mating.f90
-	offspring_per_pair := ind.Pop.Num_offspring * 2
+	offspring_per_pair := ind.popPart.Pop.Num_offspring * 2
 	actual_offspring := uint32(offspring_per_pair)		// truncate num offspring to integer
 	if offspring_per_pair - float64(actual_offspring) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
 	//if offspring_per_pair - float64(uint32(offspring_per_pair)) > uniformRandom.Float64() { actual_offspring++ }	// randomly round it up sometimes
@@ -242,7 +249,7 @@ func CalcFortranNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 func CalcFitnessNumOffspring(ind *Individual, uniformRandom *rand.Rand) uint32 {
 	// in the fortran version this is controlled by fitness_dependent_fertility
 	utils.NotImplementedYet("CalcFitnessNumOffspring not implemented yet")
-	return uint32(random.Round(uniformRandom, ind.Pop.Num_offspring*2))
+	return uint32(random.Round(uniformRandom, ind.popPart.Pop.Num_offspring*2))
 }
 
 
@@ -365,6 +372,7 @@ func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 	// Get the alleles for this individual
 	allelesForThisIndiv := dna.AlleleCountFactory()		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
+	//config.Verbose(1, "Individual, numMutations=%v:", ind.NumMutations)
 	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(allelesForThisIndiv) }
 	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(allelesForThisIndiv) }
 
