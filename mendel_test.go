@@ -31,8 +31,8 @@ func TestMendelCase4(t *testing.T) {
 	// Also compare the allele-bins files
 	outFileDir := "test/output/testcase4"
 	expFileDir := "test/expected/testcase4"
-	subdir := "/allele-bins/gen-50/"
-	f := "allele-bins.json"
+	subdir := "/allele-bins/"
+	f := "00000050.json"
 	compareFiles(t, outFileDir+subdir+f, expFileDir+subdir+f)
 	//files := []string{"deleterious.csv", "neutral.csv", "favorable.csv", "del_allele.csv", "fav_allele.csv"}
 	//for _, f := range files {

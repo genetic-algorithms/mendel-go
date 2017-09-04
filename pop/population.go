@@ -715,7 +715,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 
 	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
-	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
 		p.outputAlleles(genNum, popSize, lastGen)
 	}
 
@@ -784,62 +784,35 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 
 	bucketJson.Deleterious = make([]uint32, bucketCount)
 	fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
-	//if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DELETERIOUS_CSV); alleleWriter != nil {
-	//	fillAndOutputBuckets(alleles.Deleterious, popSize, bucketCount, alleleWriter)
-	//}
 
 	bucketJson.Neutral = make([]uint32, bucketCount)
-	// Do not even write the neutrals file if we know we don't have any
-	if config.Cfg.Computation.Track_neutrals && config.Cfg.Mutations.Fraction_neutral != 0.0 {
-		fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
-		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.NEUTRAL_CSV); alleleWriter != nil {
-		//		fillAndOutputBuckets(alleles.Neutral, popSize, bucketCount, alleleWriter)
-		//	}
-	}
+	fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 
 	// Do not even write the favorables file if we know we don't have any
-	if config.Cfg.Mutations.Frac_fav_mutn != 0.0 {
-		bucketJson.Favorable = make([]uint32, bucketCount)
-		fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
-		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAVORABLE_CSV); alleleWriter != nil {
-		//		fillAndOutputBuckets(alleles.Favorable, popSize, bucketCount, alleleWriter)
-		//	}
-	}
+	bucketJson.Favorable = make([]uint32, bucketCount)
+	fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
 
 	// Do not even write the alleles files if we know we don't have any
-	if config.Cfg.Population.Num_contrasting_alleles != 0 {
-		bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
-		fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
-		bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
-		fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
-		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.DEL_ALLELE_CSV); alleleWriter != nil {
-		//		fillAndOutputBuckets(alleles.DelInitialAlleles, popSize, bucketCount, alleleWriter)
-		//	}
-		//	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, config.FAV_ALLELE_CSV); alleleWriter != nil {
-		//		fillAndOutputBuckets(alleles.FavInitialAlleles, popSize, bucketCount, alleleWriter)
-		//	}
-	}
-
-	newJson, err := json.Marshal(bucketJson)
-	if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err) }
-
-	/*
-	// Wrap the json in an outer json object and write it to the file
-	if lastGen {
-		newJson = append(newJson, "]}"...)		// no more allele outputs, so end the array and wrapping object
-	} else {
-		newJson = append(newJson, ","...)		// more json objects to come in the array so append a comma
-	}
-	*/
+	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
+	fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
+	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
+	fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
 
 	fileName := fmt.Sprintf("%08d.json", genNum)
-	if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
-		if _, err := alleleWriter.Write(newJson); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", fileName, err)
+
+	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) {
+		newJson, err := json.Marshal(bucketJson)
+		if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err)	}
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
+			if _, err := alleleWriter.Write(newJson); err != nil {
+				log.Fatalf("error writing alleles to %v: %v", fileName, err)
+			}
 		}
 	}
 
-	outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
+	if config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) {
+		outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
+	}
 
 	utils.Measure.Stop("allele-count")
 }
