@@ -24,7 +24,8 @@ type LinkageBlock struct {
 	numFavAllele uint16
 	//alleleDelFitnessEffect float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
 	//alleleFavFitnessEffect float32
-	owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
+	//TODO: remove if we no longer transfer ownership
+	//owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
 
 /*
@@ -66,6 +67,7 @@ type LinkageBlock2 struct {
 }
 */
 
+/*
 // This version of the LB factory is used with the config.Cfg.Computation.Transfer_linkage_blocks option
 func LinkageBlockFactory(owner *Chromosome) *LinkageBlock {
 	// Initially there are no mutations.
@@ -75,7 +77,6 @@ func LinkageBlockFactory(owner *Chromosome) *LinkageBlock {
 }
 
 
-/*
 // LinkageBlockFactory creates an LB for an individual with a ptr back to the LBMutations object of the parent this LB was inherited from.
 // It also starts with all of the cumulative stats from its parent's LB.
 func LinkageBlockFactory2(owner *Chromosome, parentLB *LinkageBlock2) (lb *LinkageBlock2) {
@@ -118,7 +119,7 @@ func (lb *LinkageBlock) GetNumMutations() uint32 {
 }
 
 
-// Note: this method is a little faster and less memory for lower mutation rates...
+/*
 // Transfer will give the "to" chromosome (of the child) the equivalent LB, by just transferring ownership of this LB instance (if it has not already given it
 // to another child), or by copying the LB if it must. The reason transfer of ownership to a child is ok is once this function is called, the "from" chromosome (the parent) will
 // never do anything with this LB again, except maybe copy the contents to another child. From this perspective, it is also important that
@@ -175,6 +176,7 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 
 	return newLb
 }
+*/
 
 
 // AppendMutation creates and adds a mutation to this LB.
