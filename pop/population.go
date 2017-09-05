@@ -58,10 +58,10 @@ type Population struct {
 	MeanNumMutations float64
 
 	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable  float64       // cache some of the stats we usually gather
-	MeanDelFit, MeanFavFit                                float64
+	//MeanDelFit, MeanFavFit                                float64
 
 	MeanNumDelAllele, MeanNumNeutAllele, MeanNumFavAllele float64       // cache some of the stats we usually gather
-	MeanDelAlleleFit, MeanFavAlleleFit                    float64
+	//MeanDelAlleleFit, MeanFavAlleleFit                    float64
 }
 
 
@@ -486,7 +486,7 @@ func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, g
 func (p *Population) ReportDeadStats() {
 	elimVerboseLevel := uint32(4)            // level at which we will collect and print stats about dead/eliminated individuals
 	if !config.IsVerbose(elimVerboseLevel) { return }
-	var avgDel, avgNeut, avgFav, avgDelFit, avgFavFit, avgFitness, minFitness, maxFitness float64 	// these are stats for dead/eliminated individuals
+	var avgDel, avgNeut, avgFav, /*avgDelFit, avgFavFit,*/ avgFitness, minFitness, maxFitness float64 	// these are stats for dead/eliminated individuals
 	minFitness = 99.0
 	maxFitness = -99.0
 	var numDead, numDel, numNeut, numFav uint32
@@ -504,12 +504,12 @@ func (p *Population) ReportDeadStats() {
 			if ind.GenoFitness < minFitness {
 				minFitness = ind.GenoFitness
 			}
-			d, n, f, avD, avF := ind.GetMutationStats()
+			d, n, f /*, avD, avF*/ := ind.GetMutationStats()
 			numDel += d
 			numNeut += n
 			numFav += f
-			avgDelFit += float64(d) * avD
-			avgFavFit += float64(f) * avF
+			//avgDelFit += float64(d) * avD
+			//avgFavFit += float64(f) * avF
 		}
 	}
 
@@ -520,9 +520,10 @@ func (p *Population) ReportDeadStats() {
 		avgNeut = float64(numNeut) / float64(numDead)
 		avgFav = float64(numFav) / float64(numDead)
 	}
-	if numDel > 0 { avgDelFit = avgDelFit / float64(numDel) }
-	if numFav > 0 { avgFavFit = avgFavFit / float64(numFav) }
-	config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v, del fitness: %v, fav fitness: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav, avgDelFit, avgFavFit)
+	//if numDel > 0 { avgDelFit = avgDelFit / float64(numDel) }
+	//if numFav > 0 { avgFavFit = avgFavFit / float64(numFav) }
+	//config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v, del fitness: %v, fav fitness: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav, avgDelFit, avgFavFit)
+	config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav)
 }
 
 
@@ -568,24 +569,24 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint32, float
 
 
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (p *Population) GetMutationStats() (float64, float64, float64,  float64, float64) {
+func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64, float64*/) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
 	//config.Verbose(9, "p.MeanNumDeleterious=%v, p.MeanDelFit=%v", p.MeanNumDeleterious, p.MeanDelFit)
-	if p.MeanNumDeleterious > 0 && p.MeanDelFit < 0.0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit }
-	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0;  p.MeanDelFit=0.0;  p.MeanFavFit=0.0
+	if p.MeanNumDeleterious > 0 /*&& p.MeanDelFit < 0.0*/ { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable /*, p.MeanDelFit, p.MeanFavFit*/ }
+	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0  //;  p.MeanDelFit=0.0;  p.MeanFavFit=0.0
 
 	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		d, n, f, avD, avF := ind.GetMutationStats()
+		d, n, f /*, avD, avF*/ := ind.GetMutationStats()
 		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
 		delet += d
 		neut += n
 		fav += f
-		p.MeanDelFit += float64(d) * avD
-		p.MeanFavFit += float64(f) * avF
+		//p.MeanDelFit += float64(d) * avD
+		//p.MeanFavFit += float64(f) * avF
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
@@ -593,30 +594,30 @@ func (p *Population) GetMutationStats() (float64, float64, float64,  float64, fl
 		p.MeanNumNeutral = float64(neut) / size
 		p.MeanNumFavorable = float64(fav) / size
 	}
-	if delet > 0 { p.MeanDelFit = p.MeanDelFit / float64(delet) }
-	if fav > 0 { p.MeanFavFit = p.MeanFavFit / float64(fav) }
-	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable, p.MeanDelFit, p.MeanFavFit
+	//if delet > 0 { p.MeanDelFit = p.MeanDelFit / float64(delet) }
+	//if fav > 0 { p.MeanFavFit = p.MeanFavFit / float64(fav) }
+	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable  //, p.MeanDelFit, p.MeanFavFit
 }
 
 
 // GetInitialAlleleStats returns the average number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
-func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float64, float64) {
+//func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float64, float64) {
+func (p *Population) GetInitialAlleleStats() (float64, float64, float64) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if p.MeanNumDelAllele > 0 && p.MeanDelAlleleFit < 0.0 { return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele, p.MeanDelAlleleFit, p.MeanFavAlleleFit	}
-	p.MeanNumDelAllele=0.0;  p.MeanNumNeutAllele=0.0;  p.MeanNumFavAllele=0.0;  p.MeanDelAlleleFit=0.0;  p.MeanFavAlleleFit=0.0
+	if p.MeanNumDelAllele > 0 /*&& p.MeanDelAlleleFit < 0.0*/ { return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele /*, p.MeanDelAlleleFit, p.MeanFavAlleleFit*/ }
+	p.MeanNumDelAllele=0.0;  p.MeanNumNeutAllele=0.0;  p.MeanNumFavAllele=0.0  //;  p.MeanDelAlleleFit=0.0;  p.MeanFavAlleleFit=0.0
 
 	// For each type of allele, get the average fitness factor and number of alleles for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		d, n, f, avD, avF := ind.GetInitialAlleleStats()
-		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
+		//d, n, f, avD, avF := ind.GetInitialAlleleStats()
+		d, n, f := ind.GetInitialAlleleStats()
 		delet += d
 		neut += n
 		fav += f
-		p.MeanDelAlleleFit += float64(d) * avD
-		p.MeanFavAlleleFit += float64(f) * avF
+		//p.MeanDelAlleleFit += float64(d) * avD
+		//p.MeanFavAlleleFit += float64(f) * avF
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
@@ -624,9 +625,9 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float6
 		p.MeanNumNeutAllele = float64(neut) / size
 		p.MeanNumFavAllele = float64(fav) / size
 	}
-	if delet > 0 { p.MeanDelAlleleFit = p.MeanDelAlleleFit / float64(delet) }
-	if fav > 0 { p.MeanFavAlleleFit = p.MeanFavAlleleFit / float64(fav) }
-	return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele, p.MeanDelAlleleFit, p.MeanFavAlleleFit
+	//if delet > 0 { p.MeanDelAlleleFit = p.MeanDelAlleleFit / float64(delet) }
+	//if fav > 0 { p.MeanFavAlleleFit = p.MeanFavAlleleFit / float64(fav) }
+	return p.MeanNumDelAllele, p.MeanNumNeutAllele, p.MeanNumFavAllele  //, p.MeanDelAlleleFit, p.MeanFavAlleleFit
 }
 
 
@@ -636,22 +637,14 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
+		//fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
+		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
 	}
 
 	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
 		// Write header for this file
 		fmt.Fprintln(fitWriter, "# Generation  Pop-size  Avg Offspring  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
 	}
-
-	/*
-	if alleleWriter := config.FMgr.GetFile(config.ALLELES_COUNT_FILENAME); alleleWriter != nil {
-		// Write the outer json object and the array that will contain the output of each generation
-		if _, err := alleleWriter.Write([]byte(`{"allelesForEachGen":[`)); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", config.ALLELES_COUNT_FILENAME, err)
-		}
-	}
-	*/
 }
 
 
@@ -673,10 +666,12 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()
 		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
-			d, n, f, avDelFit, avFavFit := p.GetMutationStats()
-			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
-			ad, an, af, avDelAlFit, avFavAlFit := p.GetInitialAlleleStats()
-			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
+			d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()
+			//log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
+			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
+			ad, an, af /*, avDelAlFit, avFavAlFit*/ := p.GetInitialAlleleStats()
+			//log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
+			log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v", ad, an, af)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
@@ -693,10 +688,11 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-		d, n, f, avDelFit, avFavFit := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
+		d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
+		//fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
+		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
 		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
 		if lastGen {
 			//todo: put summary stats in comments at the end of the file?

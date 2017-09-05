@@ -4,6 +4,7 @@
 /* Order of todos:
 - When copying an LB make the new one bigger by mutation rate / num LBs
 - Remove per mutation type stats in LB, chromo, indiv (and stats needed for mendel.hst optional)
+- Make the LB objects inline in the chromosome
 - Make the Chromosome objects inline in the indivs
 - Reuse 2 populations (including the indivs, etc.) instead of a new one each generation
 - Update mendel-go-spc/settings.py

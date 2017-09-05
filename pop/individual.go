@@ -22,9 +22,9 @@ type Individual struct {
 	//todo: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
 	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
-	MeanDelFit, MeanFavFit float64
+	//MeanDelFit, MeanFavFit float64
 	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
-	MeanDelAlleleFit, MeanFavAlleleFit float64
+	//MeanDelAlleleFit, MeanFavAlleleFit float64
 
 	ChromosomesFromDad []*dna.Chromosome
 	ChromosomesFromMom []*dna.Chromosome
@@ -302,60 +302,60 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of deleterious and favorable
-func (ind *Individual) GetMutationStats() (uint32, uint32, uint32, float64, float64) {
+func (ind *Individual) GetMutationStats() (uint32, uint32, uint32 /*, float64, float64*/) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDeleterious > 0 && ind.MeanDelFit < 0.0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit	}
-	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0;  ind.MeanDelFit=0.0;  ind.MeanFavFit=0.0
+	if ind.NumDeleterious > 0 /*&& ind.MeanDelFit < 0.0*/ { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable /*, ind.MeanDelFit, ind.MeanFavFit*/ }
+	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0  //;  ind.MeanDelFit=0.0;  ind.MeanFavFit=0.0
 
 	// Calc the average of each type of mutation: multiply the average from each chromosome and num mutns from each chromosome, then at the end divide by total num mutns
 	for _, c := range ind.ChromosomesFromDad {
-		delet, neut, fav, avD, avF := c.GetMutationStats()
+		delet, neut, fav /*, avD, avF*/ := c.GetMutationStats()
 		ind.NumDeleterious += delet
 		ind.NumNeutral += neut
 		ind.NumFavorable += fav
-		ind.MeanDelFit += (float64(delet) * avD)
-		ind.MeanFavFit += (float64(fav) * avF)
+		//ind.MeanDelFit += (float64(delet) * avD)
+		//ind.MeanFavFit += (float64(fav) * avF)
 	}
 	for _, c := range ind.ChromosomesFromMom {
-		delet, neut, fav, avD, avF := c.GetMutationStats()
+		delet, neut, fav /*, avD, avF*/ := c.GetMutationStats()
 		ind.NumDeleterious += delet
 		ind.NumNeutral += neut
 		ind.NumFavorable += fav
-		ind.MeanDelFit += (float64(delet) * avD)
-		ind.MeanFavFit += (float64(fav) * avF)
+		//ind.MeanDelFit += (float64(delet) * avD)
+		//ind.MeanFavFit += (float64(fav) * avF)
 	}
-	if ind.NumDeleterious > 0 { ind.MeanDelFit = ind.MeanDelFit / float64(ind.NumDeleterious) }
-	if ind.NumFavorable > 0 { ind.MeanFavFit = ind.MeanFavFit / float64(ind.NumFavorable) }
-	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable, ind.MeanDelFit, ind.MeanFavFit
+	//if ind.NumDeleterious > 0 { ind.MeanDelFit = ind.MeanDelFit / float64(ind.NumDeleterious) }
+	//if ind.NumFavorable > 0 { ind.MeanFavFit = ind.MeanFavFit / float64(ind.NumFavorable) }
+	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable  //, ind.MeanDelFit, ind.MeanFavFit
 }
 
 
 // GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of deleterious and favorable
-func (ind *Individual) GetInitialAlleleStats() (uint32, uint32, uint32, float64, float64) {
+func (ind *Individual) GetInitialAlleleStats() (uint32, uint32, uint32 /*, float64, float64*/ ) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDelAllele > 0 && ind.MeanDelAlleleFit < 0.0 { return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit }
-	ind.NumDelAllele=0;  ind.NumNeutAllele=0;  ind.NumFavAllele=0;  ind.MeanDelAlleleFit=0.0;  ind.MeanFavAlleleFit=0.0
+	if ind.NumDelAllele > 0 /*&& ind.MeanDelAlleleFit < 0.0*/ { return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele /*, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit*/ }
+	ind.NumDelAllele=0;  ind.NumNeutAllele=0;  ind.NumFavAllele=0  //;  ind.MeanDelAlleleFit=0.0;  ind.MeanFavAlleleFit=0.0
 
 	// Calc the average of each type of allele: multiply the average from each chromosome and num alleles from each chromosome, then at the end divide by total num alleles
 	for _, c := range ind.ChromosomesFromDad {
-		delet, neut, fav, avD, avF := c.GetInitialAlleleStats()
+		delet, neut, fav /*, avD, avF*/ := c.GetInitialAlleleStats()
 		ind.NumDelAllele += delet
 		ind.NumNeutAllele += neut
 		ind.NumFavAllele += fav
-		ind.MeanDelAlleleFit += (float64(delet) * avD)
-		ind.MeanFavAlleleFit += (float64(fav) * avF)
+		//ind.MeanDelAlleleFit += (float64(delet) * avD)
+		//ind.MeanFavAlleleFit += (float64(fav) * avF)
 	}
 	for _, c := range ind.ChromosomesFromMom {
-		delet, neut, fav, avD, avF := c.GetInitialAlleleStats()
+		delet, neut, fav /*, avD, avF*/ := c.GetInitialAlleleStats()
 		ind.NumDelAllele += delet
 		ind.NumNeutAllele += neut
 		ind.NumFavAllele += fav
-		ind.MeanDelAlleleFit += (float64(delet) * avD)
-		ind.MeanFavAlleleFit += (float64(fav) * avF)
+		//ind.MeanDelAlleleFit += (float64(delet) * avD)
+		//ind.MeanFavAlleleFit += (float64(fav) * avF)
 	}
-	if ind.NumDelAllele > 0 { ind.MeanDelAlleleFit = ind.MeanDelAlleleFit / float64(ind.NumDelAllele) }
-	if ind.NumFavAllele > 0 { ind.MeanFavAlleleFit = ind.MeanFavAlleleFit / float64(ind.NumFavAllele) }
-	return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit
+	//if ind.NumDelAllele > 0 { ind.MeanDelAlleleFit = ind.MeanDelAlleleFit / float64(ind.NumDelAllele) }
+	//if ind.NumFavAllele > 0 { ind.MeanFavAlleleFit = ind.MeanFavAlleleFit / float64(ind.NumFavAllele) }
+	return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele  //, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit
 }
 
 
@@ -388,6 +388,7 @@ func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 
 // Report prints out statistics of this individual. If final==true it could print more details.
 func (ind *Individual) Report(_ bool) {
-	deleterious, neutral, favorable, avDelFit, avFavFit := ind.GetMutationStats()
-	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
+	deleterious, neutral, favorable /*, avDelFit, avFavFit*/ := ind.GetMutationStats()
+	//log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
+	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable)
 }

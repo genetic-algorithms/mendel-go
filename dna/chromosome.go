@@ -216,36 +216,36 @@ func (c *Chromosome) SumFitness() (fitness float64) {
 
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
+func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable uint32 /*, avDelFit, avFavFit float64*/) {
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _,lb := range c.LinkageBlocks {
-		delet, neut, fav, avD, avF := lb.GetMutationStats()
+		delet, neut, fav /*, avD, avF*/ := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float64(delet) * avD)
-		avFavFit += (float64(fav) * avF)
+		//avDelFit += (float64(delet) * avD)
+		//avFavFit += (float64(fav) * avF)
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
-	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
+	//if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
+	//if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
 	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
 }
 
 
 // GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
-func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable uint32, avDelFit, avFavFit float64) {
+func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable uint32 /*, avDelFit, avFavFit float64*/) {
 	// Calc the average of each type of allele: multiply the average from each LB and num alleles from each LB, then at the end divide by total num alleles
 	for _,lb := range c.LinkageBlocks {
-		delet, neut, fav, avD, avF := lb.GetInitialAlleleStats()
+		delet, neut, fav /*, avD, avF*/ := lb.GetInitialAlleleStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		avDelFit += (float64(delet) * avD)
-		avFavFit += (float64(fav) * avF)
+		//avDelFit += (float64(delet) * avD)
+		//avFavFit += (float64(fav) * avF)
 	}
-	if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
-	if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
+	//if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
+	//if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
 	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
 }
