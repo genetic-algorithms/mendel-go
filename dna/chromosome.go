@@ -30,7 +30,7 @@ func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
 // Makes a semi-deep copy (everything but the mutations) of a chromosome. "Copy" means actually copy, or create a new chromosome with new LBs that point back to the LB history chain.
 func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
-	newChr.NumMutations = c.NumMutations
+	//newChr.NumMutations = c.NumMutations   // <- Transfer() does this
 	for lbIndex := range c.LinkageBlocks {
 		//if config.Cfg.Computation.Transfer_linkage_blocks {
 			c.LinkageBlocks[lbIndex].Transfer(c, newChr, lbIndex)
@@ -95,8 +95,8 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
 		if uniformRandom.Intn(2) == 0 {
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
-				lb := dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
-				gamete.NumMutations += lb.GetNumMutations()
+				/*lb :=*/ dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
+				//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb
@@ -104,8 +104,8 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 			//}
 		} else {
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
-				lb := mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
-				gamete.NumMutations += lb.GetNumMutations()
+				/*lb :=*/ mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
+				//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb
@@ -146,7 +146,6 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 	switch {
 	case numCrossovers <= 0:
 		// Handle special case of no crossover - copy all LBs from primary
-		//config.Verbose(9, " Copying all LBs from primary")
 		gamete = primary.Copy(lBsPerChromosome)
 		return
 	default:
@@ -176,8 +175,8 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lbIndex :=begIndex; lbIndex <=endIndex; lbIndex++ {
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
-				lb := parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
-				gamete.NumMutations += lb.GetNumMutations()
+				/*lb :=*/ parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
+				//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb
@@ -203,6 +202,14 @@ func (c *Chromosome) AppendMutation(lbInChr int, mutId uint64, uniformRandom *ra
 	//		of calculating its own fitness, so we won't do that.
 	c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
 	c.NumMutations++
+}
+
+
+// ChrAppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs on 2 chromosomes (favorable to 1, deleterious to the other).
+func ChrAppendInitialContrastingAlleles(chr1, chr2 *Chromosome, lbIndex int, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) {
+	AppendInitialContrastingAlleles(chr1.LinkageBlocks[lbIndex], chr2.LinkageBlocks[lbIndex], uniqueInt, uniformRandom)
+	chr1.NumMutations++
+	chr2.NumMutations++
 }
 
 // SumFitness combines the fitness effect of all of its LBs in the additive method

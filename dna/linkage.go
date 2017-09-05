@@ -129,14 +129,14 @@ func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) *LinkageBloc
 		// "From" still owns this LB, so it is his to give away
 		//config.Verbose(9, " Transferring ownership of LB %p from %p to %p", lb, from, to)
 		to.LinkageBlocks[lbIndex] = lb
-		//to.NumMutations += lb.GetNumMutations()
+		to.NumMutations += lb.GetNumMutations()
 		lb.owner = to
 		return lb
 	} else {
 		// This LB has already been given away to another offspring, so need to make a copy
 		newLB := lb.Copy(to)
 		to.LinkageBlocks[lbIndex] = newLB
-		//to.NumMutations += newLB.GetNumMutations()
+		to.NumMutations += newLB.GetNumMutations()
 		return newLB
 	}
 }
@@ -148,6 +148,7 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	if len(lb.mutn) > 0 {
 		newLb.mutn = make([]Mutation, len(lb.mutn)) 	// allocate a new underlying array the same length as the source
+		//newLb.mutn = make([]Mutation, len(lb.mutn), len(lb.mutn)+2) 	//todo: consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs) so it doesn't have to be copied as soon as a mutation is added
 		copy(newLb.mutn, lb.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	}
 	//if len(lb.mutations.mutn) > 0 {

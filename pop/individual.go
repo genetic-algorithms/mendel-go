@@ -154,7 +154,6 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 	}
 	child.NumMutations += numMutations
 	//d, n, f := offspr.GetNumMutations()
-	//config.Verbose(1, "numMutations=%d, child.NumMutations=%d", numMutations, child.NumMutations)
 
 	child.GenoFitness = Mdl.CalcIndivFitness(child) 		// store resulting fitness
 	if child.GenoFitness <= 0.0 { child.Dead = true }
@@ -184,7 +183,8 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			for i:=1; i<=int(allelesPerLB); i++ {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
 				// Note: we can use the global UniqueInt object because this method is called before we create go routines.
-				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
+				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
+				dna.ChrAppendInitialContrastingAlleles(ind.ChromosomesFromDad[c], ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesEvenly++
 				//ind.popPart.Pop.NextMutId += 2
 			}
@@ -195,7 +195,8 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			// else ratioSoFar = 0
 			if ratioSoFar <= desiredRemainderRatio && numWithAllelesRemainder < allelesRemainder {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
-				dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
+				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
+				dna.ChrAppendInitialContrastingAlleles(ind.ChromosomesFromDad[c], ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesRemainder++
 				//ind.popPart.Pop.NextMutId += 2
 			}
@@ -372,7 +373,6 @@ func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
 func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 	// Get the alleles for this individual
 	allelesForThisIndiv := dna.AlleleCountFactory()		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
-	//config.Verbose(1, "Individual, numMutations=%v:", ind.NumMutations)
 	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(allelesForThisIndiv) }
 	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(allelesForThisIndiv) }
 

@@ -12,22 +12,22 @@ import (
 
 // Typical small run
 func TestMendelCase1(t *testing.T) {
-	mendelCase(t, 1, 1)
+	mendelCase(t, 1, 1, "mendel.hst")
 }
 
 // Same as TestMendelCase1 except that none of the mutations are tracked, but the results should be the same.
 func TestMendelCase2(t *testing.T) {
-	mendelCase(t, 2, 1)
+	mendelCase(t, 2, 1, "mendel.hst")
 }
 
 // Same as TestMendelCase2 except crossover_model=partial and mean_num_crossovers=2
 func TestMendelCase3(t *testing.T) {
-	mendelCase(t, 3, 3)
+	mendelCase(t, 3, 3, "mendel.hst")
 }
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase4(t *testing.T) {
-	mendelCase(t, 4, 4)
+	mendelCase(t, 4, 4, "mendel.fit")
 	// Also compare the allele-bins files
 	outFileDir := "test/output/testcase4"
 	expFileDir := "test/expected/testcase4"
@@ -42,48 +42,48 @@ func TestMendelCase4(t *testing.T) {
 
 // Same as TestMendelCase3 except with selection_model=ups, and heritability and non_scaling_noise back to default
 func TestMendelCase5(t *testing.T) {
-	mendelCase(t, 5, 5)
+	mendelCase(t, 5, 5, "mendel.fit")
 }
 
 // Same as TestMendelCase5 except with selection_model=spps
 func TestMendelCase6(t *testing.T) {
-	mendelCase(t, 6, 6)
+	mendelCase(t, 6, 6, "mendel.hst")
 }
 
 // Same as TestMendelCase5 except with selection_model=partialtrunc
 func TestMendelCase7(t *testing.T) {
-	mendelCase(t, 7, 7)
+	mendelCase(t, 7, 7, "mendel.hst")
 }
 
 // Same as TestMendelCase6 except with 4 threads
 func TestMendelCase8(t *testing.T) {
-	mendelCase(t, 8, 8)
+	mendelCase(t, 8, 8, "mendel.hst")
 }
 
 // Same as TestMendelCase8 except with exponential pop growth
 func TestMendelCase9(t *testing.T) {
-	mendelCase(t, 9, 9)
+	mendelCase(t, 9, 9, "mendel.hst")
 }
 
 // Same as TestMendelCase8 except with carrying capacity pop growth
 func TestMendelCase10(t *testing.T) {
-	mendelCase(t, 10, 10)
+	mendelCase(t, 10, 10, "mendel.hst")
 }
 
 // Same as TestMendelCase8 except with founders pop growth with bottleneck, and weibull
 func TestMendelCase11(t *testing.T) {
-	mendelCase(t, 11, 11)
+	mendelCase(t, 11, 11, "mendel.fit")
 }
 
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
-func mendelCase(t *testing.T, num, expNum int) {
+func mendelCase(t *testing.T, num, expNum int, outputFile string) {
 	testCase := "testcase" + strconv.Itoa(num)
 	expTestCase := "testcase" + strconv.Itoa(expNum)		// the number of the expected output file
 	inFileName := "test/input/mendel-" + testCase + ".ini"
 	outFileDir := "test/output/" + testCase
-	outFileName := outFileDir + "/mendel.hst"
-	expFileName := "test/expected/" + expTestCase + "/mendel.hst"
+	outFileName := outFileDir + "/" + outputFile
+	expFileName := "test/expected/" + expTestCase + "/" + outputFile
 	if err := os.MkdirAll(outFileDir, 0755); err != nil {
 		t.Errorf("Error creating %v: %v", outFileDir, err)
 		return
