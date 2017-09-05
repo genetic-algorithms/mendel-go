@@ -11,6 +11,7 @@ import (
 type Chromosome struct {
 	LinkageBlocks []*LinkageBlock
 	NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
+	FitnessEffect float32	// keep a running total of the fitness contribution of this chromosome
 }
 
 // This only creates an empty chromosome for gen 0 as part of Meiosis(). Meiosis() creates a populated chromosome.
@@ -200,25 +201,29 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 func (c *Chromosome) AppendMutation(lbInChr int, mutId uint64, uniformRandom *rand.Rand) {
 	// Note: to try to save time, we could accumulate the chromosome fitness as we go, but doing so would bypass the LB method
 	//		of calculating its own fitness, so we won't do that.
-	c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
+	fitnessEffect := c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
 	c.NumMutations++
+	c.FitnessEffect += fitnessEffect
 }
 
 
 // ChrAppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs on 2 chromosomes (favorable to 1, deleterious to the other).
 func ChrAppendInitialContrastingAlleles(chr1, chr2 *Chromosome, lbIndex int, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) {
-	AppendInitialContrastingAlleles(chr1.LinkageBlocks[lbIndex], chr2.LinkageBlocks[lbIndex], uniqueInt, uniformRandom)
+	fitnessEffect1, fitnessEffect2 := AppendInitialContrastingAlleles(chr1.LinkageBlocks[lbIndex], chr2.LinkageBlocks[lbIndex], uniqueInt, uniformRandom)
 	chr1.NumMutations++
+	chr1.FitnessEffect += fitnessEffect1
 	chr2.NumMutations++
+	chr2.FitnessEffect += fitnessEffect2
 }
 
 // SumFitness combines the fitness effect of all of its LBs in the additive method
-func (c *Chromosome) SumFitness() (fitness float64) {
-	for _, lb := range c.LinkageBlocks {
-		fitness += lb.SumFitness()
-	}
-	// Note: we don't bother caching the fitness in the chromosome, because we cache the total in the individual, and we know better when to cache there.
-	return
+func (c *Chromosome) SumFitness() float64 {
+	return float64(c.FitnessEffect)
+	//var fitness float32
+	//for _, lb := range c.LinkageBlocks {
+	//	fitness += lb.SumFitness()
+	//}
+	//return float64(fitness)
 }
 
 

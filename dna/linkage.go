@@ -130,6 +130,7 @@ func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) *LinkageBloc
 		//config.Verbose(9, " Transferring ownership of LB %p from %p to %p", lb, from, to)
 		to.LinkageBlocks[lbIndex] = lb
 		to.NumMutations += lb.GetNumMutations()
+		to.FitnessEffect += lb.SumFitness()
 		lb.owner = to
 		return lb
 	} else {
@@ -137,6 +138,7 @@ func (lb *LinkageBlock) Transfer(from, to *Chromosome, lbIndex int) *LinkageBloc
 		newLB := lb.Copy(to)
 		to.LinkageBlocks[lbIndex] = newLB
 		to.NumMutations += newLB.GetNumMutations()
+		to.FitnessEffect += newLB.SumFitness()
 		return newLB
 	}
 }
@@ -177,11 +179,11 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 
 // AppendMutation creates and adds a mutation to this LB.
 // Note: The implementation of golang's append() appears to be that if it has to copy the array is doubles the capacity, which is probably what we want for the Mutation arrays.
-func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) {
+func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (fitnessEffect float32) {
 	mType := CalcMutationType(uniformRandom)
 	switch mType {
 	case DELETERIOUS:
-		fitnessEffect := calcDelMutationAttrs(uniformRandom)
+		fitnessEffect = calcDelMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
 			//mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
@@ -198,7 +200,7 @@ func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) {
 		}
 		lb.numNeutrals++
 	case FAVORABLE:
-		fitnessEffect := calcFavMutationAttrs(uniformRandom)
+		fitnessEffect = calcFavMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
 			//mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
@@ -209,12 +211,13 @@ func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) {
 		//lb.favFitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
 		lb.fitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
 	}
+	return
 }
 
 
 // AppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs (favorable to 1, deleterious to the other).
 // The 2 LBs passed in are typically the same LB position on the same chromosome number, 1 from each parent.
-func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) {
+func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) (fitnessEffect1, fitnessEffect2 float32) {
 	// Note: for now we assume that all initial contrasting alleles are co-dominant so that in the homozygous case (2 of the same favorable
 	//		allele (or 2 of the deleterious allele) - 1 from each parent), the combined fitness effect is 1.0 * the allele fitness.
 	expression := 0.5
@@ -228,7 +231,8 @@ func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.Un
 	lb1.mutn = append(lb1.mutn, Mutation{Id: uniqueInt.NextInt(), Type: FAV_ALLELE})
 	lb1.numFavAllele++
 	//lb1.alleleFavFitnessEffect += float32(fitnessEffect)
-	lb1.fitnessEffect += float32(fitnessEffect)
+	fitnessEffect1 = float32(fitnessEffect)
+	lb1.fitnessEffect += fitnessEffect1
 
 	// Add a deleterious allele to the 2nd LB
 	//delAllele := DeleteriousAlleleFactory(-fitnessEffect)
@@ -237,14 +241,17 @@ func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.Un
 	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt()+1, Type: DEL_ALLELE})
 	lb2.numDelAllele++
 	//lb2.alleleDelFitnessEffect += float32(-fitnessEffect)
-	lb2.fitnessEffect += float32(-fitnessEffect)
+	fitnessEffect2 = float32(-fitnessEffect)
+	lb2.fitnessEffect += fitnessEffect2
+	return
 }
 
 
 // SumFitness combines the fitness effect of all of its mutations in the additive method
-func (lb *LinkageBlock) SumFitness() (fitness float64) {
+func (lb *LinkageBlock) SumFitness() (fitness float32) {
 	//fitness = float64(lb.delFitnessEffect + lb.favFitnessEffect + lb.alleleDelFitnessEffect + lb.alleleFavFitnessEffect)
-	fitness = float64(lb.fitnessEffect)
+	//fitness = float64(lb.fitnessEffect)
+	fitness = lb.fitnessEffect
 	return
 }
 
