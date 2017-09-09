@@ -121,9 +121,9 @@ func main() {
 		//	prevPop = nil 		// give GC a chance to free that population
 		//	newP = pop.PopulationFactory(population, gen)
 		//}
-		childrenPop := pop.PopPool.NextGeneration(parentPop, gen)
+		childrenPop := pop.PopPool.GetNextGeneration(parentPop, gen)
 		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
-		parentPop = nil 	// give GC a chance to reclaim the previous generation
+		//parentPop = nil 	// give GC a chance to reclaim the previous generation
 		if config.Cfg.Computation.Force_gc {
 			utils.Measure.Start("GC")
 			runtime.GC()
@@ -137,7 +137,6 @@ func main() {
 		}
 
 		childrenPop.ReportEachGen(gen, gen == maxGenNum)
-		//prevPop = population
 		pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
 		parentPop = childrenPop        // for the next iteration
 	}

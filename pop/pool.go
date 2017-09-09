@@ -38,14 +38,16 @@ func PoolFactory() {
 
 // RecylePopulation holds on to a pop that is done being the parent pop. We will reuse this pop when NextGeneration is called.
 func (p *Pool) RecyclePopulation(pop *Population) {
+	//config.Verbose(1, " in RecyclePopulation")
 	if !p.reuse { return }		// do not store this pop, so we will create a new one when asked for a pop
+	//config.Verbose(1, " storing old pop for reuse")
 	p.oldPop = pop
 	p.oldPopInited = false
 }
 
 
 // NextGeneration returns a pop that can be used for the children of this gen. Either a recycled gen or a new one.
-func (p *Pool) NextGeneration(parentPop *Population, genNum uint32) *Population {
+func (p *Pool) GetNextGeneration(parentPop *Population, genNum uint32) *Population {
 	p.parentPop = parentPop 		// we need to know the parent pop in some of the methods below
 	if p.oldPop != nil {		// oldPop will never get set if reuse is false
 		p.childrenPop = nil
@@ -54,11 +56,13 @@ func (p *Pool) NextGeneration(parentPop *Population, genNum uint32) *Population 
 			p.oldPop.Reinitialize(parentPop, genNum)
 			p.oldPopInited = true
 		}
+		//config.Verbose(1, " returning recycled pop")
 		return p.oldPop
 	} else {
 		p.oldPop = nil
 		p.oldPopInited = false
 		p.childrenPop = PopulationFactory(parentPop, genNum)	// this creates the PopulationParts too
+		//config.Verbose(1, " returning new pop")
 		return p.childrenPop
 	}
 }
@@ -97,13 +101,15 @@ func (p *Pool) SetEstimatedNumIndivs(part *PopulationPart, estimatedNumIndivs ui
 // GetIndividual returns the next available Individual to reuse, or creates one if necessary.
 // Note: this has to use the member vars of the part (instead of having our own) so it is thread safe.
 func (p *Pool) GetIndividual(part *PopulationPart) (ind *Individual) {
-	// should we look at cap() instead of len() and test if the ptr to the Individual is nil? No sure if we ever shrink this slice
+	// should we look at cap() instead of len() and test if the ptr to the Individual is nil? Not sure if we ever shrink this slice
 	if part.NextIndivIndex < len(part.Indivs) {
 		if part.Indivs[part.NextIndivIndex] == nil { log.Fatalf("Error: part.Indivs[%v] is nil even though index is < length %v", part.NextIndivIndex, len(part.Indivs))}
 		// We are still within the allocated array and there is an existing Individual object we can reuse
+		//config.Verbose(1, " reusing individual at index %d", part.NextIndivIndex)
 		ind = part.Indivs[part.NextIndivIndex].Reinitialize()
 	} else {
 		// The Indivs slice is too small. Create an indiv and append it.
+		//config.Verbose(1, " creating new individual at index %d", part.NextIndivIndex)
 		ind = IndividualFactory(part, false)
 		part.Indivs = append(part.Indivs, ind)
 	}
@@ -125,11 +131,21 @@ func (p *Pool) FreeParentRefs(dadIndex int, momIndex int) {
 }
 
 
-// FreeChildrenPtrs should be called after IndivRefs points to all of the individuals. This get rid of the parts references to them,
+// FreeChildrenPtrs should be called after IndivRefs points to all of the individuals. This gets rid of the parts references to them,
 // so GC can free individuals as soon as IndivRefs goes away.
-func (p *Pool) FreeChildrenPtrs() {
-	if p.reuse { return }
+func (p *Pool) FreeChildrenPtrs(lastGen bool) {
+	if p.reuse && !lastGen { return }
 	for _, part := range p.getChildrenPop().Parts {
 		part.FreeIndivs()
 	}
+}
+
+
+// FreeBeforeAlleleCount frees everything possible for GC before we count alleles. We assume we won't be called after this
+func (p *Pool) FreeBeforeAlleleCount() {
+	p.FreeChildrenPtrs(true)
+	p.oldPop = nil
+	p.oldPopInited = false
+	p.parentPop = nil
+	p.childrenPop = nil
 }

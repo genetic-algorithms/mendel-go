@@ -13,6 +13,7 @@ import (
 	"sync"
 	"runtime"
 	"encoding/json"
+	"runtime/debug"
 )
 
 type RecombinationType uint8
@@ -103,6 +104,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 			p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))    // for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
 		}
 		p.makeAndFillIndivRefs()
+		//PopPool.FreeChildrenPtrs(false)  // <- can't call this yet because Pool doesn't have a children pop yet
 	} else {
 		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
 		// Mate() will populate PopulationPart with Individuals and run makeAndFillIndivRefs()
@@ -112,7 +114,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 }
 
 
-// Reinitialize repurposes a population object for another generation. This saves freeing and reallocating a lot of objects
+// Reinitialize recycles a population object for another generation. This saves freeing and reallocating a lot of objects
 func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Population {
 	// Reinitialize is never called on the genesis population
 	p.TargetSize = Mdl.PopulationGrowth(prevPop, genNum)
@@ -122,10 +124,32 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 	//Note: the above won't allow the backing array to be GC'd, but that's what we want, because likely we will be able to reuse it.
 	//		To really free it: p.IndivRefs = nil
 
-	// It already has PopulationPart objects, reinitializes those too
-	for _, part := range p.Parts { part.Reinitialize()}
+	// It already has PopulationPart objects, reinitialize those too
+	for _, part := range p.Parts {
+		part.Reinitialize()
+		//config.Verbose(1, " part has len(Indivs)=%d after Reinitialize", len(part.Indivs))
+	}
 
 	// These member vars stay the same: Num_offspring, LBsPerChromosome
+
+	// Zero out stats
+	p.ActualAvgOffspring = 0.0
+	p.PreSelGenoFitnessMean = 0.0
+	p.PreSelGenoFitnessVariance = 0.0
+	p.PreSelGenoFitnessStDev = 0.0
+	p.EnvironNoise = 0.0
+	p.MeanFitness = 0.0
+	p.MinFitness = 0.0
+	p.MaxFitness = 0.0
+	p.TotalNumMutations = 0
+	p.MeanNumMutations = 0.0
+	p.MeanNumDeleterious = 0.0
+	p.MeanNumNeutral = 0.0
+	p.MeanNumFavorable  = 0.0
+	p.MeanNumDelAllele = 0.0
+	p.MeanNumNeutAllele = 0.0
+	p.MeanNumFavAllele = 0.0
+
 	return p
 }
 
@@ -229,6 +253,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.5)
 
 			// Start the concurrent routine for this part of the pop
+			//config.Verbose(1, " running PopulationPartMate with parent segment size %v", endIndex - beginIndex + 1)
 			waitGroup.Add(1)
 			go newPart.Mate(p, parentIndices[beginIndex:endIndex +1], utils.GlobalUniqueInt.DonateRange(numMuts), newRandom, &waitGroup)
 
@@ -244,6 +269,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 
 	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
 	//for _, part := range newP.Parts { part.FreeIndivs() }	// now that we point to all of the individuals in IndivRefs, get rid of the parts references to them, so GC can free individuals as soon as IndivRefs goes away
+	PopPool.FreeChildrenPtrs(false)
 
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
@@ -758,21 +784,27 @@ type NormalizedBuckets struct {
 // outputAlleles gathers all of the alleles in this generation, calculates the bins, and outputs them to a file
 func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	utils.Measure.Start("allele-count")
+
+	// Free up some memory, because this is going to take a lot
+	if lastGen && config.Cfg.Computation.Allele_count_gc_interval > 0 {
+		debug.SetGCPercent(-1) 		// if force_gc=false we didn't do this earlier
+		PopPool.FreeBeforeAlleleCount()
+	}
+
 	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
 	//alleles := dna.AlleleCountFactory(genNum, popSize)
 	alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
 	for i := range p.IndivRefs {
-		ind := p.IndivRefs[i].Indiv
-		ind.CountAlleles(alleles)
+		//ind := p.IndivRefs[i].Indiv
+		p.IndivRefs[i].Indiv.CountAlleles(alleles)
 
 		// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
 		// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
-			if config.Cfg.Computation.Force_gc && config.Cfg.Computation.Allele_count_gc_interval > 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 {
+			if config.Cfg.Computation.Allele_count_gc_interval > 0 && ( i == 0 || (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 ) {
 				utils.Measure.Start("GC")
-				//config.Verbose(1, "Running GC dur allele count")
 				runtime.GC()
 				utils.Measure.Stop("GC")
 			}
@@ -911,7 +943,7 @@ func (p *Population) makeAndFillIndivRefs() {
 	if cap(p.IndivRefs) < size {
 		p.IndivRefs = make([]IndivRef, size)
 	}
-	// else this is a repurposed pop and the IndivRefs was big enough
+	// else this is a recycled pop and the IndivRefs was big enough
 
 	// Now populate the refs array
 	irIndex := 0

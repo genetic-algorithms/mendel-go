@@ -69,6 +69,7 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unique
 		/*newChildren :=*/ parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, p, uniformRandom)
 		//p.Append(newChildren...) 		// <- Mate() already adds the Individuals to this part
 
+		PopPool.FreeParentRefs(dadI, momI)
 		/*
 		if !config.Cfg.Computation.Reuse_populations {
 			//parentPop.IndivRefs[dadI].Indiv.Free()	// <- this doesn't help any more than setting the Indiv ptr to nil
