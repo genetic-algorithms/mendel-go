@@ -36,22 +36,22 @@ func (a ByFitness) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].Indiv.PhenoFitness }
 
 
-// Population tracks the tribes and global info about the population. It also handles population-wide actions
-// like mating and selection.
+// Population tracks the tribes and global info about the population. It also handles population-wide actions like mating and selection.
 type Population struct {
 	//indivs []*Individual 	// delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
 	Parts []*PopulationPart
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
-	//NextMutId uint64 		// the next value this pop can use for a mutation id
 
 	TargetSize uint32        // the target size of this population after selection
 	Num_offspring float64       // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
+	LBsPerChromosome uint32                                             // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
+
+	// Stats
 	ActualAvgOffspring float64       // The average number of offspring each individual from last generation actually had in this generation
 	PreSelGenoFitnessMean float64                                       // The average fitness of all of the individuals (before selection) due to their genomic mutations
 	PreSelGenoFitnessVariance float64                                   //
 	PreSelGenoFitnessStDev    float64                                   // The standard deviation from the GenoFitnessMean
 	EnvironNoise              float64                                   // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
-	LBsPerChromosome uint32                                             // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
 
 	MeanFitness, MinFitness, MaxFitness float64                         // cache summary info about the individuals
 	TotalNumMutations uint32
@@ -65,14 +65,11 @@ type Population struct {
 }
 
 
-// PopulationFactory creates a new population (either the initial pop, or the next generation).
-//func PopulationFactory(initialSize uint32) *Population {
+// PopulationFactory creates a new population If genNum==0 it create the special genesis population.
 func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 	var targetSize uint32
-	//var nextMutId uint64
 	if prevPop != nil {
 		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
-		//nextMutId = prevPop.NextMutId
 	} else {
 		// This is the 1st generation, so set the size from the config param
 		targetSize = config.Cfg.Basic.Pop_size
@@ -81,25 +78,54 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: targetSize,
-		//NextMutId: nextMutId,
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
-	//p.Num_offspring = 2.0 * config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 4
 	p.Num_offspring = config.Cfg.Population.Reproductive_rate * fertility_factor 	// the default for Num_offspring is 2
 
 	p.LBsPerChromosome = uint32(config.Cfg.Population.Num_linkage_subunits / config.Cfg.Population.Haploid_chromosome_number)	// main.initialize() already confirmed it was a clean multiple
 
 	if genNum == 0 {
-		// Create individuals (with no mutations) for the 1st generation. (For subsequent generations, individuals are added to the Population object via Mate().
-		//for i:=uint32(1); i<= initialSize; i++ { p.Append(IndividualFactory(p, true)) }
-		p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))	// for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
+		// Create individuals (with no mutations) for the genesis generation. (For subsequent generations, individuals are added to the Population object via Mate().
+		if config.Cfg.Computation.Reuse_populations {
+			// Need to make the proper number of pop parts in case we reuse this population later
+			//todo: make a reusable iterator class that spreads things out over a list of object
+			segmentSize := uint32(utils.RoundToEven(float64(targetSize) / float64(config.Cfg.Computation.Num_threads)))
+			if segmentSize <= 0 { segmentSize = 2 }
+			for i := uint32(1); i <= config.Cfg.Computation.Num_threads; i++ {
+				thisSegmentSize := utils.MinUint32(segmentSize, targetSize) 	// don't let segmentSize go past the num of indivs left
+				if i == config.Cfg.Computation.Num_threads { thisSegmentSize = targetSize } 	// last part, do everything left
+				//config.Verbose(1, " running PopulationPartFactory with segment size %v", thisSegmentSize)
+				p.Parts = append(p.Parts, PopulationPartFactory(thisSegmentSize, p))
+				targetSize = utils.MaxUint32(targetSize - thisSegmentSize, 0)
+			}
+		} else {
+			p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))    // for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
+		}
 		p.makeAndFillIndivRefs()
 	} else {
 		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
 		// Mate() will populate PopulationPart with Individuals and run makeAndFillIndivRefs()
 	}
 
+	return p
+}
+
+
+// Reinitialize repurposes a population object for another generation. This saves freeing and reallocating a lot of objects
+func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Population {
+	// Reinitialize is never called on the genesis population
+	p.TargetSize = Mdl.PopulationGrowth(prevPop, genNum)
+
+	// Truncate the IndivRefs slice. makeAndFillIndivRefs() will make it again if not big enough.
+	p.IndivRefs = p.IndivRefs[:0]
+	//Note: the above won't allow the backing array to be GC'd, but that's what we want, because likely we will be able to reuse it.
+	//		To really free it: p.IndivRefs = nil
+
+	// It already has PopulationPart objects, reinitializes those too
+	for _, part := range p.Parts { part.Reinitialize()}
+
+	// These member vars stay the same: Num_offspring, LBsPerChromosome
 	return p
 }
 
@@ -163,14 +189,10 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	defer utils.Measure.Start("Mate").Stop("Mate")
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
-	// Create the next generation population object that we will fill in as a result of mating.
-	//newP := PopulationFactory(0)
-
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
 	//config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
-	//newP.Part.Mate(p, parentIndices, uniformRandom)
 	// Divide parentIndices into segments (whose size is an even number) and schedule a go routine to mate each segment
 	// Note: runtime.GOMAXPROCS(runtime.NumCPU()) is the default, but this statement can be modified to set a different number of CPUs to use
 	segmentSize := utils.RoundToEven( float64(len(parentIndices)) / float64(len(newP.Parts)) )
@@ -204,7 +226,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 			}
 
 			// Choose a range of the mutation id's for this part - have to make sure it won't exceed this
-			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.3)
+			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.5)
 
 			// Start the concurrent routine for this part of the pop
 			waitGroup.Add(1)
@@ -220,18 +242,8 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	// Wait for all of the Mate functions to complete
 	waitGroup.Wait()
 
-	/* this was before concurrency...
-	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
-	for i := uint32(0); i < p.GetCurrentSize() - 1; i += 2 {
-		dadI := parentIndices[i]
-		momI := parentIndices[i+1]
-		//newIndivs := p.indivs[dadI].Mate(p.indivs[momI], uniformRandom)
-		newIndivs := p.IndivRefs[dadI].Indiv.Mate(p.IndivRefs[momI].Indiv, uniformRandom)
-		newP.Append(newIndivs...)
-	}
-	*/
 	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
-	for _, part := range newP.Parts { part.FreeIndivs() }	// now that we point to all of the individuals in IndivRefs, get rid of the parts references to them, so GC can free individuals as soon as IndivRefs goes away
+	//for _, part := range newP.Parts { part.FreeIndivs() }	// now that we point to all of the individuals in IndivRefs, get rid of the parts references to them, so GC can free individuals as soon as IndivRefs goes away
 
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
@@ -277,7 +289,7 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	numDead := p.getNumDead()		// under certain circumstances this could be > the number we wanted to select out
 	p.ReportDeadStats()
 	p.IndivRefs = p.IndivRefs[numDead:]		// re-slice IndivRefs to eliminate the dead individuals
-	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	//todo: comment out
+	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	//TODO: comment out
 
 	/* We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs.
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
@@ -633,7 +645,7 @@ func (p *Population) GetInitialAlleleStats() (float64, float64, float64) {
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (p *Population) ReportInitial(maxGenNum uint32) {
-	config.Verbose(1, "Running with a population size of %d for %d generations with %d threads", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads)
+	config.Verbose(1, "Running with a population size of %d for %d generations with %d threads and reuse_populations=%v", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads, config.Cfg.Computation.Reuse_populations)
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
@@ -896,14 +908,19 @@ func (p *Population) makeAndFillIndivRefs() {
 	// Find the total num of individuals so we can initialize the refs array
 	size := 0
 	for _, part := range p.Parts { size += int(part.GetCurrentSize()) }
-	p.IndivRefs = make([]IndivRef, size)
+	if cap(p.IndivRefs) < size {
+		p.IndivRefs = make([]IndivRef, size)
+	}
+	// else this is a repurposed pop and the IndivRefs was big enough
 
 	// Now populate the refs array
 	irIndex := 0
 	for _, part := range p.Parts {
 		for j := range part.Indivs {
 			p.IndivRefs[irIndex].Indiv = part.Indivs[j]
-			part.Indivs[j] = nil 	// eliminate this reference to the individual so garbage collection can delete the individual as soon as we use and eliminate the reference in IndivRefs in Mate() of next gen
+			if !config.Cfg.Computation.Reuse_populations {
+				part.Indivs[j] = nil    // eliminate this reference to the individual so garbage collection can delete the individual as soon as we use and eliminate the reference in IndivRefs in Mate() of next gen
+			}
 			irIndex++
 		}
 	}

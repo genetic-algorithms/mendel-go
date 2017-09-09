@@ -44,6 +44,7 @@ func initialize() *rand.Rand {
 	utils.Measure.Start("Total")
 
 	utils.GlobalUniqueIntFactory()
+	pop.PoolFactory()
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
@@ -102,33 +103,43 @@ func main() {
 
 	uniformRandom := initialize()
 
-	population := pop.PopulationFactory(nil, 0) 		// time 0 population
-	population.GenerateInitialAlleles(uniformRandom)
+	parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
+	parentPop.GenerateInitialAlleles(uniformRandom)
 	maxGenNum := config.Cfg.Basic.Num_generations
-	population.ReportInitial(maxGenNum)
+	parentPop.ReportInitial(maxGenNum)
+	//var prevPop *pop.Population
 
 	// Main generation loop.
 	popMaxSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
 	popMax := config.Cfg.Population.Max_pop_size
-	for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || population.GetCurrentSize() < popMax); gen++ {
+	for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
-		newP := pop.PopulationFactory(population, gen)
-		population.Mate(newP, uniformRandom)		// this fills in the next gen population object with the offspring
-		population = nil 	// give GC a chance to reclaim the previous generation
+		//var newP *pop.Population
+		//if config.Cfg.Computation.Reuse_populations && prevPop != nil {
+		//	newP = prevPop.Reinitialize(population, gen)
+		//} else {
+		//	prevPop = nil 		// give GC a chance to free that population
+		//	newP = pop.PopulationFactory(population, gen)
+		//}
+		childrenPop := pop.PopPool.NextGeneration(parentPop, gen)
+		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
+		parentPop = nil 	// give GC a chance to reclaim the previous generation
 		if config.Cfg.Computation.Force_gc {
 			utils.Measure.Start("GC")
 			runtime.GC()
 			utils.Measure.Stop("GC")
 		}
-		newP.Select(uniformRandom)
+		childrenPop.Select(uniformRandom)
 
-		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && newP.GetCurrentSize() < 2) || newP.GetCurrentSize() == 0 {
+		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
 			log.Println("Population is extinct. Stopping simulation.")
 			break
 		}
 
-		newP.ReportEachGen(gen, gen == maxGenNum)
-		population = newP 		// for the next iteration
+		childrenPop.ReportEachGen(gen, gen == maxGenNum)
+		//prevPop = population
+		pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
+		parentPop = childrenPop        // for the next iteration
 	}
 
 	// Finish up

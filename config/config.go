@@ -108,6 +108,7 @@ type Config struct {
 		//Transfer_linkage_blocks bool
 		Force_gc bool
 		Allele_count_gc_interval uint32
+		Reuse_populations bool
 	}
 }
 
@@ -171,6 +172,11 @@ func (c *Config) validateAndAdjust() error {
 	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("Error: If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
 
 	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
+
+	if c.Computation.Reuse_populations && c.Population.Pop_growth_model != "none" { 	//todo: can't use enum for node, because of circular import
+		log.Println("Forcing reuse_populations to false because population growth was specified")
+		c.Computation.Reuse_populations = false
+	}
 
 	return nil
 }

@@ -16,23 +16,34 @@ type Chromosome struct {
 }
 
 // This only creates an empty chromosome for gen 0 as part of Meiosis(). Meiosis() creates a populated chromosome.
-func ChromosomeFactory(lBsPerChromosome uint32, initialize bool) *Chromosome {
+func ChromosomeFactory(lBsPerChromosome uint32, _ bool) *Chromosome {
 	c := &Chromosome{
 		//LinkageBlocks: make([]*LinkageBlock, lBsPerChromosome),
 		LinkageBlocks: make([]LinkageBlock, lBsPerChromosome),
 	}
 
-	if initialize {			// first generation
+	//if genesis {			// first generation
 		//for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c)	}
-		for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlock{} }
-	}
+		//for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlock{} } 	// <- do not need to do this because the make() above creates zero-elements
+	//}
 
 	return c
 }
 
 
+// Reinitialize gets an existing/old chromosome ready for reuse. In addition to their member vars, Chromosome objects have an array of LBs. We will end up
+// overwriting the contents of those LB objects (including their Mutation array) in TransferLB(), but we want to reuse the memory allocation of those arrays.
+// In the other Chromosome methods we can tell if the recycled chromosome exists because the ptr to it will be non-nil.
+func (c *Chromosome) Reinitialize() *Chromosome {
+	c.NumMutations = 0
+	c.FitnessEffect = 0.0
+	return c
+}
+
+
+/*
 // Makes a semi-deep copy (everything but the mutations) of a chromosome. "Copy" means actually copy, or create a new chromosome with new LBs that point back to the LB history chain.
-func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
+func (c *Chromosome) CopyOld(lBsPerChromosome uint32) (newChr *Chromosome) {
 	newChr = ChromosomeFactory(lBsPerChromosome, false)
 	//newChr.NumMutations = c.NumMutations   // <- Transfer() does this
 	for lbIndex := range c.LinkageBlocks {
@@ -41,17 +52,35 @@ func (c *Chromosome) Copy(lBsPerChromosome uint32) (newChr *Chromosome) {
 	}
 	return
 }
+*/
 
 
-// TransferLB copies a LB from this chromosome to newChr
-func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
-	// Copy the LB from 1 chromo to the other
-	newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex] 	// this copies all of the LB struct fields (but not the mutn array that backs the slice)
-	if len(c.LinkageBlocks[lbIndex].mutn) > 0 {
-		newChr.LinkageBlocks[lbIndex].mutn = make([]Mutation, len(c.LinkageBlocks[lbIndex].mutn)) 	// allocate a new underlying array the same length as the source
-		//newLb.mutn = make([]Mutation, len(c.LinkageBlocks[lbIndex].mutn), len(lb.mutn)+2) 	//todo: consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs) so it doesn't have to be copied as soon as a mutation is added
-		copy(newChr.LinkageBlocks[lbIndex].mutn, c.LinkageBlocks[lbIndex].mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
+// Copy makes a deep copy of this chromosome to offspr
+func (c *Chromosome) Copy(/*lBsPerChromosome uint32,*/ offspr *Chromosome) /*(newChr *Chromosome)*/ {
+	//newChr.NumMutations = c.NumMutations   // <- TransferLB() takes care of this
+	for lbIndex := range c.LinkageBlocks {
+		c.TransferLB(offspr, lbIndex)
 	}
+}
+
+
+// TransferLB copies a LB from this chromosome to newChr. The LB in newChr may be recycled from a previous gen, we will completely overwrite it.
+// As a side effect, we also update the newChr's mutation and fitness stats
+func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
+	// Assign the parent-LB to this child-LB to copy all of the member vars, but we don't want to copy the mutn slice because that will point to the same backing array,
+	// and the child-LB needs an independent backing array (because this parent-LB will likely be copies to other child-LBs)
+	tmpMutn := newChr.LinkageBlocks[lbIndex].mutn 		// save the slice header
+	newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex] 	// this copies all of the LB struct fields (but not the mutn array that backs the slice)
+	newChr.LinkageBlocks[lbIndex].mutn = tmpMutn[:0]		// put back the slice header (and its backing array) but set it to zero length
+
+	if cap(newChr.LinkageBlocks[lbIndex].mutn) < len(c.LinkageBlocks[lbIndex].mutn) {
+		// Increase the child-LB capacity so it can accept the mutations from the parent-LB
+		newChr.LinkageBlocks[lbIndex].mutn = make([]Mutation, len(c.LinkageBlocks[lbIndex].mutn)) 	//todo: consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs)
+	} else {
+		// The capacity was big enough, get the child-LB len the same as the parent-LB so the copy copies what we want
+		newChr.LinkageBlocks[lbIndex].mutn = newChr.LinkageBlocks[lbIndex].mutn[:len(c.LinkageBlocks[lbIndex].mutn)]
+	}
+	copy(newChr.LinkageBlocks[lbIndex].mutn, c.LinkageBlocks[lbIndex].mutn) 	// now copy the mutations
 
 	// Housekeeping for the new chromo
 	newChr.NumMutations += newChr.LinkageBlocks[lbIndex].GetNumMutations()
@@ -63,58 +92,43 @@ func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
 func (c *Chromosome) GetNumLinkages() uint32 { return uint32(len(c.LinkageBlocks)) }
 
 
-// Meiosis creates and returns a chromosome as part of reproduction by implementing the crossover model specified in the config file.
-// This is 1 form of Copy() for the Chromosome class.
-func (dad *Chromosome) Meiosis(mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
-	gamete = Mdl.Crossover(dad, mom, lBsPerChromosome, uniformRandom)
+// Meiosis fills in a child chromosome as part of reproduction by implementing the crossover model specified in the config file.
+// This is 1 form of Copy for the Chromosome class.
+func (dad *Chromosome) Meiosis(mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+	offspr.Reinitialize() 	// In case it is a recycled chromosome
 
-	/* This is what we used to do in individual.OneOffspring(). Keeping it for reference...
-	for lb:=uint32(0); lb< dad.GetNumLinkages(); lb++ {
-		// randomly choose which grandparents to get the LBs from
-		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromDad[lb] = dad.LinkagesFromDad[lb].Copy()
-		} else {
-			offspr.LinkagesFromDad[lb] = dad.LinkagesFromMom[lb].Copy()
-		}
-
-		if uniformRandom.Intn(2) == 0 {
-			offspr.LinkagesFromMom[lb] = mom.LinkagesFromDad[lb].Copy()
-		} else {
-			offspr.LinkagesFromMom[lb] = mom.LinkagesFromMom[lb].Copy()
-		}
-	}
-	*/
+	/*gamete =*/ Mdl.Crossover(dad, mom, offspr, lBsPerChromosome, uniformRandom)
 
 	return
 }
 
 
 // The different implementations of LB crossover to another chromosome during meiosis
-type CrossoverType func(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) *Chromosome
+type CrossoverType func(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) //*Chromosome
 
 // Create the gamete from all of dad's chromosomes or all of mom's chromosomes.
-func NoCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
+func NoCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
 	//gamete = ChromosomeFactory(lBsPerChromosome, false)
-	// Copy all of the LBs from the one or the other
+	// Create the chromosome (if necessary) and copy all of the LBs from the one or the other
 	if uniformRandom.Intn(2) == 0 {
-		gamete = dad.Copy(lBsPerChromosome)
+		/*gamete =*/ dad.Copy(/*lBsPerChromosome,*/ offspr)
 	} else {
-		gamete = mom.Copy(lBsPerChromosome)
+		/*gamete =*/ mom.Copy(/*lBsPerChromosome,*/ offspr)
 	}
 	return
 }
 
 
 // Create the gamete from dad and mom's chromosomes by randomly choosing each LB from either.
-func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
-	gamete = ChromosomeFactory(lBsPerChromosome, false)
+func FullCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+	//gamete = ChromosomeFactory(lBsPerChromosome, false)
 	// Each LB can come from either dad or mom
 	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
 		if uniformRandom.Intn(2) == 0 {
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
 			///*lb :=*/ dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
 			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			dad.TransferLB(gamete, lbIndex)
+			dad.TransferLB(offspr, lbIndex)
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb
@@ -124,7 +138,7 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
 			///*lb :=*/ mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
 			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			mom.TransferLB(gamete, lbIndex)
+			mom.TransferLB(offspr, lbIndex)
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb
@@ -137,8 +151,8 @@ func FullCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, un
 
 
 // Create the gamete from dad and mom's chromosomes by randomly choosing sections of LBs from either.
-func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (gamete *Chromosome) {
-	gamete = ChromosomeFactory(lBsPerChromosome, false)
+func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+	//gamete = ChromosomeFactory(lBsPerChromosome, false)
 
 	// Algorithm: choose random sizes for <numCrossovers> LB sections for primary and <numCrossovers> LB sections for secondary
 
@@ -165,7 +179,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 	switch {
 	case numCrossovers <= 0:
 		// Handle special case of no crossover - copy all LBs from primary
-		gamete = primary.Copy(lBsPerChromosome)
+		/*gamete =*/ primary.Copy(/*lBsPerChromosome,*/ offspr)
 		return
 	default:
 		numLbSections = (2 * numCrossovers)
@@ -196,7 +210,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, lBsPerChromosome uint32,
 			//if config.Cfg.Computation.Transfer_linkage_blocks {
 			///*lb :=*/ parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
 			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			parent.TransferLB(gamete, lbIndex)
+			parent.TransferLB(offspr, lbIndex)
 			//} else {
 			//	lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
 			//	gamete.LinkageBlocks[lbIndex] = lb

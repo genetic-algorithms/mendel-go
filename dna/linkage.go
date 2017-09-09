@@ -24,7 +24,7 @@ type LinkageBlock struct {
 	numFavAllele uint16
 	//alleleDelFitnessEffect float32              // keep a running sum of the fitness so we can calc the LB fitness quickly
 	//alleleFavFitnessEffect float32
-	//TODO: remove if we no longer transfer ownership
+	// we no longer transfer ownership
 	//owner                   *Chromosome         // keep track of owner so we know whether we have to copy this LB or can just transfer ownership
 }
 
@@ -151,7 +151,7 @@ func (lb *LinkageBlock) Copy(owner *Chromosome) *LinkageBlock {
 	// Assigning a slice does not copy all the array elements, so we have to make that happen
 	if len(lb.mutn) > 0 {
 		newLb.mutn = make([]Mutation, len(lb.mutn)) 	// allocate a new underlying array the same length as the source
-		//newLb.mutn = make([]Mutation, len(lb.mutn), len(lb.mutn)+2) 	//todo: consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs) so it doesn't have to be copied as soon as a mutation is added
+		//newLb.mutn = make([]Mutation, len(lb.mutn), len(lb.mutn)+2) 	// consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs) so it doesn't have to be copied as soon as a mutation is added
 		copy(newLb.mutn, lb.mutn)        // this copies the array elements, which are ptrs to mutations, but it does not copy the mutations themselves (which are immutable, so we can reuse them)
 	}
 	//if len(lb.mutations.mutn) > 0 {

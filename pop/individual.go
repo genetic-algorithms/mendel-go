@@ -12,50 +12,68 @@ import (
 
 // Individual represents 1 organism in the population, tracking its mutations and alleles.
 type Individual struct {
-	//Pop *Population
 	popPart *PopulationPart
 	GenoFitness     float64		// fitness due to genomic mutations
 	PhenoFitness     float64		// fitness due to GenoFitness plus environmental noise and selection noise
 	Dead            bool 		// if true, selection has identified it for elimination
 	NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
 
-	//todo: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
+	// Note: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
 	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
 	//MeanDelFit, MeanFavFit float64
 	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
 	//MeanDelAlleleFit, MeanFavAlleleFit float64
 
+	//todo: can we make these inline too?
 	ChromosomesFromDad []*dna.Chromosome
 	ChromosomesFromMom []*dna.Chromosome
-	//LinkagesFromDad []*dna.LinkageBlock
-	//LinkagesFromMom []*dna.LinkageBlock
 }
 
 
-func IndividualFactory(popPart *PopulationPart, initialize bool) *Individual {
+func IndividualFactory(popPart *PopulationPart, genesis bool) *Individual {
 	ind := &Individual{
 		popPart: popPart,
 		ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 		ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
-		//LinkagesFromDad: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
-		//LinkagesFromMom: make([]*dna.LinkageBlock, config.Cfg.Population.Num_linkage_subunits),
 	}
 
-	// If this is gen 0, initialize with empty chromosomes and linkage blocks (with no mutations).
-	// Otherwise this is an offspring that will get its chromosomes and LBs later from meiosis.
-	if initialize {
-		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, true) }
-		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, true) }
-		//for i := range ind.LinkagesFromDad { ind.LinkagesFromDad[i] = dna.LinkageBlockFactory() }
-		//for i := range ind.LinkagesFromMom { ind.LinkagesFromMom[i] = dna.LinkageBlockFactory() }
-	}
+	//if genesis {   // <- always initialize with empty chromosomes and linkage blocks (with no mutations)
+		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
+		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
+	//}
 
 	return ind
 }
 
 
-// Not currently used - FreeChromosomes nils out ptrs to memory that this individual owns, so that GC can reclaim it.
+// Reinitialize gets an existing/old individual ready for reuse. In addition to their member vars, Individual objects have an array of Chromosomes ptrs. We will end up
+// overwriting the contents of those Chromosome objects (including their LB array), but we want to reuse the memory allocation of those arrays.
+func (ind *Individual) Reinitialize() *Individual {
+	// Reset the stats
+	ind.GenoFitness = 0.0
+	ind.PhenoFitness = 0.0
+	ind.Dead = false
+	ind.NumMutations = 0
+	ind.NumDeleterious = 0
+	ind.NumNeutral = 0
+	ind.NumFavorable = 0
+	ind.NumDelAllele = 0
+	ind.NumNeutAllele = 0
+	ind.NumFavAllele = 0
+
+	/* Chromosome.Meiosis() reinitializes the chromosomes...
+	// ChromosomesFromDad and ChromosomesFromMom have an array of ptrs to existing Chromosomes and we want reuse that memory.
+	for _, c := range ind.ChromosomesFromDad { c.Reinitialize() }
+	for _, c := range ind.ChromosomesFromMom { c.Reinitialize() }
+	// Note that the rest of the contents of the chromosomes and LBs will get reinitialized or overwritten during meiosis
+	*/
+
+	return ind
+}
+
+
+/* Not currently used - FreeChromosomes nils out ptrs to memory that this individual owns, so that GC can reclaim it.
 func (ind *Individual) FreeChromosomes() {
 	// The only ptrs we have are to our chromosomes, which should also free the LBs they own
 	ind.ChromosomesFromDad = []*dna.Chromosome{} 	// replacing the slice should free the previous backing array which will free all the chromosome ptrs in 1 operation
@@ -64,6 +82,7 @@ func (ind *Individual) FreeChromosomes() {
 	//for i := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[i] = nil }
 	//for i := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[i] = nil }
 }
+*/
 
 
 // GetNumChromosomes returns the number of chromosomes from each parent (we assume they always have the same number from each parent)
@@ -71,13 +90,13 @@ func (ind *Individual) GetNumChromosomes() uint32 { return uint32(len(ind.Chromo
 
 
 // Mate combines this person with the specified person to create a list of offspring.
-func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) []*Individual {
+// The offspring are added to newPopPart
+func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) /*[]*Individual*/ {
 	if RecombinationType(config.Cfg.Population.Recombination_model) != FULL_SEXUAL { utils.NotImplementedYet("Recombination models other than FULL_SEXUAL are not yet supported") }
 
 	// Mate ind and otherInd to create offspring
 	actual_offspring := Mdl.CalcNumOffspring(ind, uniformRandom)
-	//config.Verbose(9, " actual_offspring=%d", actual_offspring)
-	offspr := make([]*Individual, actual_offspring)
+	offspr := make([]*Individual, actual_offspring) 	// temporary slice of the children created
 	for child:=uint32(0); child<actual_offspring; child++ {
 		offspr[child] = ind.OneOffspring(otherInd, newPopPart, uniformRandom)
 	}
@@ -88,42 +107,31 @@ func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, un
 		child.AddMutations(ind.popPart.Pop.LBsPerChromosome, uniformRandom)
 	}
 
-	return offspr
+	return /*offspr*/
 }
 
 
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
 func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) *Individual {
-	offspr := IndividualFactory(newPopPart, false)
+	//offspr := IndividualFactory(newPopPart, false)
+	offspr := PopPool.GetIndividual(newPopPart)	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
+	lBsPerChromosome := dad.popPart.Pop.LBsPerChromosome 		// doesn't matter which parent we get this from
 
-	// Inherit linkage blocks
+	// Loop thru each chromosome and inherit linkage blocks
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
-		//config.Verbose(9, "Copying LBs from dad chromosomes %p and %p ...", dad.ChromosomesFromDad[c], dad.ChromosomesFromMom[c])
-		chr := dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], dad.popPart.Pop.LBsPerChromosome, uniformRandom)
-		offspr.ChromosomesFromDad[c] = chr
-		offspr.NumMutations += chr.NumMutations
-		//config.Verbose(9, "Copying LBs from mom chromosomes %p and %p ...", mom.ChromosomesFromDad[c], mom.ChromosomesFromMom[c])
-		chr = mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], dad.popPart.Pop.LBsPerChromosome, uniformRandom)
-		offspr.ChromosomesFromMom[c] = chr
-		offspr.NumMutations += chr.NumMutations
-	}
+		// For your chromosome coming from your dad, combine LBs from his dad and mom
+		offsprChr := offspr.ChromosomesFromDad[c]
+		/*chr :=*/ dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		//offspr.ChromosomesFromDad[c] = chr
+		offspr.NumMutations += offsprChr.NumMutations
 
-	/*
-	for c := range offspr.ChromosomesFromDad {
-		config.Verbose(9, "Chromosome from dad %v, %p:", c, offspr.ChromosomesFromDad[c])
-		for lb := range offspr.ChromosomesFromDad[c].LinkageBlocks {
-			config.Verbose(9, "  LB %v, %p: %v", lb, offspr.ChromosomesFromDad[c].LinkageBlocks[lb], offspr.ChromosomesFromDad[c].LinkageBlocks[lb])
-		}
+		// For your chromosome coming from your mom, combine LBs from her dad and mom
+		offsprChr = offspr.ChromosomesFromMom[c]
+		/*chr =*/ mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		//offspr.ChromosomesFromMom[c] = chr
+		offspr.NumMutations += offsprChr.NumMutations
 	}
-
-	for c := range offspr.ChromosomesFromMom {
-		config.Verbose(9, "Chromosome from mom %v, %p:", c, offspr.ChromosomesFromMom[c])
-		for lb := range offspr.ChromosomesFromMom[c].LinkageBlocks {
-			config.Verbose(9, "  LB %v, %p: %v", lb, offspr.ChromosomesFromMom[c].LinkageBlocks[lb], offspr.ChromosomesFromMom[c].LinkageBlocks[lb])
-		}
-	}
-	*/
 
 	return offspr
 }
