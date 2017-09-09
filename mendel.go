@@ -2,11 +2,10 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- Reuse 2 populations (including the indivs, etc.) instead of a new one each generation
 - Update mendel-go-spc/settings.py
-- Maybe make the Chromosome objects inline in the indivs
 - Consider: When copying an LB make the new one bigger by mutation_rate / num_LBs
 - Test large multiple threads run on M4 (install go) and compare results with mendel-f90
+- Make pop reuse work for pop growth runs
 - add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - Tribes

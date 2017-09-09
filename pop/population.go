@@ -315,7 +315,7 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	numDead := p.getNumDead()		// under certain circumstances this could be > the number we wanted to select out
 	p.ReportDeadStats()
 	p.IndivRefs = p.IndivRefs[numDead:]		// re-slice IndivRefs to eliminate the dead individuals
-	for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	//TODO: comment out
+	//for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	// just checking
 
 	/* We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs.
 	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
