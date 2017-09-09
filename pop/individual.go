@@ -25,22 +25,27 @@ type Individual struct {
 	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
 	//MeanDelAlleleFit, MeanFavAlleleFit float64
 
-	//todo: can we make these inline too?
-	ChromosomesFromDad []*dna.Chromosome
-	ChromosomesFromMom []*dna.Chromosome
+	//ChromosomesFromDad []*dna.Chromosome
+	//ChromosomesFromMom []*dna.Chromosome
+	ChromosomesFromDad []dna.Chromosome
+	ChromosomesFromMom []dna.Chromosome
 }
 
 
-func IndividualFactory(popPart *PopulationPart, genesis bool) *Individual {
+func IndividualFactory(popPart *PopulationPart, _ bool) *Individual {
 	ind := &Individual{
 		popPart: popPart,
-		ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
-		ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		//ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		//ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		ChromosomesFromDad: make([]dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
+		ChromosomesFromMom: make([]dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 	}
 
 	//if genesis {   // <- always initialize with empty chromosomes and linkage blocks (with no mutations)
-		for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
-		for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
+	//for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
+	//for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
+	for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
+	for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
 	//}
 
 	return ind
@@ -121,14 +126,14 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
 		// For your chromosome coming from your dad, combine LBs from his dad and mom
-		offsprChr := offspr.ChromosomesFromDad[c]
-		/*chr :=*/ dad.ChromosomesFromDad[c].Meiosis(dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		offsprChr := &offspr.ChromosomesFromDad[c]
+		/*chr :=*/ dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
 		//offspr.ChromosomesFromDad[c] = chr
 		offspr.NumMutations += offsprChr.NumMutations
 
 		// For your chromosome coming from your mom, combine LBs from her dad and mom
-		offsprChr = offspr.ChromosomesFromMom[c]
-		/*chr =*/ mom.ChromosomesFromDad[c].Meiosis(mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		offsprChr = &offspr.ChromosomesFromMom[c]
+		/*chr =*/ mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
 		//offspr.ChromosomesFromMom[c] = chr
 		offspr.NumMutations += offsprChr.NumMutations
 	}
@@ -192,7 +197,7 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
 				// Note: we can use the global UniqueInt object because this method is called before we create go routines.
 				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
-				dna.ChrAppendInitialContrastingAlleles(ind.ChromosomesFromDad[c], ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
+				dna.ChrAppendInitialContrastingAlleles(&ind.ChromosomesFromDad[c], &ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesEvenly++
 				//ind.popPart.Pop.NextMutId += 2
 			}
@@ -204,7 +209,7 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			if ratioSoFar <= desiredRemainderRatio && numWithAllelesRemainder < allelesRemainder {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
 				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
-				dna.ChrAppendInitialContrastingAlleles(ind.ChromosomesFromDad[c], ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
+				dna.ChrAppendInitialContrastingAlleles(&ind.ChromosomesFromDad[c], &ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesRemainder++
 				//ind.popPart.Pop.NextMutId += 2
 			}

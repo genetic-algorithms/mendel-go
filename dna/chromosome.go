@@ -15,29 +15,37 @@ type Chromosome struct {
 	FitnessEffect float32	// keep a running total of the fitness contribution of this chromosome
 }
 
+/*
 // This only creates an empty chromosome for gen 0 as part of Meiosis(). Meiosis() creates a populated chromosome.
-func ChromosomeFactory(lBsPerChromosome uint32, _ bool) *Chromosome {
+func ChromosomeFactoryOld(lBsPerChromosome uint32, _ bool) *Chromosome {
 	c := &Chromosome{
 		//LinkageBlocks: make([]*LinkageBlock, lBsPerChromosome),
 		LinkageBlocks: make([]LinkageBlock, lBsPerChromosome),
 	}
-
 	//if genesis {			// first generation
 		//for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlockFactory(c)	}
 		//for i := range c.LinkageBlocks { c.LinkageBlocks[i] = LinkageBlock{} } 	// <- do not need to do this because the make() above creates zero-elements
 	//}
-
 	return c
+}
+*/
+
+
+// Since the Individual's slice of chromosomes isn't ptrs, but the actual objects, we have
+// this factory work on it directly (instead of creating an object and returning a ptr to it).
+func (c *Chromosome) ChromosomeFactory(lBsPerChromosome uint32) {
+	c.LinkageBlocks = make([]LinkageBlock, lBsPerChromosome)
 }
 
 
 // Reinitialize gets an existing/old chromosome ready for reuse. In addition to their member vars, Chromosome objects have an array of LBs. We will end up
 // overwriting the contents of those LB objects (including their Mutation array) in TransferLB(), but we want to reuse the memory allocation of those arrays.
 // In the other Chromosome methods we can tell if the recycled chromosome exists because the ptr to it will be non-nil.
-func (c *Chromosome) Reinitialize() *Chromosome {
+//func (c *Chromosome) Reinitialize() *Chromosome {
+func (c *Chromosome) Reinitialize() {
 	c.NumMutations = 0
 	c.FitnessEffect = 0.0
-	return c
+	//return c
 }
 
 
