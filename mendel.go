@@ -3,6 +3,8 @@
 
 /* Order of todos:
 - Update mendel-go-spc/settings.py
+- Figure out the delay at the beginning
+- Add progress output to allele output
 - Consider: When copying an LB make the new one bigger by mutation_rate / num_LBs
 - Test large multiple threads run on M4 (install go) and compare results with mendel-f90
 - Make pop reuse work for pop growth runs
