@@ -75,20 +75,27 @@ func (c *Chromosome) Copy(/*lBsPerChromosome uint32,*/ offspr *Chromosome) /*(ne
 // TransferLB copies a LB from this chromosome to newChr. The LB in newChr may be recycled from a previous gen, we will completely overwrite it.
 // As a side effect, we also update the newChr's mutation and fitness stats
 func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
-	// Assign the parent-LB to this child-LB to copy all of the member vars, but we don't want to copy the mutn slice because that will point to the same backing array,
-	// and the child-LB needs an independent backing array (because this parent-LB will likely be copies to other child-LBs)
-	tmpMutn := newChr.LinkageBlocks[lbIndex].mutn 		// save the slice header
-	newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex] 	// this copies all of the LB struct fields (but not the mutn array that backs the slice)
-	newChr.LinkageBlocks[lbIndex].mutn = tmpMutn[:0]		// put back the slice header (and its backing array) but set it to zero length
-
-	if cap(newChr.LinkageBlocks[lbIndex].mutn) < len(c.LinkageBlocks[lbIndex].mutn) {
-		// Increase the child-LB capacity so it can accept the mutations from the parent-LB
-		newChr.LinkageBlocks[lbIndex].mutn = make([]Mutation, len(c.LinkageBlocks[lbIndex].mutn)) 	//todo: consider making the new LB with a capacity a little bigger (mutation_rate / num_LBs)
+	//if config.Cfg.Computation.Perf_option == 2 {
+		newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex]    // this copies all of the LB struct fields, including the slice reference (but not the mutn array that backs the slice)
+		newChr.LinkageBlocks[lbIndex].IsPtrToParent = true            // indicate we are still using the parents mutn array, so we will copy it later if we have to add a mutation
+	/*
 	} else {
-		// The capacity was big enough, get the child-LB len the same as the parent-LB so the copy copies what we want
-		newChr.LinkageBlocks[lbIndex].mutn = newChr.LinkageBlocks[lbIndex].mutn[:len(c.LinkageBlocks[lbIndex].mutn)]
+		// Assign the parent-LB to this child-LB to copy all of the member vars, but we don't want to copy the mutn slice because that will point to the same backing array,
+		// and the child-LB needs an independent backing array (because this parent-LB will likely be copies to other child-LBs)
+		tmpMutn := newChr.LinkageBlocks[lbIndex].mutn        // save the slice header
+		newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex]    // this copies all of the LB struct fields (but not the mutn array that backs the slice)
+		newChr.LinkageBlocks[lbIndex].mutn = tmpMutn[:0]        // put back the slice header (and its backing array) but set it to zero length
+
+		if cap(newChr.LinkageBlocks[lbIndex].mutn) < len(c.LinkageBlocks[lbIndex].mutn) {
+			// Increase the child-LB capacity so it can accept the mutations from the parent-LB
+			newChr.LinkageBlocks[lbIndex].mutn = make([]Mutation, len(c.LinkageBlocks[lbIndex].mutn))
+		} else {
+			// The capacity was big enough, get the child-LB len the same as the parent-LB so the copy copies what we want
+			newChr.LinkageBlocks[lbIndex].mutn = newChr.LinkageBlocks[lbIndex].mutn[:len(c.LinkageBlocks[lbIndex].mutn)]
+		}
+		copy(newChr.LinkageBlocks[lbIndex].mutn, c.LinkageBlocks[lbIndex].mutn)    // now copy the mutations
 	}
-	copy(newChr.LinkageBlocks[lbIndex].mutn, c.LinkageBlocks[lbIndex].mutn) 	// now copy the mutations
+	*/
 
 	// Housekeeping for the new chromo
 	newChr.NumMutations += newChr.LinkageBlocks[lbIndex].GetNumMutations()

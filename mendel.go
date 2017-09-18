@@ -2,17 +2,19 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- Update mendel-go-spc/settings.py
-- Figure out the delay at the beginning
 - Add progress output to allele output
+- Change mendel.hst to only output mutation numbers
+- Load existing results into spc on m4 and r4. SPC user data is stored in spc/user_data/brucemp/mendel_go/xyz123
+- Compare results with mendel-f90
+- Fix frac_fav_mutn and fraction_neutral (i think frac_fav_mutn is only of the non-neutral mutations, but confirm)
+- Figure out the delay at the beginning on r4 (and to a lesser extent on m4)
 - Consider: When copying an LB make the new one bigger by mutation_rate / num_LBs
-- Test large multiple threads run on M4 (install go) and compare results with mendel-f90
-- Make pop reuse work for pop growth runs
-- add normalized alleles output files: The y-axis is Proportion of SNPs: this is basically the counts divided by the total number of alleles. And the x-axis is called Mean minor allele frequency: this is just the number of 100 bins divided by 100." Also the normalized graph is only 0 to 0.5 on the x axis.
+- (Maybe) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)
+- (Maybe not) Make pop reuse work for pop growth runs
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - Tribes
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
-- support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
+- (When needed) support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
  */
 package main

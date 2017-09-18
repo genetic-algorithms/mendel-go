@@ -675,8 +675,7 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
-		//fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-del-fit  Avg-fav-fit  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
-		fmt.Fprintln(histWriter, "# Generation  Pop-size  Avg Offspring  Avg-deleterious Avg-neutral  Avg-favorable  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
+		fmt.Fprintln(histWriter, "# Generation  Avg-deleterious Avg-neutral  Avg-favorable")
 	}
 
 	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
@@ -727,10 +726,9 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
 		d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
-		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		//aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
-		//fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, avDelFit, avFavFit, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
-		fmt.Fprintf(histWriter, "%d  %d  %v  %v  %v  %v  %v  %v  %v  %v  %v  %v\n", genNum, popSize, p.ActualAvgOffspring, d, n, f, aveFit, minFit, maxFit, totalMutns, meanMutns, p.EnvironNoise)
+		fmt.Fprintf(histWriter, "%d  %v  %v  %v\n", genNum, d, n, f)
 		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
 		if lastGen {
 			//todo: put summary stats in comments at the end of the file?
@@ -792,7 +790,6 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	}
 
 	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
-	//alleles := dna.AlleleCountFactory(genNum, popSize)
 	alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
 	for i := range p.IndivRefs {
 		//ind := p.IndivRefs[i].Indiv
@@ -803,12 +800,14 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
-			if config.Cfg.Computation.Allele_count_gc_interval > 0 && ( i == 0 || (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 ) {
+			if config.Cfg.Computation.Allele_count_gc_interval > 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 {
 				utils.Measure.Start("GC")
 				runtime.GC()
 				utils.Measure.Stop("GC")
 			}
 		}
+
+		if i != 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 { config.Verbose(1, "Counted alleles in %d individuals", i) }
 	}
 
 	// Write the plot file for each type of mutation/allele

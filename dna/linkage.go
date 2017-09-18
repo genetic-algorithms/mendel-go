@@ -14,6 +14,8 @@ import (
 // LinkageBlock represents 1 linkage block in the genome of an individual. It tracks the mutations in this LB and the cumulative fitness affect on the individual's fitness.
 type LinkageBlock struct {
 	mutn []Mutation		// holds deleterious, neutral, favorable, initial deleterious, initial favorable
+	//todo: instead of adding the space of another LB member var, we could always make sure the mutn array is barely big enough so the builtin append() would naturally copy it
+	IsPtrToParent bool		// whether or not the mutn slice is still a reference to its parents mutn array. We don't copy it until we add a mutation. During create of a new LB, this will naturally be set to false.
 	fitnessEffect float32
 	//delFitnessEffect       float32              // keep a running sum of the fitness so we can calc the LB fitness quickly.
 	//favFitnessEffect       float32
@@ -188,32 +190,60 @@ func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (
 		fitnessEffect = calcDelMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			//mutn := DeleteriousMutationFactory(fitnessEffect, uniformRandom)
-			//lb.mutations.mutn = append(lb.mutations.mutn, mutn)
-			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: DELETERIOUS})
+			//if config.Cfg.Computation.Perf_option >= 1 {
+				lb.appendMutn(Mutation{Id: mutId, Type: DELETERIOUS})
+			//} else {
+			//	lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: DELETERIOUS})
+			//}
 		}
 		lb.numDeleterious++
 		//lb.delFitnessEffect += fitnessEffect		// currently only the additive combination model is supported, so this is appropriate
 		lb.fitnessEffect += fitnessEffect		// currently only the additive combination model is supported, so this is appropriate
 	case NEUTRAL:
 		if config.Cfg.Computation.Track_neutrals {
-			//lb.mutations.mutn = append(lb.mutations.mutn, NeutralMutationFactory(uniformRandom))
-			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: NEUTRAL})
+			//if config.Cfg.Computation.Perf_option >= 1 {
+				lb.appendMutn(Mutation{Id: mutId, Type: NEUTRAL})
+			//} else {
+			//	lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: NEUTRAL})
+			//}
 		}
 		lb.numNeutrals++
 	case FAVORABLE:
 		fitnessEffect = calcFavMutationAttrs(uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			//mutn := FavorableMutationFactory(fitnessEffect, uniformRandom)
-			//lb.mutations.mutn = append(lb.mutations.mutn, mutn)
-			lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: FAVORABLE})
+			//if config.Cfg.Computation.Perf_option >= 1 {
+				lb.appendMutn(Mutation{Id: mutId, Type: FAVORABLE})
+			//} else {
+			//	lb.mutn = append(lb.mutn, Mutation{Id: mutId, Type: FAVORABLE})
+			//}
 		}
 		lb.numFavorable++
 		//lb.favFitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
 		lb.fitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
 	}
 	return
+}
+
+
+// appendMutn add a mutation to the LB slice, but only adds 2 elements (instead of doubling) if it needs to be made bigger
+func (lb *LinkageBlock) appendMutn(mutn Mutation) {
+	origLen := len(lb.mutn)
+	newLen := origLen + 1
+	// If the mutn backing array is already ours but not big enough, or if we are still referring to our parents array, make a new/bigger array
+	//if newLen > cap(lb.mutn) || (config.Cfg.Computation.Perf_option == 2 && lb.IsPtrToParent) {
+	if newLen > cap(lb.mutn) || lb.IsPtrToParent {
+		// current backing array is not big enough, so allocate a new one
+		newCap := origLen + 2 	// make the capacity of the new backing array 2 bigger, in case we add another mutn later
+		newSlice := make([]Mutation, newLen, newCap)
+		copy(newSlice, lb.mutn)		// will only copy the number of elements slice has (the smaller one)
+		newSlice[origLen] = mutn
+		lb.mutn = newSlice
+	} else {
+		// current backing array is big enough
+		lb.mutn = lb.mutn[0:newLen]		// increase the len of the slice
+		lb.mutn[origLen] = mutn
+	}
 }
 
 

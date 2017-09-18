@@ -109,6 +109,7 @@ type Config struct {
 		Force_gc bool
 		Allele_count_gc_interval uint32
 		Reuse_populations bool
+		Perf_option int
 	}
 }
 
