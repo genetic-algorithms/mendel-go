@@ -157,7 +157,6 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 // Size returns the current number of individuals in this population
 func (p *Population) GetCurrentSize() uint32 {
 	//return uint32(len(p.indivs))
-	config.Verbose(9, "Population.GetCurrentSize(): %v", len(p.IndivRefs))
 	return uint32(len(p.IndivRefs)) }
 
 /*
@@ -791,6 +790,12 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 
 	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
 	alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
+	gcInterval := config.Cfg.Computation.Allele_count_gc_interval
+	if gcInterval > 0 && gcInterval < 100 {
+		// Interpret this as a %, with a min and max bound
+		gcInterval = uint32(float32(p.GetCurrentSize() * gcInterval) / 100.0)
+		gcInterval = utils.MaxUint32( utils.MinUint32(gcInterval, 500), 100 )
+	}
 	for i := range p.IndivRefs {
 		//ind := p.IndivRefs[i].Indiv
 		p.IndivRefs[i].Indiv.CountAlleles(alleles)
@@ -800,14 +805,14 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
-			if config.Cfg.Computation.Allele_count_gc_interval > 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 {
+			if gcInterval > 0 && (i % int(gcInterval)) == 0 {
 				utils.Measure.Start("GC")
 				runtime.GC()
 				utils.Measure.Stop("GC")
 			}
 		}
 
-		if i != 0 && (i % int(config.Cfg.Computation.Allele_count_gc_interval)) == 0 { config.Verbose(1, "Counted alleles in %d individuals", i) }
+		if i != 0 && gcInterval > 0 && (i % int(gcInterval)) == 0 { config.Verbose(1, "Counted alleles in %d individuals", i) }
 	}
 
 	// Write the plot file for each type of mutation/allele
