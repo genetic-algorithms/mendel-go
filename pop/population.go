@@ -832,11 +832,9 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	bucketJson.Neutral = make([]uint32, bucketCount)
 	fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 
-	// Do not even write the favorables file if we know we don't have any
 	bucketJson.Favorable = make([]uint32, bucketCount)
 	fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
 
-	// Do not even write the alleles files if we know we don't have any
 	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
 	fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
@@ -861,6 +859,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	utils.Measure.Stop("allele-count")
 }
 
+// outputNormalizedAlleles uses the absolute data gathered in outputAlleles() and normalizes all of the bin counts (by dividing them by the total number of alleles)
 func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
 	totalAlleles := len(alleles.Deleterious) + len(alleles.Neutral) + len(alleles.Favorable)
@@ -900,15 +899,14 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 
 //func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
 func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
-	//buckets := make([]uint32, bucketCount)
 
 	for _, count := range counts {
 		percentage := float64(count) / float64(popSize)
 		var i uint32
 		floati := percentage * float64(bucketCount)
-		// At this point, if we just converted floati to uint32 (by truncating), bucket i would contain all float values: i <= floati < i+1
-		// But we really want the buckets to contain: i < floati <= i+1
-		// Remember that when we output the buckets below, we add 1 to the index of the bucket, so e.g. bucket 5 will contain: 4 < count <= 5
+		// At this point, if we just converted floati to uint32 (by truncating), index i would contain all float values: index <= floati < index+1
+		// But we really want the indexes to contain: index < floati <= index+1
+		// Because remember that when we output the buckets numbers into the file, we add 1 to the index of the bucket, so e.g. bucket 5 (index 4 here) will contain: 4 < count <= 5
 		// (The issue is does a count that is exactly 5 end up in bucket 5 or 6. It should go in bucket 5.)
 		if math.Floor(floati) == floati {
 			i = uint32(floati) - 1

@@ -2,14 +2,11 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- Add progress output to allele output
-- Change mendel.hst to only output mutation numbers
-- Load existing results into spc on m4 and r4. SPC user data is stored in spc/user_data/brucemp/mendel_go/xyz123
+- (Maybe) Change allele bins back such that exactly 5% goes in bucket 6
 - Compare results with mendel-f90
 - Fix frac_fav_mutn and fraction_neutral (i think frac_fav_mutn is only of the non-neutral mutations, but confirm)
 - Figure out the delay at the beginning on r4 (and to a lesser extent on m4)
-- Consider: When copying an LB make the new one bigger by mutation_rate / num_LBs
-- (Maybe) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)
+- (Consider) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)
 - (Maybe not) Make pop reuse work for pop growth runs
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - Tribes
