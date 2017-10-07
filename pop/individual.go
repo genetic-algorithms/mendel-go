@@ -391,11 +391,11 @@ func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 
 	// Add the alleles found for this individual to the alleles map for the whole population
 	// Note: map returns the zero value of the value type for keys which are not yet in the map (zero value for int is 0), so we do not need to check if it is there with: if count, ok := alleles.Deleterious[id]; ok {
-	for id := range allelesForThisIndiv.Deleterious { alleles.Deleterious[id] += 1 }
-	for id := range allelesForThisIndiv.Neutral { alleles.Neutral[id] += 1 }
-	for id := range allelesForThisIndiv.Favorable { alleles.Favorable[id] += 1 }
-	for id := range allelesForThisIndiv.DelInitialAlleles { alleles.DelInitialAlleles[id] += 1 }
-	for id := range allelesForThisIndiv.FavInitialAlleles { alleles.FavInitialAlleles[id] += 1 }
+	for id, num := range allelesForThisIndiv.Deleterious { alleles.Deleterious[id] += num }
+	for id, num := range allelesForThisIndiv.Neutral { alleles.Neutral[id] += num }
+	for id, num := range allelesForThisIndiv.Favorable { alleles.Favorable[id] += num }
+	for id, num := range allelesForThisIndiv.DelInitialAlleles { alleles.DelInitialAlleles[id] += num }
+	for id, num := range allelesForThisIndiv.FavInitialAlleles { alleles.FavInitialAlleles[id] += num }
 }
 
 

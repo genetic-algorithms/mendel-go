@@ -101,6 +101,7 @@ type Config struct {
 		Restart_case bool
 		Restart_dump_number uint32
 		Plot_allele_gens uint32
+		Count_duplicate_alleles bool
 		Verbosity uint32
 		Data_file_path string
 		Files_to_output string

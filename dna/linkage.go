@@ -3,9 +3,10 @@ package dna
 import (
 	"math/rand"
 	"bitbucket.org/geneticentropy/mendel-go/config"
-	"log"
+	//"log"
 	//"unsafe"
 	"bitbucket.org/geneticentropy/mendel-go/utils"
+	"log"
 )
 
 // Note: with a typical 10K population (30K during mating) and 989 LBs per individual there are a lot of LBs, so saving
@@ -330,15 +331,35 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 		//config.Verbose(1, "    m.Id=%v, m.Type=%v", id, m.Type)
 		switch m.Type {
 		case DELETERIOUS:
-			allelesForThisIndiv.Deleterious[id] = 1
+			if config.Cfg.Computation.Count_duplicate_alleles {
+				allelesForThisIndiv.Deleterious[id] += 1
+			} else {
+				allelesForThisIndiv.Deleterious[id] = 1
+			}
 		case NEUTRAL:
-			allelesForThisIndiv.Neutral[id] = 1
+			if config.Cfg.Computation.Count_duplicate_alleles {
+				allelesForThisIndiv.Neutral[id] += 1
+			} else {
+				allelesForThisIndiv.Neutral[id] = 1
+			}
 		case FAVORABLE:
-			allelesForThisIndiv.Favorable[id] = 1
+			if config.Cfg.Computation.Count_duplicate_alleles {
+				allelesForThisIndiv.Favorable[id] += 1
+			} else {
+				allelesForThisIndiv.Favorable[id] = 1
+			}
 		case DEL_ALLELE:
-			allelesForThisIndiv.DelInitialAlleles[id] = 1
+			if config.Cfg.Computation.Count_duplicate_alleles {
+				allelesForThisIndiv.DelInitialAlleles[id] += 1
+			} else {
+				allelesForThisIndiv.DelInitialAlleles[id] = 1
+			}
 		case FAV_ALLELE:
-			allelesForThisIndiv.FavInitialAlleles[id] = 1
+			if config.Cfg.Computation.Count_duplicate_alleles {
+				allelesForThisIndiv.FavInitialAlleles[id] += 1
+			} else {
+				allelesForThisIndiv.FavInitialAlleles[id] = 1
+			}
 		default:
 			log.Fatalf("Error: unknown Mutation type %v found when counting alleles.", m.Type)
 		}

@@ -826,29 +826,30 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		bucketJson.Bins[i] = uint32(i) + 1
 	}
 
+	var tmpTotalMutns uint32
 	bucketJson.Deleterious = make([]uint32, bucketCount)
-	fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
+	tmpTotalMutns = fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious, tmpTotalMutns)
 
 	bucketJson.Neutral = make([]uint32, bucketCount)
-	fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
+	tmpTotalMutns = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral, tmpTotalMutns)
 
 	bucketJson.Favorable = make([]uint32, bucketCount)
-	fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
+	tmpTotalMutns = fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable, tmpTotalMutns)
 
 	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
-	fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
+	tmpTotalMutns = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles, tmpTotalMutns)
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
-	fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
+	tmpTotalMutns = fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles, tmpTotalMutns)
 
+	config.Verbose(1, "tmpTotalMutns: %d", tmpTotalMutns)
 	fileName := fmt.Sprintf("%08d.json", genNum)
 
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) {
 		newJson, err := json.Marshal(bucketJson)
 		if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err)	}
 		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
-			if _, err := alleleWriter.Write(newJson); err != nil {
-				log.Fatalf("error writing alleles to %v: %v", fileName, err)
-			}
+			if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", fileName, err) }
+			config.FMgr.CloseDirFile(config.ALLELE_BINS_DIRECTORY, fileName)
 		}
 	}
 
@@ -891,28 +892,32 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 	if err != nil { log.Fatalf("error marshaling normalized allele bins to json: %v", err) }
 
 	if alleleWriter := config.FMgr.GetDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
-		if _, err := alleleWriter.Write(newJson); err != nil {
-			log.Fatalf("error writing alleles to %v: %v", fileName, err)
-		}
+		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", fileName, err) }
+		config.FMgr.CloseDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName)
 	}
 }
 
 //func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
-func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
+func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32, tmpTotalMutns uint32) uint32 {
 
 	for _, count := range counts {
+		tmpTotalMutns += count
 		percentage := float64(count) / float64(popSize)
 		var i uint32
 		floati := percentage * float64(bucketCount)
+		i = uint32(floati)
+		/* I think this is the more appropriate way, but the simple truncation in the line above is what mendel-f90/bucket brigade does...
 		// At this point, if we just converted floati to uint32 (by truncating), index i would contain all float values: index <= floati < index+1
 		// But we really want the indexes to contain: index < floati <= index+1
 		// Because remember that when we output the buckets numbers into the file, we add 1 to the index of the bucket, so e.g. bucket 5 (index 4 here) will contain: 4 < count <= 5
-		// (The issue is does a count that is exactly 5 end up in bucket 5 or 6. It should go in bucket 5.)
+		// (The issue is does a count that is exactly 5% end up in bucket 5 or 6. I think it should go in bucket 5.)
 		if math.Floor(floati) == floati {
 			i = uint32(floati) - 1
 		} else {
 			i = uint32(floati)
 		}
+		*/
+
 		// The way the calcs above are done, neither of these 2 cases should ever actually happen, but just a safeguard...
 		if i < 0 {
 			log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i)
@@ -933,7 +938,7 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 	}
 	*/
 
-	return
+	return tmpTotalMutns
 }
 
 

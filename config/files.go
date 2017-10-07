@@ -34,7 +34,7 @@ var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, 
 type FileMgr struct {
 	dataFilePath string 		// the directory in which output files should go
 	Files map[string]*os.File 		// key is filename, value is file descriptor (nil if not opened yet)
-	Dirs map[string]map[string]*os.File			// directories that hold a group of output files
+	Dirs map[string]map[string]*os.File			// directories that hold a group of output files. Key is dir name, value is map in which key is filename, value is file descriptor (nil if not opened yet)
 }
 
 // FMgr is the singleton instance of FileMgr, created by FileMgrFactory.
@@ -114,6 +114,25 @@ func (fMgr *FileMgr) GetDirFile(dirName, fileName string) *os.File {
 		}
 	}
 	return nil
+}
+
+
+// CloseDirFile closes a file under a directory.
+func (fMgr *FileMgr) CloseDirFile(dirName, fileName string) {
+	if dir, ok := fMgr.Dirs[dirName]; ok {
+		// We have this dir entry, look for the file entry within it
+		if file, ok := dir[fileName]; ok && file != nil {
+			if err := file.Close(); err != nil {
+				log.Printf("Error closing %v: %v", fileName, err)
+			} else {
+				dir[fileName] = nil
+			}
+		} else {
+			log.Printf("Error: file %v in directory %v can not be closed because it is not open", fileName, dirName)
+		}
+	} else {
+		log.Printf("Error: file %v in directory %v can not be closed because %v output was never requested", fileName, dirName, dirName)
+	}
 }
 
 
