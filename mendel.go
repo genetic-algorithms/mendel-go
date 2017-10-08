@@ -2,10 +2,10 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
+- Fix frac_fav_mutn and fraction_neutral (i think frac_fav_mutn is only of the non-neutral mutations, but confirm)
 - investigate difference in number of alleles between go and f90
 - add option to omit 1st allele bin
-- Compare results with mendel-f90
-- Fix frac_fav_mutn and fraction_neutral (i think frac_fav_mutn is only of the non-neutral mutations, but confirm)
+- Compare more runs with mendel-f90
 - Cache breakdown of mutation totals
 - Figure out the delay at the beginning on r4 (and to a lesser extent on m4)
 - (Consider) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)

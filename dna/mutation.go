@@ -77,20 +77,28 @@ func AlleleCountFactory() *AlleleCount {
 // CalcMutationType determines if the next mutation should be deleterious/neutral/favorable based on a random number and the various relevant rates for this population.
 // This is used by the LB to determine which of the Mutation subclasses to create.
 func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
-	//m = &Mutation{}
 
-	// Determine if this mutation is deleterious, neutral, or favorable
+	// Determine if this mutation is deleterious, neutral, or favorable.
+	// Frac_fav_mutn is the fraction of the non-neutral mutations that are favorable.
+	rnd := uniformRandom.Float64()
+	if rnd < config.Cfg.Mutations.Frac_fav_mutn * (1.0 - config.Cfg.Mutations.Fraction_neutral) {
+		mType = FAVORABLE
+	} else if rnd < 1.0 - config.Cfg.Mutations.Fraction_neutral {
+		mType = DELETERIOUS
+	} else {
+		mType = NEUTRAL
+	}
+
+	/* This is the old/wrong way i was doing it...
 	rnd := uniformRandom.Float64()
 	if rnd < config.Cfg.Mutations.Frac_fav_mutn {
 		mType = FAVORABLE
-		//m = FavorableMutationFactory(uniformRandom)
 	} else if rnd < config.Cfg.Mutations.Frac_fav_mutn + config.Cfg.Mutations.Fraction_neutral {
 		mType = NEUTRAL
-		//m = NeutralMutationFactory(uniformRandom)
 	} else {
 		mType = DELETERIOUS
-		//m = DeleteriousMutationFactory(uniformRandom)
 	}
+	*/
 	return
 }
 
