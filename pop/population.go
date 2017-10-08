@@ -830,6 +830,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	bucketJson.Deleterious = make([]uint32, bucketCount)
 	tmpTotalMutns = fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious, tmpTotalMutns)
 
+	// Note: we do this even when there are no neutrals, because the plotting software needs all 0's in that case
 	bucketJson.Neutral = make([]uint32, bucketCount)
 	tmpTotalMutns = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral, tmpTotalMutns)
 
@@ -840,6 +841,17 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	tmpTotalMutns = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles, tmpTotalMutns)
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
 	tmpTotalMutns = fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles, tmpTotalMutns)
+
+	if config.Cfg.Computation.Omit_first_allele_bin {
+		// Shift all slices 1 to the left
+		bucketJson.Bins = bucketJson.Bins[1:]
+		bucketJson.Deleterious = bucketJson.Deleterious[1:]
+		bucketJson.Neutral = bucketJson.Neutral[1:]
+		bucketJson.Favorable = bucketJson.Favorable[1:]
+		bucketJson.DelInitialAlleles = bucketJson.DelInitialAlleles[1:]
+		bucketJson.FavInitialAlleles = bucketJson.FavInitialAlleles[1:]
+		// This will affect both the allele bin output and the normalized output
+	}
 
 	config.Verbose(1, "tmpTotalMutns: %d", tmpTotalMutns)
 	fileName := fmt.Sprintf("%08d.json", genNum)
@@ -863,7 +875,8 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 // outputNormalizedAlleles uses the absolute data gathered in outputAlleles() and normalizes all of the bin counts (by dividing them by the total number of alleles)
 func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
-	totalAlleles := len(alleles.Deleterious) + len(alleles.Neutral) + len(alleles.Favorable)
+	// Note: even when Omit_first_allele_bin==true we are still dividing all bin counts by the total number of mutations
+	totalAlleles := len(alleles.Deleterious) + len(alleles.Neutral) + len(alleles.Favorable) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
 	normalizedBucketJson := &NormalizedBuckets{}
 
 	normalizedBucketJson.Generation = genNum
@@ -886,6 +899,16 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 	normalizedBucketJson.Favorable = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
 		normalizedBucketJson.Favorable[i] = float64(bucketJson.Favorable[i]) / float64(totalAlleles)
+	}
+
+	normalizedBucketJson.DelInitialAlleles = make([]float64, normalizedBucketCount)
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		normalizedBucketJson.DelInitialAlleles[i] = float64(bucketJson.DelInitialAlleles[i]) / float64(totalAlleles)
+	}
+
+	normalizedBucketJson.FavInitialAlleles = make([]float64, normalizedBucketCount)
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		normalizedBucketJson.FavInitialAlleles[i] = float64(bucketJson.FavInitialAlleles[i]) / float64(totalAlleles)
 	}
 
 	newJson, err := json.Marshal(normalizedBucketJson)

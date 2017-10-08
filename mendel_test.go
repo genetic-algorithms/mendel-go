@@ -51,7 +51,7 @@ func TestMendelCase5(t *testing.T) {
 	mendelCase(t, 5, 5)
 }
 
-// Same as TestMendelCase5 except with selection_model=spps
+// Same as TestMendelCase5 except with selection_model=spps and omit_first_allele_bin=true
 func TestMendelCase6(t *testing.T) {
 	mendelCaseBin(t, 6, 6, "00000020.json")
 }
