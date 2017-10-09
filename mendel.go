@@ -2,7 +2,7 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- merge jon's mendel-go-spc PR to default to last gen on bin plots, and: add omit_first_allele_bin, default mendel.hst output, fix fixed fitness effect wording
+- mendel-go-spc changes: add omit_first_allele_bin param, default mendel.hst output (is my defaults file enough?), fix fixed fitness effect wording (and others)
 - is jon plotting initial alleles in allele plots?
 - investigate difference in number of alleles between go and f90
 - Compare more runs with mendel-f90
