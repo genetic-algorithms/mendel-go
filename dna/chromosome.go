@@ -11,7 +11,7 @@ import (
 type Chromosome struct {
 	//LinkageBlocks []*LinkageBlock
 	LinkageBlocks []LinkageBlock
-	NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
+	//NumMutations uint32		// keep a running total of the mutations. This is both mutations and initial alleles.
 	FitnessEffect float32	// keep a running total of the fitness contribution of this chromosome
 }
 
@@ -43,7 +43,7 @@ func (c *Chromosome) ChromosomeFactory(lBsPerChromosome uint32) {
 // In the other Chromosome methods we can tell if the recycled chromosome exists because the ptr to it will be non-nil.
 //func (c *Chromosome) Reinitialize() *Chromosome {
 func (c *Chromosome) Reinitialize() {
-	c.NumMutations = 0
+	//c.NumMutations = 0
 	c.FitnessEffect = 0.0
 	//return c
 }
@@ -64,17 +64,23 @@ func (c *Chromosome) CopyOld(lBsPerChromosome uint32) (newChr *Chromosome) {
 
 
 // Copy makes a deep copy of this chromosome to offspr
-func (c *Chromosome) Copy(/*lBsPerChromosome uint32,*/ offspr *Chromosome) /*(newChr *Chromosome)*/ {
+func (c *Chromosome) Copy(/*lBsPerChromosome uint32,*/ offspr *Chromosome) (deleterious, neutral, favorable, delAllele, favAllele uint32) {
 	//newChr.NumMutations = c.NumMutations   // <- TransferLB() takes care of this
 	for lbIndex := range c.LinkageBlocks {
-		c.TransferLB(offspr, lbIndex)
+		delet, neut, fav, delAll, favAll := c.TransferLB(offspr, lbIndex)
+		deleterious += delet
+		neutral += neut
+		favorable += fav
+		delAllele += delAll
+		favAllele += favAll
 	}
+	return
 }
 
 
 // TransferLB copies a LB from this chromosome to newChr. The LB in newChr may be recycled from a previous gen, we will completely overwrite it.
-// As a side effect, we also update the newChr's mutation and fitness stats
-func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
+// As a side effect, we also update the newChr's fitness stats. Returns the numbers of each kind of mutation.
+func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) (uint32, uint32, uint32, uint32, uint32) {
 	//if config.Cfg.Computation.Perf_option == 2 {
 		newChr.LinkageBlocks[lbIndex] = c.LinkageBlocks[lbIndex]    // this copies all of the LB struct fields, including the slice reference (but not the mutn array that backs the slice)
 		newChr.LinkageBlocks[lbIndex].IsPtrToParent = true            // indicate we are still using the parents mutn array, so we will copy it later if we have to add a mutation
@@ -98,8 +104,9 @@ func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) {
 	*/
 
 	// Housekeeping for the new chromo
-	newChr.NumMutations += newChr.LinkageBlocks[lbIndex].GetNumMutations()
+	//newChr.NumMutations += newChr.LinkageBlocks[lbIndex].GetNumMutations()
 	newChr.FitnessEffect += newChr.LinkageBlocks[lbIndex].SumFitness()
+	return newChr.LinkageBlocks[lbIndex].GetMutationStats()
 }
 
 
@@ -109,64 +116,50 @@ func (c *Chromosome) GetNumLinkages() uint32 { return uint32(len(c.LinkageBlocks
 
 // Meiosis fills in a child chromosome as part of reproduction by implementing the crossover model specified in the config file.
 // This is 1 form of Copy for the Chromosome class.
-func (dad *Chromosome) Meiosis(mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+func (dad *Chromosome) Meiosis(mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (uint32, uint32, uint32, uint32, uint32) {
 	offspr.Reinitialize() 	// In case it is a recycled chromosome
 
-	/*gamete =*/ Mdl.Crossover(dad, mom, offspr, lBsPerChromosome, uniformRandom)
-
-	return
+	return Mdl.Crossover(dad, mom, offspr, lBsPerChromosome, uniformRandom)
 }
 
 
 // The different implementations of LB crossover to another chromosome during meiosis
-type CrossoverType func(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) //*Chromosome
+type CrossoverType func(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (uint32, uint32, uint32, uint32, uint32)
 
-// Create the gamete from all of dad's chromosomes or all of mom's chromosomes.
-func NoCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+// Create the gamete from all of dad's chromosomes or all of mom's chromosomes. Returns the number of each kind of mutation in the new chromosome.
+func NoCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) (uint32, uint32, uint32, uint32, uint32) {
 	//gamete = ChromosomeFactory(lBsPerChromosome, false)
 	// Create the chromosome (if necessary) and copy all of the LBs from the one or the other
 	if uniformRandom.Intn(2) == 0 {
-		/*gamete =*/ dad.Copy(/*lBsPerChromosome,*/ offspr)
+		return dad.Copy(offspr)
 	} else {
-		/*gamete =*/ mom.Copy(/*lBsPerChromosome,*/ offspr)
+		return mom.Copy(offspr)
 	}
-	return
 }
 
 
-// Create the gamete from dad and mom's chromosomes by randomly choosing each LB from either.
-func FullCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
-	//gamete = ChromosomeFactory(lBsPerChromosome, false)
+// Create the gamete from dad and mom's chromosomes by randomly choosing each LB from either. Returns the number of each kind of mutation in the new chromosome.
+func FullCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, _ uint32, uniformRandom *rand.Rand) (deleterious, neutral, favorable, delAllele, favAllele uint32) {
 	// Each LB can come from either dad or mom
 	for lbIndex :=0; lbIndex <int(dad.GetNumLinkages()); lbIndex++ {
+		var delet, neut, fav, delAll, favAll uint32
 		if uniformRandom.Intn(2) == 0 {
-			//if config.Cfg.Computation.Transfer_linkage_blocks {
-			///*lb :=*/ dad.LinkageBlocks[lbIndex].Transfer(dad, gamete, lbIndex)
-			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			dad.TransferLB(offspr, lbIndex)
-			//} else {
-			//	lb := LinkageBlockFactory(gamete, dad.LinkageBlocks[lbIndex])
-			//	gamete.LinkageBlocks[lbIndex] = lb
-			//	gamete.NumMutations += lb.GetNumMutations()
-			//}
+			delet, neut, fav, delAll, favAll = dad.TransferLB(offspr, lbIndex)
 		} else {
-			//if config.Cfg.Computation.Transfer_linkage_blocks {
-			///*lb :=*/ mom.LinkageBlocks[lbIndex].Transfer(mom, gamete, lbIndex)
-			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			mom.TransferLB(offspr, lbIndex)
-			//} else {
-			//	lb := LinkageBlockFactory(gamete, mom.LinkageBlocks[lbIndex])
-			//	gamete.LinkageBlocks[lbIndex] = lb
-			//	gamete.NumMutations += lb.GetNumMutations()
-			//}
+			delet, neut, fav, delAll, favAll = mom.TransferLB(offspr, lbIndex)
 		}
+		deleterious += delet
+		neutral += neut
+		favorable += fav
+		delAllele += delAll
+		favAllele += favAll
 	}
 	return
 }
 
 
-// Create the gamete from dad and mom's chromosomes by randomly choosing sections of LBs from either.
-func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) /*(gamete *Chromosome)*/ {
+// Create the gamete from dad and mom's chromosomes by randomly choosing sections of LBs from either. Returns the number of each kind of mutation in the new chromosome.
+func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (deleterious, neutral, favorable, delAllele, favAllele uint32) {
 	//gamete = ChromosomeFactory(lBsPerChromosome, false)
 
 	// Algorithm: choose random sizes for <numCrossovers> LB sections for primary and <numCrossovers> LB sections for secondary
@@ -194,7 +187,7 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsP
 	switch {
 	case numCrossovers <= 0:
 		// Handle special case of no crossover - copy all LBs from primary
-		/*gamete =*/ primary.Copy(/*lBsPerChromosome,*/ offspr)
+		deleterious, neutral, favorable, delAllele, favAllele = primary.Copy(offspr)
 		return
 	default:
 		numLbSections = (2 * numCrossovers)
@@ -222,15 +215,12 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsP
 		if section >=  numLbSections { endIndex = maxIndex }		// make the last section reach to the end of the chromosome
 		//config.Verbose(9, " Copying LBs %v-%v from %v\n", begIndex, endIndex, parent==primary)
 		for lbIndex :=begIndex; lbIndex <=endIndex; lbIndex++ {
-			//if config.Cfg.Computation.Transfer_linkage_blocks {
-			///*lb :=*/ parent.LinkageBlocks[lbIndex].Transfer(parent, gamete, lbIndex)
-			//gamete.NumMutations += lb.GetNumMutations()   // <- Transfer() does this
-			parent.TransferLB(offspr, lbIndex)
-			//} else {
-			//	lb := LinkageBlockFactory(gamete, parent.LinkageBlocks[lbIndex])
-			//	gamete.LinkageBlocks[lbIndex] = lb
-			//	gamete.NumMutations += lb.GetNumMutations()
-			//}
+			delet, neut, fav, delAll, favAll := parent.TransferLB(offspr, lbIndex)
+			deleterious += delet
+			neutral += neut
+			favorable += fav
+			delAllele += delAll
+			favAllele += favAll
 		}
 
 		// For next iteration
@@ -245,22 +235,23 @@ func PartialCrossover(dad *Chromosome, mom *Chromosome, offspr *Chromosome, lBsP
 }
 
 
-// AppendMutation creates and adds a mutations to the LB specified
-func (c *Chromosome) AppendMutation(lbInChr int, mutId uint64, uniformRandom *rand.Rand) {
+// AppendMutation creates and adds a mutations to the LB specified. Returns the type of mutation added.
+func (c *Chromosome) AppendMutation(lbInChr int, mutId uint64, uniformRandom *rand.Rand) MutationType {
 	// Note: to try to save time, we could accumulate the chromosome fitness as we go, but doing so would bypass the LB method
 	//		of calculating its own fitness, so we won't do that.
-	fitnessEffect := c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
-	c.NumMutations++
+	mType, fitnessEffect := c.LinkageBlocks[lbInChr].AppendMutation(mutId, uniformRandom)
+	//c.NumMutations++
 	c.FitnessEffect += fitnessEffect
+	return mType
 }
 
 
 // ChrAppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs on 2 chromosomes (favorable to 1, deleterious to the other).
 func ChrAppendInitialContrastingAlleles(chr1, chr2 *Chromosome, lbIndex int, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) {
 	fitnessEffect1, fitnessEffect2 := AppendInitialContrastingAlleles(&chr1.LinkageBlocks[lbIndex], &chr2.LinkageBlocks[lbIndex], uniqueInt, uniformRandom)
-	chr1.NumMutations++
+	//chr1.NumMutations++
 	chr1.FitnessEffect += fitnessEffect1
-	chr2.NumMutations++
+	//chr2.NumMutations++
 	chr2.FitnessEffect += fitnessEffect2
 }
 
@@ -275,31 +266,32 @@ func (c *Chromosome) SumFitness() float64 {
 }
 
 
+/* Not currently used...
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of each
-func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable uint32 /*, avDelFit, avFavFit float64*/) {
+func (c *Chromosome) GetMutationStats() (deleterious, neutral, favorable, delAllele, favAllele uint32) {
 	// Calc the average of each type of mutation: multiply the average from each LB and num mutns from each LB, then at the end divide by total num mutns
 	for _,lb := range c.LinkageBlocks {
-		delet, neut, fav /*, avD, avF*/ := lb.GetMutationStats()
+		delet, neut, fav, delAll, favAll := lb.GetMutationStats()
 		deleterious += delet
 		neutral += neut
 		favorable += fav
-		//avDelFit += (float64(delet) * avD)
-		//avFavFit += (float64(fav) * avF)
+		delAllele += delAll
+		favAllele += favAll
 	}
-	//if deleterious > 0 { avDelFit = avDelFit / float64(deleterious) }
-	//if favorable > 0 { avFavFit = avFavFit / float64(favorable) }
 	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
 }
+*/
 
 
+/* Not currently used...
 // GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
-func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable uint32 /*, avDelFit, avFavFit float64*/) {
+func (c *Chromosome) GetInitialAlleleStats() (deleterious, favorable uint32) {
 	// Calc the average of each type of allele: multiply the average from each LB and num alleles from each LB, then at the end divide by total num alleles
 	for _,lb := range c.LinkageBlocks {
-		delet, neut, fav /*, avD, avF*/ := lb.GetInitialAlleleStats()
+		delet, fav := lb.GetInitialAlleleStats()
 		deleterious += delet
-		neutral += neut
+		//neutral += neut
 		favorable += fav
 		//avDelFit += (float64(delet) * avD)
 		//avFavFit += (float64(fav) * avF)
@@ -309,6 +301,7 @@ func (c *Chromosome) GetInitialAlleleStats() (deleterious, neutral, favorable ui
 	// Note: we don't bother caching the fitness stats in the chromosome, because we cache the total in the individual, and we know better when to cache there.
 	return
 }
+*/
 
 
 /*

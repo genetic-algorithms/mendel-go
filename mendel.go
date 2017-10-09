@@ -2,8 +2,6 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- add option to omit 1st allele bin by omitting 1st element of bins and mutation arrays: {"bins": [2, 3, 4, …], "deleterious": [596, 349, 257, …]}
-- Cache breakdown of mutation totals
 - merge jon's mendel-go-spc PR to default to last gen on bin plots, and: add omit_first_allele_bin, default mendel.hst output, fix fixed fitness effect wording
 - is jon plotting initial alleles in allele plots?
 - investigate difference in number of alleles between go and f90

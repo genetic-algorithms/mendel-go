@@ -22,7 +22,7 @@ type Individual struct {
 	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
 	//MeanDelFit, MeanFavFit float64
-	NumDelAllele, NumNeutAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
+	NumDelAllele, /*NumNeutAllele,*/ NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
 	//MeanDelAlleleFit, MeanFavAlleleFit float64
 
 	//ChromosomesFromDad []*dna.Chromosome
@@ -64,7 +64,7 @@ func (ind *Individual) Reinitialize() *Individual {
 	ind.NumNeutral = 0
 	ind.NumFavorable = 0
 	ind.NumDelAllele = 0
-	ind.NumNeutAllele = 0
+	//ind.NumNeutAllele = 0
 	ind.NumFavAllele = 0
 
 	/* Chromosome.Meiosis() reinitializes the chromosomes...
@@ -126,16 +126,25 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 	for c:=uint32(0); c<dad.GetNumChromosomes(); c++ {
 		// Meiosis() implements the crossover model specified in the config file
 		// For your chromosome coming from your dad, combine LBs from his dad and mom
+		var deleterious, neutral, favorable, delAllele, favAllele uint32
 		offsprChr := &offspr.ChromosomesFromDad[c]
-		/*chr :=*/ dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
-		//offspr.ChromosomesFromDad[c] = chr
-		offspr.NumMutations += offsprChr.NumMutations
+		deleterious, neutral, favorable, delAllele, favAllele = dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		offspr.NumMutations += (deleterious + neutral + favorable + delAllele + favAllele)
+		offspr.NumDeleterious += deleterious
+		offspr.NumNeutral += neutral
+		offspr.NumFavorable += favorable
+		offspr.NumDelAllele += delAllele
+		offspr.NumFavAllele += favAllele
 
 		// For your chromosome coming from your mom, combine LBs from her dad and mom
 		offsprChr = &offspr.ChromosomesFromMom[c]
-		/*chr =*/ mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
-		//offspr.ChromosomesFromMom[c] = chr
-		offspr.NumMutations += offsprChr.NumMutations
+		deleterious, neutral, favorable, delAllele, favAllele = mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		offspr.NumMutations += (deleterious + neutral + favorable + delAllele + favAllele)
+		offspr.NumDeleterious += deleterious
+		offspr.NumNeutral += neutral
+		offspr.NumFavorable += favorable
+		offspr.NumDelAllele += delAllele
+		offspr.NumFavAllele += favAllele
 	}
 
 	return offspr
@@ -153,20 +162,25 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 		lb := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits))	// choose a random LB within the individual
 		chr := lb / int(lBsPerChromosome) 		// get the chromosome index
 		lbInChr := lb % int(lBsPerChromosome)	// get index of LB within the chromosome
-		//lb := uniformRandom.Intn(int(dad.GetNumLinkages()))	// choose a random LB index
 
 		// Randomly choose the LB from dad or mom to put the mutation in.
 		// Note: AppendMutation() creates a mutation with deleterious/neutral/favorable, dominant/recessive, etc. based on the relevant input parameter rates
-		//if popPart.NextMutId > popPart.LastMutId { log.Printf("Warning: population part exceeded LastMutId %d with NextMutId %d", popPart.LastMutId, popPart.NextMutId)}
+		var mType dna.MutationType
 		if uniformRandom.Intn(2) == 0 {
-			child.ChromosomesFromDad[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
+			mType = child.ChromosomesFromDad[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
 		} else {
-			child.ChromosomesFromMom[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
+			mType = child.ChromosomesFromMom[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
 		}
-		//popPart.NextMutId++
+		switch mType {
+		case dna.DELETERIOUS:
+			child.NumDeleterious++
+		case dna.NEUTRAL:
+			child.NumNeutral++
+		case dna.FAVORABLE:
+			child.NumFavorable++
+		}
 	}
 	child.NumMutations += numMutations
-	//d, n, f := offspr.GetNumMutations()
 
 	child.GenoFitness = Mdl.CalcIndivFitness(child) 		// store resulting fitness
 	if child.GenoFitness <= 0.0 { child.Dead = true }
@@ -218,6 +232,8 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 		}
 	}
 	ind.NumMutations += numAlleles * 2
+	ind.NumDelAllele += numAlleles
+	ind.NumFavAllele += numAlleles
 
 	//config.Verbose(5, " Initial alleles given to %v faction of LBs in the individual ((%v+%v)/%v)", float64(numWithAllelesRemainder + numWithAllelesEvenly) / float64(numProcessedLBs), numWithAllelesEvenly, numWithAllelesRemainder, numProcessedLBs)
 	return numWithAllelesRemainder + numWithAllelesEvenly, numProcessedLBs
@@ -315,71 +331,50 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 }
 
 
-// GetMutationStats returns the number of deleterious, neutral, favorable mutations, and the average fitness factor of deleterious and favorable
-func (ind *Individual) GetMutationStats() (uint32, uint32, uint32 /*, float64, float64*/) {
+// GetMutationStats returns the number of deleterious, neutral, favorable mutations
+func (ind *Individual) GetMutationStats() (uint32, uint32, uint32) {
+	/* We now count each type of mutation for the individual as we go...
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDeleterious > 0 /*&& ind.MeanDelFit < 0.0*/ { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable /*, ind.MeanDelFit, ind.MeanFavFit*/ }
-	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0  //;  ind.MeanDelFit=0.0;  ind.MeanFavFit=0.0
-
+	if ind.NumDeleterious > 0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable}
+	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0
 	// Calc the average of each type of mutation: multiply the average from each chromosome and num mutns from each chromosome, then at the end divide by total num mutns
 	for _, c := range ind.ChromosomesFromDad {
-		delet, neut, fav /*, avD, avF*/ := c.GetMutationStats()
+		delet, neut, fav := c.GetMutationStats()
 		ind.NumDeleterious += delet
 		ind.NumNeutral += neut
 		ind.NumFavorable += fav
-		//ind.MeanDelFit += (float64(delet) * avD)
-		//ind.MeanFavFit += (float64(fav) * avF)
 	}
 	for _, c := range ind.ChromosomesFromMom {
-		delet, neut, fav /*, avD, avF*/ := c.GetMutationStats()
+		delet, neut, fav := c.GetMutationStats()
 		ind.NumDeleterious += delet
 		ind.NumNeutral += neut
 		ind.NumFavorable += fav
-		//ind.MeanDelFit += (float64(delet) * avD)
-		//ind.MeanFavFit += (float64(fav) * avF)
 	}
-	//if ind.NumDeleterious > 0 { ind.MeanDelFit = ind.MeanDelFit / float64(ind.NumDeleterious) }
-	//if ind.NumFavorable > 0 { ind.MeanFavFit = ind.MeanFavFit / float64(ind.NumFavorable) }
-	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable  //, ind.MeanDelFit, ind.MeanFavFit
+	*/
+	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable
 }
 
 
 // GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of deleterious and favorable
-func (ind *Individual) GetInitialAlleleStats() (uint32, uint32, uint32 /*, float64, float64*/ ) {
+func (ind *Individual) GetInitialAlleleStats() (uint32, uint32) {
+	/* We now count the initial alleles for the individual as we go...
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDelAllele > 0 /*&& ind.MeanDelAlleleFit < 0.0*/ { return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele /*, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit*/ }
-	ind.NumDelAllele=0;  ind.NumNeutAllele=0;  ind.NumFavAllele=0  //;  ind.MeanDelAlleleFit=0.0;  ind.MeanFavAlleleFit=0.0
-
+	if ind.NumDelAllele > 0 { return ind.NumDelAllele, ind.NumFavAllele}
+	ind.NumDelAllele=0; ind.NumFavAllele=0
 	// Calc the average of each type of allele: multiply the average from each chromosome and num alleles from each chromosome, then at the end divide by total num alleles
 	for _, c := range ind.ChromosomesFromDad {
-		delet, neut, fav /*, avD, avF*/ := c.GetInitialAlleleStats()
+		delet, fav := c.GetInitialAlleleStats()
 		ind.NumDelAllele += delet
-		ind.NumNeutAllele += neut
 		ind.NumFavAllele += fav
-		//ind.MeanDelAlleleFit += (float64(delet) * avD)
-		//ind.MeanFavAlleleFit += (float64(fav) * avF)
 	}
 	for _, c := range ind.ChromosomesFromMom {
-		delet, neut, fav /*, avD, avF*/ := c.GetInitialAlleleStats()
+		delet, fav := c.GetInitialAlleleStats()
 		ind.NumDelAllele += delet
-		ind.NumNeutAllele += neut
 		ind.NumFavAllele += fav
-		//ind.MeanDelAlleleFit += (float64(delet) * avD)
-		//ind.MeanFavAlleleFit += (float64(fav) * avF)
 	}
-	//if ind.NumDelAllele > 0 { ind.MeanDelAlleleFit = ind.MeanDelAlleleFit / float64(ind.NumDelAllele) }
-	//if ind.NumFavAllele > 0 { ind.MeanFavAlleleFit = ind.MeanFavAlleleFit / float64(ind.NumFavAllele) }
-	return ind.NumDelAllele, ind.NumNeutAllele, ind.NumFavAllele  //, ind.MeanDelAlleleFit, ind.MeanFavAlleleFit
+	*/
+	return ind.NumDelAllele, ind.NumFavAllele
 }
-
-
-/*
-// GatherAlleles adds all of this individual's alleles (both mutations and initial alleles) to the given struct
-func (ind *Individual) GatherAlleles(alleles *dna.Alleles) {
-	for _, c := range ind.ChromosomesFromDad { c.GatherAlleles(alleles) }
-	for _, c := range ind.ChromosomesFromMom { c.GatherAlleles(alleles) }
-}
-*/
 
 
 // CountAlleles counts all of this individual's alleles (both mutations and initial alleles) and adds them to the given struct
