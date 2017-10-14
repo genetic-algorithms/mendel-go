@@ -2,7 +2,8 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- mendel-go-spc changes: add omit_first_allele_bin param, default mendel.hst output (is my defaults file enough?), fix fixed fitness effect wording (and others)
+- investigate mutation rate being only non-neutral mutations
+- open src mendel-go and mendel-go-spc
 - is jon plotting initial alleles in allele plots?
 - investigate difference in number of alleles between go and f90
 - Compare more runs with mendel-f90

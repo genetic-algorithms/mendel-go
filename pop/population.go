@@ -928,18 +928,22 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 		percentage := float64(count) / float64(popSize)
 		var i uint32
 		floati := percentage * float64(bucketCount)
-		i = uint32(floati)
-		/* I think this is the more appropriate way, but the simple truncation in the line above is what mendel-f90/bucket brigade does...
+
+		//i = uint32(floati)
+		//if i == bucketCount { i = bucketCount - 1 }
+
+		/* I think this is the more appropriate way, but the simple truncation in the 2 lines above is what mendel-f90/bucket brigade does... */
 		// At this point, if we just converted floati to uint32 (by truncating), index i would contain all float values: index <= floati < index+1
 		// But we really want the indexes to contain: index < floati <= index+1
 		// Because remember that when we output the buckets numbers into the file, we add 1 to the index of the bucket, so e.g. bucket 5 (index 4 here) will contain: 4 < count <= 5
 		// (The issue is does a count that is exactly 5% end up in bucket 5 or 6. I think it should go in bucket 5.)
+		// This also handles correctly the case in which the mutation is in every single individual. The mendel-f90/bucket brigade approach would put that in index 100, which doesn't exist.
 		if math.Floor(floati) == floati {
 			i = uint32(floati) - 1
 		} else {
 			i = uint32(floati)
 		}
-		*/
+
 
 		// The way the calcs above are done, neither of these 2 cases should ever actually happen, but just a safeguard...
 		if i < 0 {
