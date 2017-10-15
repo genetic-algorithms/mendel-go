@@ -1,6 +1,6 @@
 # Description
 
-This is the golang version of Mendel's Accountant, a genetic mutation tracking simulation program.
+This is the golang version of Mendel's Accountant, a genetic mutation tracking program used to simulate and study macroevolution.
 
 # Setup
 
@@ -10,16 +10,24 @@ This is the golang version of Mendel's Accountant, a genetic mutation tracking s
 
 # Build and run
 
+Build and run with test/input/mendel-case.ini:
+
 ```
 make
 ```
 
-# View godoc info of the project
-
-Assuming you have cloned this project into `$GOPATH/src/bitbucket.org/geneticentropy/mendel-go`:
+Build and run the automated tests:
 
 ```
-godoc bitbucket.org/geneticentropy/mendel-go
+make test-main
+```
+
+# View godoc info of the project
+
+Assuming you have cloned this project into `$GOPATH/src/github.com/genetic-algorithms/mendel-go`:
+
+```
+godoc github.com/genetic-algorithms/mendel-go
 ```
 
 Then add any of the packages/subdirectories listed to the cmd above.
