@@ -938,9 +938,12 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 		// Because remember that when we output the buckets numbers into the file, we add 1 to the index of the bucket, so e.g. bucket 5 (index 4 here) will contain: 4 < count <= 5
 		// (The issue is does a count that is exactly 5% end up in bucket 5 or 6. I think it should go in bucket 5.)
 		// This also handles correctly the case in which the mutation is in every single individual. The mendel-f90/bucket brigade approach would put that in index 100, which doesn't exist.
-		if math.Floor(floati) == floati {
-			i = uint32(floati) - 1
+		const roundingError float64 = 0.000000000001
+		trunci := math.Trunc(floati + roundingError)
+		if floati > trunci - roundingError && floati < trunci + roundingError {
+			i = uint32(trunci) - 1
 		} else {
+			log.Printf("floati=%v", floati)
 			i = uint32(floati)
 		}
 

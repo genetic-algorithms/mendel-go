@@ -2,7 +2,6 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- investigate mutation rate being only non-neutral mutations
 - open src mendel-go and mendel-go-spc
 - is jon plotting initial alleles in allele plots?
 - investigate difference in number of alleles between go and f90
