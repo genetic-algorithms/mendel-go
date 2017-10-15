@@ -2,10 +2,10 @@ package dna
 
 import (
 	"math/rand"
-	"bitbucket.org/geneticentropy/mendel-go/config"
+	"github.com/genetic-algorithms/mendel-go/config"
 	//"log"
 	//"unsafe"
-	"bitbucket.org/geneticentropy/mendel-go/utils"
+	"github.com/genetic-algorithms/mendel-go/utils"
 	"log"
 )
 

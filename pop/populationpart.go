@@ -3,7 +3,7 @@ package pop
 import (
 	"math/rand"
 	"sync"
-	"bitbucket.org/geneticentropy/mendel-go/utils"
+	"github.com/genetic-algorithms/mendel-go/utils"
 )
 
 // PopulationPart is a construct used to partition the population for the purpose mating parts of the population

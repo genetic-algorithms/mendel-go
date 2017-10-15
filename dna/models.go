@@ -1,7 +1,7 @@
 package dna
 
 import (
-	"bitbucket.org/geneticentropy/mendel-go/config"
+	"github.com/genetic-algorithms/mendel-go/config"
 	"strings"
 	"log"
 )

@@ -7,6 +7,7 @@ This is the golang version of Mendel's Accountant, a genetic mutation tracking p
 - Install go, set GOROOT and GOPATH
 - Install glide
 - Install make
+- Clone this repo into $GOPATH/src/github.com/genetic-algorithms/mendel-go
 
 # Build and run
 
@@ -16,10 +17,22 @@ Build and run with test/input/mendel-case.ini:
 make
 ```
 
+Run with a different input file:
+
+```
+./mendel-go -f <input-file>
+```
+
 Build and run the automated tests:
 
 ```
 make test-main
+```
+
+Test some of the packages:
+
+```
+make test-pkgs
 ```
 
 # View godoc info of the project

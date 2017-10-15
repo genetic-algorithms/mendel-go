@@ -1,10 +1,10 @@
 package pop
 
 import (
-	"bitbucket.org/geneticentropy/mendel-go/dna"
-	"bitbucket.org/geneticentropy/mendel-go/config"
-	"bitbucket.org/geneticentropy/mendel-go/utils"
-	"bitbucket.org/geneticentropy/mendel-go/random"
+	"github.com/genetic-algorithms/mendel-go/dna"
+	"github.com/genetic-algorithms/mendel-go/config"
+	"github.com/genetic-algorithms/mendel-go/utils"
+	"github.com/genetic-algorithms/mendel-go/random"
 	"log"
 	"math/rand"
 )
