@@ -943,7 +943,7 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 		if floati > trunci - roundingError && floati < trunci + roundingError {
 			i = uint32(trunci) - 1
 		} else {
-			log.Printf("floati=%v", floati)
+			//log.Printf("floati=%v", floati)
 			i = uint32(floati)
 		}
 

@@ -13,3 +13,5 @@ vendor/
 
 # Intellij files
 .idea/
+/mendel-go.iml
+/projectFilesBackup

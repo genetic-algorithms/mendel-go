@@ -1,8 +1,7 @@
-// Package  main is main program of the golang version of mendel's accountant.
+// Package main is the main program of the golang version of mendel's accountant.
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- open src mendel-go and mendel-go-spc
 - is jon plotting initial alleles in allele plots?
 - investigate difference in number of alleles between go and f90
 - Compare more runs with mendel-f90
