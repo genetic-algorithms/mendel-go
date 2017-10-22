@@ -781,6 +781,7 @@ type NormalizedBuckets struct {
 // outputAlleles gathers all of the alleles in this generation, calculates the bins, and outputs them to a file
 func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	utils.Measure.Start("allele-count")
+	var deleterious, neutral, favorable, delAllele, favAllele uint32
 
 	// Free up some memory, because this is going to take a lot
 	if lastGen && config.Cfg.Computation.Allele_count_gc_interval > 0 {
@@ -826,21 +827,20 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		bucketJson.Bins[i] = uint32(i) + 1
 	}
 
-	var tmpTotalMutns uint32
 	bucketJson.Deleterious = make([]uint32, bucketCount)
-	tmpTotalMutns = fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious, tmpTotalMutns)
+	deleterious = fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
 
 	// Note: we do this even when there are no neutrals, because the plotting software needs all 0's in that case
 	bucketJson.Neutral = make([]uint32, bucketCount)
-	tmpTotalMutns = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral, tmpTotalMutns)
+	neutral = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 
 	bucketJson.Favorable = make([]uint32, bucketCount)
-	tmpTotalMutns = fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable, tmpTotalMutns)
+	favorable = fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
 
 	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
-	tmpTotalMutns = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles, tmpTotalMutns)
+	delAllele = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
-	tmpTotalMutns = fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles, tmpTotalMutns)
+	favAllele = fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
 
 	if config.Cfg.Computation.Omit_first_allele_bin {
 		// Shift all slices 1 to the left
@@ -853,7 +853,15 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// This will affect both the allele bin output and the normalized output
 	}
 
-	config.Verbose(1, "tmpTotalMutns: %d", tmpTotalMutns)
+	totalMutns := deleterious + neutral + favorable + delAllele + favAllele
+	var countingStr string
+	if config.Cfg.Computation.Count_duplicate_alleles {
+		countingStr = "counting duplicates"
+	} else {
+		countingStr = "filtering out duplicates"
+	}
+	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleterious: %d, neutral: %d, favorable: %d, del initial: %d, fav initial: %d", countingStr, totalMutns, deleterious, neutral, favorable, delAllele, favAllele)
+
 	fileName := fmt.Sprintf("%08d.json", genNum)
 
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) {
@@ -921,10 +929,11 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 }
 
 //func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
-func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32, tmpTotalMutns uint32) uint32 {
+func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
+	var totalMutns uint32
 
 	for _, count := range counts {
-		tmpTotalMutns += count
+		totalMutns += count
 		percentage := float64(count) / float64(popSize)
 		var i uint32
 		floati := percentage * float64(bucketCount)
@@ -953,7 +962,8 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 			log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i)
 			i = 0
 		} else if i >= bucketCount {
-			log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i)
+			if !config.Cfg.Computation.Count_duplicate_alleles { log.Printf("Warning: bucket index %d is out of range, putting it back in range.", i) }
+			// else we expect this
 			i = bucketCount - 1
 		}
 
@@ -968,7 +978,7 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 	}
 	*/
 
-	return tmpTotalMutns
+	return totalMutns
 }
 
 
