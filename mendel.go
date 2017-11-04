@@ -23,13 +23,13 @@ import (
 	"github.com/genetic-algorithms/mendel-go/config"
 	"github.com/genetic-algorithms/mendel-go/utils"
 	"github.com/genetic-algorithms/mendel-go/pop"
-	"github.com/genetic-algorithms/mendel-go/random"
 	"math/rand"
 	"github.com/genetic-algorithms/mendel-go/dna"
 	"github.com/pkg/profile"
 	"strings"
 	"runtime"
 	"runtime/debug"
+	"github.com/genetic-algorithms/mendel-go/random"
 )
 
 // Initialize initializes variables, objects, and settings.
@@ -50,15 +50,8 @@ func initialize() *rand.Rand {
 	dna.SetModels(config.Cfg)
 	pop.SetModels(config.Cfg)
 
-	// Initialize random number generator
-	var uniformRandom *rand.Rand
-	if config.Cfg.Computation.Random_number_seed != 0 {
-		uniformRandom = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed))
-	} else {
-		uniformRandom = rand.New(rand.NewSource(random.GetSeed()))
-	}
-
-	return uniformRandom
+	random.NextSeed = config.Cfg.Computation.Random_number_seed
+	return random.RandFactory()
 }
 
 // Shutdown does all the stuff necessary at the end of the run.
@@ -103,9 +96,9 @@ func main() {
 
 	uniformRandom := initialize()
 
+	maxGenNum := config.Cfg.Basic.Num_generations
 	parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
 	parentPop.GenerateInitialAlleles(uniformRandom)
-	maxGenNum := config.Cfg.Basic.Num_generations
 	parentPop.ReportInitial(maxGenNum)
 	//var prevPop *pop.Population
 
@@ -122,6 +115,7 @@ func main() {
 		//	newP = pop.PopulationFactory(population, gen)
 		//}
 		childrenPop := pop.PopPool.GetNextGeneration(parentPop, gen)
+		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
 		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
 		//parentPop = nil 	// give GC a chance to reclaim the previous generation
 		if config.Cfg.Computation.Force_gc {

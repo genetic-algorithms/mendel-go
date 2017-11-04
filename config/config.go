@@ -80,8 +80,8 @@ type Config struct {
 		Bottleneck_pop_size uint32
 		Num_bottleneck_generations uint32
 	}
-	Substructure struct {
-		Is_parallel bool
+	Tribes struct {
+		Num_tribes uint32
 		Homogenous_tribes bool
 		Num_indiv_exchanged uint32
 		Migration_generations uint32
@@ -134,7 +134,7 @@ func ReadFromFile(filename string) error {
 	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
 	*/
 	defaultFile := FindDefaultFile()
-	if defaultFile == "" { return errors.New("Error: can not find "+DEFAULT_INPUT_FILE) }
+	if defaultFile == "" { return errors.New("can not find "+DEFAULT_INPUT_FILE) }
 	log.Printf("Using defaults file %v\n", defaultFile) 	// can not use verbosity here because we have not read the config file yet
 	if _, err := toml.DecodeFile(defaultFile, Cfg); err != nil { return err }
 	if filename != defaultFile {
@@ -153,15 +153,15 @@ func ReadFromFile(filename string) error {
 // Validate checks the config values to make sure they are valid.
 func (c *Config) validateAndAdjust() error {
 	// Check and adjust certain config values
-	if c.Basic.Pop_size % 2 != 0 { return errors.New("Error: basic.pop_size must be an even number") }
-	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("Error: Num_linkage_subunits must be an exact multiple of haploid_chromosome_number.") }
+	if c.Basic.Pop_size % 2 != 0 { return errors.New("basic.pop_size must be an even number") }
+	if (c.Population.Num_linkage_subunits % c.Population.Haploid_chromosome_number) != 0 { return errors.New("num_linkage_subunits must be an exact multiple of haploid_chromosome_number") }
 
 	c.Selection.Heritability = math.Max(1.e-20, c.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
 
-	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Can not set both allow_back_mutn and a non-zero tracking_threshold.") }
-	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("Error: Setting tracking_threshold with multiplicative_weighting is not yet supported.") }
+	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("can not set both allow_back_mutn and a non-zero tracking_threshold") }
+	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("setting tracking_threshold with multiplicative_weighting is not yet supported") }
 
-	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsDir(ALLELE_BINS_DIRECTORY) { return errors.New("Error: "+ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
+	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsDir(ALLELE_BINS_DIRECTORY) { return errors.New(ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
 	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) {
 		log.Printf("Since %v was not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY)
 		c.Computation.Tracking_threshold = 9.0
@@ -172,14 +172,16 @@ func (c *Config) validateAndAdjust() error {
 		c.Computation.Track_neutrals = false
 	}
 
-	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("Error: If num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0.") }
+	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("if num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0") }
 
 	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
 
-	if c.Computation.Reuse_populations && c.Population.Pop_growth_model != "none" { 	//todo: can't use enum for node, because of circular import
+	if c.Computation.Reuse_populations && c.Population.Pop_growth_model != "none" { 	//todo: can't use enum for none, because of circular import
 		log.Println("Forcing reuse_populations to false because population growth was specified")
 		c.Computation.Reuse_populations = false
 	}
+
+	if c.Tribes.Num_tribes <= 0 { return errors.New("num_tribes can not be <= 0") }
 
 	return nil
 }

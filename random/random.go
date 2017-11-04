@@ -8,6 +8,30 @@ import (
 	"math/rand"
 )
 
+var NextSeed int64 // is initialized to config.Cfg.Computation.Random_number_seed to avoid circular imports
+
+/*
+type Rnd struct {
+	Rnd *rand.Rand
+	Seed int64		// the seed this random number generator was created with
+}
+*/
+
+// RandFactory returns a newly created random number generator with a new seed.
+// Note: this is *not* thread safe, we assume you call this before starting the threads to give each its own RNG
+func RandFactory() *rand.Rand {
+	if NextSeed != 0 {
+		r := rand.New(rand.NewSource(NextSeed))
+		NextSeed++
+		return r
+	} else {
+		return rand.New(rand.NewSource(GetSeed()))
+	}
+}
+
+//func (r *Rnd) Float64() float64 { return r.Rnd.Float64() }
+//func (r *Rnd) Intn(n int) int   { return r.Rnd.Intn(n) }
+
 
 // Round randomly rounds an int either up or down, weighting the odds according to how far away from the integer it is.
 // If the float is a perfect int, it always chooses that.

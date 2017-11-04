@@ -9,11 +9,11 @@ import (
 	"math"
 	"github.com/genetic-algorithms/mendel-go/utils"
 	"github.com/genetic-algorithms/mendel-go/dna"
-	"github.com/genetic-algorithms/mendel-go/random"
 	"sync"
 	"runtime"
 	"encoding/json"
 	"runtime/debug"
+	"github.com/genetic-algorithms/mendel-go/random"
 )
 
 type RecombinationType uint8
@@ -233,10 +233,8 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 				// Let the 1st thread use the main uniformRandom generator. This has the effect that if there is only 1 thread, we will have the same
 				// sequence of random numbers that we had before concurrency was added (so we can verify the results).
 				newRandom = uniformRandom
-			} else if config.Cfg.Computation.Random_number_seed != 0 {
-				newRandom = rand.New(rand.NewSource(config.Cfg.Computation.Random_number_seed+int64(i)))
 			} else {
-				newRandom = rand.New(rand.NewSource(random.GetSeed()))
+				newRandom = random.RandFactory()
 			}
 
 			beginIndex := segmentStart		// just to be careful, copying segmentStart to a local var so it is different for each go routine invocation
@@ -413,7 +411,7 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 	//config.Verbose(2, "Using ApplyProportProbNoise...")
 
 	// First find max individual fitness (after applying the environmental noise)
-	var maxFitness float64 = 0.0
+	var maxFitness = 0.0
 	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
@@ -947,7 +945,7 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 		// Because remember that when we output the buckets numbers into the file, we add 1 to the index of the bucket, so e.g. bucket 5 (index 4 here) will contain: 4 < count <= 5
 		// (The issue is does a count that is exactly 5% end up in bucket 5 or 6. I think it should go in bucket 5.)
 		// This also handles correctly the case in which the mutation is in every single individual. The mendel-f90/bucket brigade approach would put that in index 100, which doesn't exist.
-		const roundingError float64 = 0.000000000001
+		const roundingError = 0.000000000001
 		trunci := math.Trunc(floati + roundingError)
 		if floati > trunci - roundingError && floati < trunci + roundingError {
 			i = uint32(trunci) - 1
