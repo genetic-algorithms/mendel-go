@@ -146,9 +146,9 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 	p.MeanNumDeleterious = 0.0
 	p.MeanNumNeutral = 0.0
 	p.MeanNumFavorable  = 0.0
-	p.MeanNumDelAllele = 0.0
-	//p.MeanNumNeutAllele = 0.0
-	p.MeanNumFavAllele = 0.0
+	// We do not need to reinitialize these each generation, because they never change after gen 0
+	//p.MeanNumDelAllele = 0.0
+	//p.MeanNumFavAllele = 0.0
 
 	return p
 }
@@ -635,7 +635,7 @@ func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64,
 }
 
 
-// GetInitialAlleleStats returns the average number of deleterious, neutral, favorable initial alleles, and the average fitness factor of each
+// GetInitialAlleleStats returns the average number of deleterious and favorable initial alleles
 //func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float64, float64) {
 func (p *Population) GetInitialAlleleStats() (float64, /*float64,*/ float64) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
@@ -670,6 +670,14 @@ func (p *Population) GetInitialAlleleStats() (float64, /*float64,*/ float64) {
 func (p *Population) ReportInitial(maxGenNum uint32) {
 	config.Verbose(1, "Running with a population size of %d for %d generations with %d threads and reuse_populations=%v", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads, config.Cfg.Computation.Reuse_populations)
 
+	// Report initial alleles if there are any
+	initialVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
+	if config.Cfg.Population.Num_contrasting_alleles > 0 && config.IsVerbose(initialVerboseLevel) {
+		ad, /*an,*/ af /*, avDelAlFit, avFavAlFit*/ := p.GetInitialAlleleStats()
+		//log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
+		log.Printf(" Indiv initial allele detail means: deleterious: %v, favorable: %v", ad, af)
+	}
+
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		// Write header for this file
 		fmt.Fprintln(histWriter, "# Generation  Avg-deleterious Avg-neutral  Avg-favorable")
@@ -703,9 +711,6 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 			d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()
 			//log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
-			ad, /*an,*/ af /*, avDelAlFit, avFavAlFit*/ := p.GetInitialAlleleStats()
-			//log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
-			log.Printf(" Indiv initial allele detail means: deleterious: %v, favorable: %v", ad, af)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
@@ -802,6 +807,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
 		// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
+		utils.Measure.CheckMemory()
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
 			if gcInterval > 0 && (i % int(gcInterval)) == 0 {
@@ -875,6 +881,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
 	}
 
+	utils.Measure.CheckMemory()
 	utils.Measure.Stop("allele-count")
 }
 

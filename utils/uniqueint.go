@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-const MaxUint64 = uint64(18446744073709551615)
+const MAXUINT64 = uint64(18446744073709551615)
 
 // UniqueInt hands out unique integer numbers, with the ability to also give a range to another object
 type UniqueInt struct {
@@ -18,7 +18,7 @@ var GlobalUniqueInt *UniqueInt
 
 // UniqueIntFactory creates the global instance of UniqueInt
 func GlobalUniqueIntFactory() {
-	GlobalUniqueInt = &UniqueInt{lastInt: MaxUint64}
+	GlobalUniqueInt = &UniqueInt{lastInt: MAXUINT64}
 }
 
 

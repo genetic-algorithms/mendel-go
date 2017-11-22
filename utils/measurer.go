@@ -5,12 +5,14 @@ import (
 	"log"
 	"strconv"
 	"sort"
+	"runtime"
 )
 
-// Measure keeps track of how much execution time was spent in various parts of the code
+// Measure keeps track of how much execution time was spent in various parts of the code, and the maximum amount of memory
 type Measurer struct {
 	DeltaTime map[string]time.Time		// holds the start time for 1 duration measurement
 	TotalTime map[string]int64
+	MaxTotalMemory uint64		// the amount of memory this program used
 	Track bool
 }
 
@@ -68,6 +70,14 @@ func (m *Measurer) Stop(codeName string) (delta float64) {
 }
 
 
+func (m *Measurer) CheckMemory() {
+	if !m.Track { return }
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	m.MaxTotalMemory = MaxUint64(m.MaxTotalMemory, mem.Sys)
+}
+
+
 // LogSummary prints to the log all of the total times.
 func (m *Measurer) LogSummary() {
 	if !m.Track { return }
@@ -89,4 +99,7 @@ func (m *Measurer) LogSummary() {
 		if separator == "" { separator = ", " }
 	}
 	log.Printf("Time measurements: %v", str)
+
+	m.CheckMemory()
+	log.Printf("Maximum amount of memory used: %.3f MB\n", float32(m.MaxTotalMemory)/1000000.0)
 }

@@ -2,14 +2,12 @@
 // It handles cmd line args, reads input files, and contains the main generation loop.
 
 /* Order of todos:
-- is jon plotting initial alleles in allele plots?
-- investigate difference in number of alleles between go and f90
 - Compare more runs with mendel-f90
+- Tribes
 - Figure out the delay at the beginning on r4 (and to a lesser extent on m4)
 - (Consider) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)
 - (Maybe not) Make pop reuse work for pop growth runs
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
-- Tribes
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - (When needed) support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
 - stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
@@ -118,6 +116,7 @@ func main() {
 		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
 		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
 		//parentPop = nil 	// give GC a chance to reclaim the previous generation
+		utils.Measure.CheckMemory()
 		if config.Cfg.Computation.Force_gc {
 			utils.Measure.Start("GC")
 			runtime.GC()
@@ -131,6 +130,7 @@ func main() {
 		}
 
 		childrenPop.ReportEachGen(gen, gen == maxGenNum)
+		if gen >= maxGenNum { break }
 		pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
 		parentPop = childrenPop        // for the next iteration
 	}
