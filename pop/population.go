@@ -55,7 +55,7 @@ type Population struct {
 	EnvironNoise              float64                                   // randomness applied to geno fitness calculated from PreSelGenoFitnessVariance, heritability, and non_scaling_noise
 
 	MeanFitness, MinFitness, MaxFitness float64                         // cache summary info about the individuals
-	TotalNumMutations uint32
+	TotalNumMutations uint64
 	MeanNumMutations float64
 
 	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable  float64       // cache some of the stats we usually gather
@@ -578,7 +578,7 @@ func (p *Population) numAlreadyDead(sortedIndexes []IndivRef) (numDead uint32) {
 
 // GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max, and total and mean mutations.
 // Note: this function should only get stats that the individuals already have, because it is called in a minimal verbose level that is meant to be fast.
-func (p *Population) GetFitnessStats() (float64, float64, float64, uint32, float64) {
+func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float64) {
 	// See if we already calculated and cached the values
 	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness, p.TotalNumMutations, p.MeanNumMutations }
 	p.MinFitness = 99.0
@@ -594,7 +594,7 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint32, float
 		}
 		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness
 		}
-		p.TotalNumMutations += ind.NumMutations
+		p.TotalNumMutations += uint64(ind.NumMutations)
 	}
 	popSize := p.GetCurrentSize()
 	p.MeanFitness = p.MeanFitness / float64(popSize)
