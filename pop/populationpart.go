@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"sync"
 	"github.com/genetic-algorithms/mendel-go/utils"
+	"log"
 )
 
 // PopulationPart is a construct used to partition the population for the purpose mating parts of the population
@@ -58,7 +59,8 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unique
 	if len(parentIndices) == 0 { return }
 	// Note: the caller already shuffled the parents
 
-	PopPool.SetEstimatedNumIndivs(p, uint32(float64(len(parentIndices)) * p.Pop.Num_offspring))
+	//PopPool.SetEstimatedNumIndivs(p, uint32(float64(len(parentIndices)) * p.Pop.Num_offspring))
+	p.SetEstimatedNumIndivs(uint32(float64(len(parentIndices)) * p.Pop.Num_offspring))
 
 	// Mate pairs and create the offspring. Now that we have shuffled the parent indices, we can just go 2 at a time thru the indices.
 	for i := 0; i < len(parentIndices) - 1; i += 2 {
@@ -69,7 +71,7 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unique
 		/*newChildren :=*/ parentPop.IndivRefs[dadI].Indiv.Mate(parentPop.IndivRefs[momI].Indiv, p, uniformRandom)
 		//p.Append(newChildren...) 		// <- Mate() already adds the Individuals to this part
 
-		PopPool.FreeParentRefs(dadI, momI)
+		parentPop.FreeParentRefs(dadI, momI)
 		/*
 		if !config.Cfg.Computation.Reuse_populations {
 			//parentPop.IndivRefs[dadI].Indiv.Free()	// <- this doesn't help any more than setting the Indiv ptr to nil
@@ -79,6 +81,42 @@ func (p *PopulationPart) Mate(parentPop *Population, parentIndices []int, unique
 		}
 		*/
 	}
+}
+
+
+// SetEstimatedNumIndivs allocates the array of ptrs to Individuals once to an approx size, instead of appending multiple times.
+// Note: this has to use the member vars of the part (instead of having our own) so it is thread safe.
+func (p *PopulationPart) SetEstimatedNumIndivs(estimatedNumIndivs uint32) {
+	if cap(p.Indivs) == 0 {
+		// This is a brand new part
+		p.Indivs = make([]*Individual, 0, estimatedNumIndivs)    // It is ok if we underestimate the size a little, because we will add individuals with append() anyway.
+		//} else if cap(part.Indivs) < estimatedNumIndivs {
+		//	// This is a repurposed part, but the Indivs array is not big enough. Let append() enlarge it.
+		//	part.Indivs = make([]*Individual, len(part.Indivs), estimatedNumIndivs) 	// setting len to the original array so we can reuse the Individual objects
+	}
+	// else the Indivs array is approx big enough and we will reuse the Individual objects it points to and enlarge as necessary
+	//todo: in the pop growth case we could do a better job of estimating the size we need.
+}
+
+
+// GetIndividual returns the next available Individual to reuse, or creates one if necessary.
+// Note: this has to use the member vars of the part (instead of having our own) so it is thread safe.
+func (p *PopulationPart) GetIndividual() (ind *Individual) {
+	// should we look at cap() instead of len() and test if the ptr to the Individual is nil? Not sure if we ever shrink this slice
+	if p.NextIndivIndex < len(p.Indivs) {
+		if p.Indivs[p.NextIndivIndex] == nil { log.Fatalf("Error: part.Indivs[%v] is nil even though index is < length %v", p.NextIndivIndex, len(p.Indivs))}
+		// We are still within the allocated array and there is an existing Individual object we can reuse
+		//config.Verbose(1, " reusing individual at index %d", part.NextIndivIndex)
+		//ind = p.Indivs[p.NextIndivIndex].Reinitialize()
+	} else {
+		// The Indivs slice is too small. Create an indiv and append it.
+		//config.Verbose(1, " creating new individual at index %d", part.NextIndivIndex)
+		ind = IndividualFactory(p, false)
+		p.Indivs = append(p.Indivs, ind)
+	}
+
+	p.NextIndivIndex++
+	return
 }
 
 

@@ -110,7 +110,7 @@ type Config struct {
 		//Transfer_linkage_blocks bool
 		Force_gc bool
 		Allele_count_gc_interval uint32
-		Reuse_populations bool
+		//Reuse_populations bool
 		Perf_option int
 	}
 }
@@ -176,10 +176,12 @@ func (c *Config) validateAndAdjust() error {
 
 	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
 
+	/*
 	if c.Computation.Reuse_populations && c.Population.Pop_growth_model != "none" { 	//todo: can't use enum for none, because of circular import
 		log.Println("Forcing reuse_populations to false because population growth was specified")
 		c.Computation.Reuse_populations = false
 	}
+	*/
 
 	if c.Tribes.Num_tribes <= 0 { return errors.New("num_tribes can not be <= 0") }
 

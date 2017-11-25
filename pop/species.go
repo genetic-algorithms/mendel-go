@@ -51,7 +51,8 @@ func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
 	random.NextSeed = config.Cfg.Computation.Random_number_seed		// reset the seed so tribes=1 is the same as pre-tribes
 	childrenS = SpeciesFactory()
 	for i := range parentS.Populations {
-		childrenS.Populations[i] = PopPool.GetNextGeneration(parentS.Populations[i], gen)	//TODO: need to make this not a singleton!!!!
+		//childrenS.Populations[i] = PopPool.GetNextGeneration(parentS.Populations[i], gen)	// need to make this not a singleton!
+		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen)	// this creates the PopulationParts too
 	}
 	return
 }
@@ -85,7 +86,7 @@ func (s *Species) Select(uniformRandom *rand.Rand) {
 func (parentS *Species) MoveToNextGeneration(childrenS *Species, gen uint32, lastGen bool) *Species {
 	for i := range parentS.Populations {
 		childrenS.Populations[i].ReportEachGen(gen, lastGen)
-		PopPool.RecyclePopulation(parentS.Populations[i])	//TODO: need to make this not a singleton!!!!
+		//PopPool.RecyclePopulation(parentS.Populations[i])	// need to make this not a singleton!
 	}
 	return childrenS
 }

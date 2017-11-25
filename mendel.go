@@ -42,7 +42,7 @@ func initialize() *rand.Rand {
 	utils.Measure.Start("Total")
 
 	utils.GlobalUniqueIntFactory()
-	pop.PoolFactory()
+	//pop.PoolFactory()
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
@@ -105,17 +105,11 @@ func main() {
 	popMax := config.Cfg.Population.Max_pop_size
 	for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
-		//var newP *pop.Population
-		//if config.Cfg.Computation.Reuse_populations && prevPop != nil {
-		//	newP = prevPop.Reinitialize(population, gen)
-		//} else {
-		//	prevPop = nil 		// give GC a chance to free that population
-		//	newP = pop.PopulationFactory(population, gen)
-		//}
-		childrenPop := pop.PopPool.GetNextGeneration(parentPop, gen)
+		//childrenPop := pop.PopPool.GetNextGeneration(parentPop, gen)
+		childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
 		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
 		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
-		//parentPop = nil 	// give GC a chance to reclaim the previous generation
+		parentPop = nil 	// give GC a chance to reclaim the previous generation
 		utils.Measure.CheckMemory()
 		if config.Cfg.Computation.Force_gc {
 			utils.Measure.Start("GC")
@@ -131,7 +125,7 @@ func main() {
 
 		childrenPop.ReportEachGen(gen, gen == maxGenNum)
 		if gen >= maxGenNum { break }
-		pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
+		//pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
 		parentPop = childrenPop        // for the next iteration
 	}
 

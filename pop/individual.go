@@ -119,7 +119,8 @@ func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, un
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
 func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) *Individual {
 	//offspr := IndividualFactory(newPopPart, false)
-	offspr := PopPool.GetIndividual(newPopPart)	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
+	//offspr := PopPool.GetIndividual(newPopPart)	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
+	offspr := newPopPart.GetIndividual()	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
 	lBsPerChromosome := dad.popPart.Pop.LBsPerChromosome 		// doesn't matter which parent we get this from
 
 	// Loop thru each chromosome and inherit linkage blocks
@@ -129,7 +130,7 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 		var deleterious, neutral, favorable, delAllele, favAllele uint32
 		offsprChr := &offspr.ChromosomesFromDad[c]
 		deleterious, neutral, favorable, delAllele, favAllele = dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
-		offspr.NumMutations += (deleterious + neutral + favorable + delAllele + favAllele)
+		offspr.NumMutations += deleterious + neutral + favorable + delAllele + favAllele
 		offspr.NumDeleterious += deleterious
 		offspr.NumNeutral += neutral
 		offspr.NumFavorable += favorable
@@ -139,7 +140,7 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 		// For your chromosome coming from your mom, combine LBs from her dad and mom
 		offsprChr = &offspr.ChromosomesFromMom[c]
 		deleterious, neutral, favorable, delAllele, favAllele = mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
-		offspr.NumMutations += (deleterious + neutral + favorable + delAllele + favAllele)
+		offspr.NumMutations += deleterious + neutral + favorable + delAllele + favAllele
 		offspr.NumDeleterious += deleterious
 		offspr.NumNeutral += neutral
 		offspr.NumFavorable += favorable

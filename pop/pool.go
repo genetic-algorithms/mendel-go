@@ -1,11 +1,12 @@
 package pop
 
+/* Not currently used, because it is only slightly faster and uses more memory. Kept here for reference...
 import (
 	"github.com/genetic-algorithms/mendel-go/config"
 	"log"
 )
 
-/* Pool is an abstraction on top of object allocation so we can reuse previous populations cleanly. When a new object is
+Pool is an abstraction on top of object allocation so we can reuse previous populations cleanly. When a new object is
 requested, it will return a cleaned up existing one if possible, otherwise it creates a new one.
 Note that this abstraction is not used for the genesis population, because that has different requirements.
 The object hierarchy of a population is (note the difference between objects and ptrs to objects):
@@ -17,7 +18,6 @@ Population
       ChromosomesFromMom []*dna.Chromosome
         []LinkageBlock
           []Mutation
-*/
 type Pool struct {
 	oldPop       *Population // we only support reusing 1 population (and all the objects within it) at a time
 	reuse        bool        // whether or not we are supposed to reuse old populations
@@ -94,7 +94,7 @@ func (p *Pool) SetEstimatedNumIndivs(part *PopulationPart, estimatedNumIndivs ui
 	//	part.Indivs = make([]*Individual, len(part.Indivs), estimatedNumIndivs) 	// setting len to the original array so we can reuse the Individual objects
 	}
 	// else the Indivs array is approx big enough and we will reuse the Individual objects it points to and enlarge as necessary
-	//todo: in the pop growth case we could do a better job of estimating the size we need.
+	// in the pop growth case we could do a better job of estimating the size we need.
 }
 
 
@@ -149,3 +149,4 @@ func (p *Pool) FreeBeforeAlleleCount() {
 	p.parentPop = nil
 	p.childrenPop = nil
 }
+*/
