@@ -21,12 +21,8 @@ type Individual struct {
 	// Note: we currently don't really need to cache these, because p.GetMutationStats caches its values, and the only other function that currently uses these is ind.Report() which only gets called for small populations.
 	//		But it would only save 0.56 MB for 10,000 population, so let's wait and see if we need them cached for more stats in the future.
 	NumDeleterious, NumNeutral, NumFavorable uint32		// cache some of the stats we usually gather
-	//MeanDelFit, MeanFavFit float64
-	NumDelAllele, /*NumNeutAllele,*/ NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
-	//MeanDelAlleleFit, MeanFavAlleleFit float64
+	NumDelAllele, NumFavAllele uint32		// cache some of the stats we usually gather about initial alleles
 
-	//ChromosomesFromDad []*dna.Chromosome
-	//ChromosomesFromMom []*dna.Chromosome
 	ChromosomesFromDad []dna.Chromosome
 	ChromosomesFromMom []dna.Chromosome
 }
@@ -35,24 +31,18 @@ type Individual struct {
 func IndividualFactory(popPart *PopulationPart, _ bool) *Individual {
 	ind := &Individual{
 		popPart: popPart,
-		//ChromosomesFromDad: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
-		//ChromosomesFromMom: make([]*dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 		ChromosomesFromDad: make([]dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 		ChromosomesFromMom: make([]dna.Chromosome, config.Cfg.Population.Haploid_chromosome_number),
 	}
 
-	//if genesis {   // <- always initialize with empty chromosomes and linkage blocks (with no mutations)
-	//for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
-	//for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c] = dna.ChromosomeFactory(popPart.Pop.LBsPerChromosome, genesis) }
-	for c := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[c].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
-	for c := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[c].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
-	//}
+	for i := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[i].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
+	for i := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[i].ChromosomeFactory(popPart.Pop.LBsPerChromosome) }
 
 	return ind
 }
 
 
-// Reinitialize gets an existing/old individual ready for reuse. In addition to their member vars, Individual objects have an array of Chromosomes ptrs. We will end up
+// Not currently used, but kept here in case we want to reuse populations - Reinitialize gets an existing/old individual ready for reuse. In addition to their member vars, Individual objects have an array of Chromosomes ptrs. We will end up
 // overwriting the contents of those Chromosome objects (including their LB array), but we want to reuse the memory allocation of those arrays.
 func (ind *Individual) Reinitialize() *Individual {
 	// Reset the stats
@@ -64,30 +54,10 @@ func (ind *Individual) Reinitialize() *Individual {
 	ind.NumNeutral = 0
 	ind.NumFavorable = 0
 	ind.NumDelAllele = 0
-	//ind.NumNeutAllele = 0
 	ind.NumFavAllele = 0
-
-	/* Chromosome.Meiosis() reinitializes the chromosomes...
-	// ChromosomesFromDad and ChromosomesFromMom have an array of ptrs to existing Chromosomes and we want reuse that memory.
-	for _, c := range ind.ChromosomesFromDad { c.Reinitialize() }
-	for _, c := range ind.ChromosomesFromMom { c.Reinitialize() }
-	// Note that the rest of the contents of the chromosomes and LBs will get reinitialized or overwritten during meiosis
-	*/
 
 	return ind
 }
-
-
-/* Not currently used - FreeChromosomes nils out ptrs to memory that this individual owns, so that GC can reclaim it.
-func (ind *Individual) FreeChromosomes() {
-	// The only ptrs we have are to our chromosomes, which should also free the LBs they own
-	ind.ChromosomesFromDad = []*dna.Chromosome{} 	// replacing the slice should free the previous backing array which will free all the chromosome ptrs in 1 operation
-	ind.ChromosomesFromMom = []*dna.Chromosome{}
-
-	//for i := range ind.ChromosomesFromDad { ind.ChromosomesFromDad[i] = nil }
-	//for i := range ind.ChromosomesFromMom { ind.ChromosomesFromMom[i] = nil }
-}
-*/
 
 
 // GetNumChromosomes returns the number of chromosomes from each parent (we assume they always have the same number from each parent)
@@ -106,20 +76,18 @@ func (ind *Individual) Mate(otherInd *Individual, newPopPart *PopulationPart, un
 		offspr[child] = ind.OneOffspring(otherInd, newPopPart, uniformRandom)
 	}
 
-	// Add mutations to each offspring. Note: this is done after mating is completed for these parents, because as an optimization some of the LBs are
-	// just transferred to the child (not copied). If we added mutations during mating, some children could get the same added mutations.
+	// Add mutations to each offspring. Note: this is done after mating is completed for these parents, because as an optimization
+	// we use copy-on-write for the children LBs. I'm not sure that matters.
 	for _, child := range offspr {
 		child.AddMutations(ind.popPart.Pop.LBsPerChromosome, uniformRandom)
 	}
 
-	return /*offspr*/
+	return
 }
 
 
 // Offspring returns 1 offspring of this person (dad) and the specified person (mom).
 func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart, uniformRandom *rand.Rand) *Individual {
-	//offspr := IndividualFactory(newPopPart, false)
-	//offspr := PopPool.GetIndividual(newPopPart)	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
 	offspr := newPopPart.GetIndividual()	// this gives us an indiv ready to use, with chromosomes and LBs, and ensures it is on the pop part list
 	lBsPerChromosome := dad.popPart.Pop.LBsPerChromosome 		// doesn't matter which parent we get this from
 
@@ -211,10 +179,8 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			for i:=1; i<=int(allelesPerLB); i++ {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
 				// Note: we can use the global UniqueInt object because this method is called before we create go routines.
-				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
 				dna.ChrAppendInitialContrastingAlleles(&ind.ChromosomesFromDad[c], &ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesEvenly++
-				//ind.popPart.Pop.NextMutId += 2
 			}
 
 			// Decide if this LB should get 1 of the remaining alleles
@@ -223,10 +189,8 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 			// else ratioSoFar = 0
 			if ratioSoFar <= desiredRemainderRatio && numWithAllelesRemainder < allelesRemainder {
 				config.Verbose(9, " Appending initial alleles to chromosome[%v].LB[%v]", c, lb)
-				//dna.AppendInitialContrastingAlleles(ind.ChromosomesFromDad[c].LinkageBlocks[lb], ind.ChromosomesFromMom[c].LinkageBlocks[lb], utils.GlobalUniqueInt, uniformRandom)
 				dna.ChrAppendInitialContrastingAlleles(&ind.ChromosomesFromDad[c], &ind.ChromosomesFromMom[c], lb, utils.GlobalUniqueInt, uniformRandom)
 				numWithAllelesRemainder++
-				//ind.popPart.Pop.NextMutId += 2
 			}
 
 			numProcessedLBs++
@@ -236,7 +200,6 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 	ind.NumDelAllele += numAlleles
 	ind.NumFavAllele += numAlleles
 
-	//config.Verbose(5, " Initial alleles given to %v faction of LBs in the individual ((%v+%v)/%v)", float64(numWithAllelesRemainder + numWithAllelesEvenly) / float64(numProcessedLBs), numWithAllelesEvenly, numWithAllelesRemainder, numProcessedLBs)
 	return numWithAllelesRemainder + numWithAllelesEvenly, numProcessedLBs
 }
 
@@ -310,13 +273,9 @@ func SumIndivFitness(ind *Individual) (fitness float64) {
 	for _, c := range ind.ChromosomesFromDad {
 		// Note: the deleterious mutation fitness factors are already negative
 		fitness += c.SumFitness()
-		//for _, m := range lb.DMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
-		//for _, m := range lb.FMutn { if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	for _, c := range ind.ChromosomesFromMom {
 		fitness += c.SumFitness()
-		//for _, m := range lb.DMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
-		//for _, m := range lb.FMutn {	if (m.GetExpressed()) { fitness += m.GetFitnessEffect() } }
 	}
 	// Note: AddMutations() will cache the fitness
 	return
@@ -334,46 +293,14 @@ func MultIndivFitness(_ *Individual) (fitness float64) {
 
 // GetMutationStats returns the number of deleterious, neutral, favorable mutations
 func (ind *Individual) GetMutationStats() (uint32, uint32, uint32) {
-	/* We now count each type of mutation for the individual as we go...
-	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDeleterious > 0 { return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable}
-	ind.NumDeleterious=0;  ind.NumNeutral=0;  ind.NumFavorable=0
-	// Calc the average of each type of mutation: multiply the average from each chromosome and num mutns from each chromosome, then at the end divide by total num mutns
-	for _, c := range ind.ChromosomesFromDad {
-		delet, neut, fav := c.GetMutationStats()
-		ind.NumDeleterious += delet
-		ind.NumNeutral += neut
-		ind.NumFavorable += fav
-	}
-	for _, c := range ind.ChromosomesFromMom {
-		delet, neut, fav := c.GetMutationStats()
-		ind.NumDeleterious += delet
-		ind.NumNeutral += neut
-		ind.NumFavorable += fav
-	}
-	*/
+	// We now count each type of mutation for the individual as we go...
 	return ind.NumDeleterious, ind.NumNeutral, ind.NumFavorable
 }
 
 
 // GetInitialAlleleStats returns the number of deleterious, neutral, favorable initial alleles, and the average fitness factor of deleterious and favorable
 func (ind *Individual) GetInitialAlleleStats() (uint32, uint32) {
-	/* We now count the initial alleles for the individual as we go...
-	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if ind.NumDelAllele > 0 { return ind.NumDelAllele, ind.NumFavAllele}
-	ind.NumDelAllele=0; ind.NumFavAllele=0
-	// Calc the average of each type of allele: multiply the average from each chromosome and num alleles from each chromosome, then at the end divide by total num alleles
-	for _, c := range ind.ChromosomesFromDad {
-		delet, fav := c.GetInitialAlleleStats()
-		ind.NumDelAllele += delet
-		ind.NumFavAllele += fav
-	}
-	for _, c := range ind.ChromosomesFromMom {
-		delet, fav := c.GetInitialAlleleStats()
-		ind.NumDelAllele += delet
-		ind.NumFavAllele += fav
-	}
-	*/
+	// We now count the initial alleles for the individual as we go...
 	return ind.NumDelAllele, ind.NumFavAllele
 }
 
@@ -398,6 +325,5 @@ func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 // Report prints out statistics of this individual. If final==true it could print more details.
 func (ind *Individual) Report(_ bool) {
 	deleterious, neutral, favorable /*, avDelFit, avFavFit*/ := ind.GetMutationStats()
-	//log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d, avg del: %v, avg fav: %v", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable, avDelFit, avFavFit)
 	log.Printf("  Ind: fitness: %v, mutations: %d, deleterious: %d, neutral: %d, favorable: %d", ind.GenoFitness, deleterious+neutral+favorable, deleterious, neutral, favorable)
 }

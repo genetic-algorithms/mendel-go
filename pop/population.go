@@ -10,7 +10,6 @@ import (
 	"github.com/genetic-algorithms/mendel-go/utils"
 	"github.com/genetic-algorithms/mendel-go/dna"
 	"sync"
-	"runtime"
 	"encoding/json"
 	"runtime/debug"
 	"github.com/genetic-algorithms/mendel-go/random"
@@ -26,21 +25,17 @@ const (
 
 // Used as the elements for the Sort routine used for selection, and as indirection to point to individuals in PopulationPart objects
 type IndivRef struct {
-	//Index uint32
-	//Fitness float64
 	Indiv *Individual
 }
 type ByFitness []IndivRef
 func (a ByFitness) Len() int           { return len(a) }
 func (a ByFitness) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-//func (a ByFitness) Less(i, j int) bool { return a[i].Fitness < a[j].Fitness }
 func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].Indiv.PhenoFitness }
 
 
 // Population tracks the tribes and global info about the population. It also handles population-wide actions like mating and selection.
 type Population struct {
-	//indivs []*Individual 	// delete - The backing array for IndexRefs. This ends up being sparse after selection, with many individuals marked dead. Note: we currently don't track males vs. females.
-	Parts []*PopulationPart
+	Parts []*PopulationPart		// Subsets of the pop that are mated in parallel. This contains the backing array for IndexRefs.
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
 	TargetSize uint32        // the target size of this population after selection
@@ -59,14 +54,12 @@ type Population struct {
 	MeanNumMutations float64
 
 	MeanNumDeleterious, MeanNumNeutral, MeanNumFavorable  float64       // cache some of the stats we usually gather
-	//MeanDelFit, MeanFavFit                                float64
 
-	MeanNumDelAllele, /*MeanNumNeutAllele,*/ MeanNumFavAllele float64       // cache some of the stats we usually gather
-	//MeanDelAlleleFit, MeanFavAlleleFit                    float64
+	MeanNumDelAllele, MeanNumFavAllele float64       // cache some of the stats we usually gather
 }
 
 
-// PopulationFactory creates a new population If genNum==0 it create the special genesis population.
+// PopulationFactory creates a new population If genNum==0 it creates the special genesis population.
 func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 	var targetSize uint32
 	if prevPop != nil {
@@ -76,7 +69,6 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 		targetSize = config.Cfg.Basic.Pop_size
 	}
 	p := &Population{
-		//indivs: make([]*Individual, 0, initialSize), 	// allocate the array for the ptrs to the indivs. The actual indiv objects will be appended either in Initialize or as the population grows during mating
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: targetSize,
 	}
@@ -88,26 +80,8 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 
 	if genNum == 0 {
 		// Create individuals (with no mutations) for the genesis generation. (For subsequent generations, individuals are added to the Population object via Mate().
-		/*
-		if config.Cfg.Computation.Reuse_populations {
-			// Need to make the proper number of pop parts in case we reuse this population later
-			//todo: make a reusable iterator class that spreads things out over a list of object
-			segmentSize := uint32(utils.RoundToEven(float64(targetSize) / float64(config.Cfg.Computation.Num_threads)))
-			if segmentSize <= 0 { segmentSize = 2 }
-			for i := uint32(1); i <= config.Cfg.Computation.Num_threads; i++ {
-				thisSegmentSize := utils.MinUint32(segmentSize, targetSize) 	// don't let segmentSize go past the num of indivs left
-				if i == config.Cfg.Computation.Num_threads { thisSegmentSize = targetSize } 	// last part, do everything left
-				//config.Verbose(1, " running PopulationPartFactory with segment size %v", thisSegmentSize)
-				p.Parts = append(p.Parts, PopulationPartFactory(thisSegmentSize, p))
-				targetSize = utils.MaxUint32(targetSize - thisSegmentSize, 0)
-			}
-		} else {
-		*/
-			p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))    // for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
-		//}
+		p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))    // for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
 		p.makeAndFillIndivRefs()
-		//PopPool.FreeChildrenPtrs(false)  // <- can't call this yet because Pool doesn't have a children pop yet
-		//p.FreeChildrenPtrs()  // <- this is done by makeAndFillIndivRefs()
 	} else {
 		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
 		// Mate() will populate PopulationPart with Individuals and run makeAndFillIndivRefs()
@@ -117,7 +91,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 }
 
 
-// Reinitialize recycles a population object for another generation. This saves freeing and reallocating a lot of objects
+// Not currently used, but kept here in case we want to reuse populations - Reinitialize recycles a population object for another generation. This saves freeing and reallocating a lot of objects
 func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Population {
 	// Reinitialize is never called on the genesis population
 	p.TargetSize = Mdl.PopulationGrowth(prevPop, genNum)
@@ -130,7 +104,6 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 	// It already has PopulationPart objects, reinitialize those too
 	for _, part := range p.Parts {
 		part.Reinitialize()
-		//config.Verbose(1, " part has len(Indivs)=%d after Reinitialize", len(part.Indivs))
 	}
 
 	// These member vars stay the same: Num_offspring, LBsPerChromosome
@@ -159,17 +132,7 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 
 // Size returns the current number of individuals in this population
 func (p *Population) GetCurrentSize() uint32 {
-	//return uint32(len(p.indivs))
 	return uint32(len(p.IndivRefs)) }
-
-/*
-// Append adds a person to this population. This is our function (instead of using append() directly), in case in
-// the future we want to allocate additional individuals in bigger chunks for efficiency. See https://blog.golang.org/go-slices-usage-and-internals
-func (p *Population) Append(indivs ...*Individual) {
-	// Note: the initial make of the Indivs array is approximately big enough avoid append having to copy the array in most cases
-	p.indivs = append(p.indivs, indivs ...)
-}
-*/
 
 
 // GenerateInitialAlleles creates the initial contrasting allele pairs (if specified by the config file) and adds them to the population
@@ -182,7 +145,6 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 	var numWithAlleles uint32 = 0 		// so we can calc the ratio so far of indivs we've given alleles to vs. number of indivs we've processed
 	var numLBsWithAlleles uint32
 	var numProcessedLBs uint32
-	//for i, ind := range p.indivs {
 	for i, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		var ratioSoFar float64
@@ -202,22 +164,20 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 
 
 // Mate mates all the pairs of the population, choosing the linkage block at each linkage block position randomly from
-// the mom or dad (as in meiosis), and then returns the new/resulting population.
+// the mom or dad according to the crossover model (as in meiosis), and then returns the new/resulting population.
 // The mating process is:
 // - randomly choose 2 parents
 // - determine number of offspring
 // - for each offspring:
-//   - for each LB position, choose 1 LB from dad (from either his dad or mom) and 1 LB from mom (from either her dad or mom)
+//   - for each LB section, choose 1 LB from dad (from either his dad or mom) and 1 LB from mom (from either her dad or mom)
 //   - add new mutations to random LBs
 //   - add offspring to new population
-//func (p *Population) Mate(uniformRandom *rand.Rand) *Population {
 func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	defer utils.Measure.Start("Mate").Stop("Mate")
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
 	parentIndices := uniformRandom.Perm(int(p.GetCurrentSize()))
-	//config.Verbose(9, "parentIndices: %v\n", parentIndices)
 
 	// Divide parentIndices into segments (whose size is an even number) and schedule a go routine to mate each segment
 	// Note: runtime.GOMAXPROCS(runtime.NumCPU()) is the default, but this statement can be modified to set a different number of CPUs to use
@@ -253,13 +213,11 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.5)
 
 			// Start the concurrent routine for this part of the pop
-			//config.Verbose(1, " running PopulationPartMate with parent segment size %v", endIndex - beginIndex + 1)
 			waitGroup.Add(1)
 			go newPart.Mate(p, parentIndices[beginIndex:endIndex +1], utils.GlobalUniqueInt.DonateRange(numMuts), newRandom, &waitGroup)
 
 			// Prep for next iteration
 			segmentStart = endIndex + 1
-			//p.NextMutId = p.NextMutId + numMuts
 		}
 		// else we are out of elements in parentIndices so do not do anything
 	}
@@ -268,28 +226,12 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	waitGroup.Wait()
 
 	newP.makeAndFillIndivRefs()	// now that we are done creating new individuals, fill in the array of references to them
-	//PopPool.FreeChildrenPtrs(false)
-	//newP.FreeChildrenPtrs()  // <- this is done by makeAndFillIndivRefs()
 
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
 
 	newP.PreSelGenoFitnessMean, newP.PreSelGenoFitnessVariance, newP.PreSelGenoFitnessStDev = newP.CalcFitnessStats()
-
-	//return newP
 }
-
-
-/* Not needed, done by makeAndFillIndivRefs()...
-// FreeChildrenPtrs should be called after IndivRefs points to all of the individuals. This gets rid of the parts references to them,
-// so GC can free individuals as soon as IndivRefs goes away.
-//todo: probably should call this at the end of makeAndFillIndivRefs(), because it needs to be done after that
-func (childrenP *Population) FreeChildrenPtrs() {
-	for _, part := range childrenP.Parts {
-		part.FreeIndivs()
-	}
-}
-*/
 
 
 // Select removes the least fit individuals in the population
@@ -304,7 +246,6 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 
 	// Sort the indexes of the Indivs array by fitness, and mark the least fit individuals as dead
 	p.sortIndexByPhenoFitness()		// this sorts p.IndivRefs
-	//numDead := p.numAlreadyDead(p.IndivRefs)
 	numAlreadyDead := p.getNumDead()
 
 	if numAlreadyDead > 0 {
@@ -319,7 +260,6 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 		if numAlreadyDead < numEliminate {
 			// Mark those that should be eliminated dead. They are sorted by fitness in ascending order, so mark the 1st ones dead.
 			for i := uint32(0); i < numEliminate; i++ {
-				//p.Indivs[indexes[i].Index].Dead = true
 				p.IndivRefs[i].Indiv.Dead = true
 			}
 		}
@@ -327,24 +267,9 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	numDead := p.getNumDead()		// under certain circumstances this could be > the number we wanted to select out
 	p.ReportDeadStats()
 	p.IndivRefs = p.IndivRefs[numDead:]		// re-slice IndivRefs to eliminate the dead individuals
-	//for i, indRef := range p.IndivRefs { if indRef.Indiv.Dead { log.Fatalf("System Error: individual IndivRefs[%v] with pheno-fitness %v and geno-fitness %v is dead but still in IndivRefs.", i, indRef.Indiv.PhenoFitness, indRef.Indiv.GenoFitness) } }	// just checking
 
-	/* We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs.
-	// Compact the Indivs array by moving the live individuals to the 1st p.Size elements. Accumulate stats on the dead along the way.
-	nextIndex := 0
-	for i := 0; i < len(p.indivs); i++ {
-		ind := p.indivs[i]
-		if !ind.Dead {
-			if i > nextIndex {
-				// copy it into the next open spot
-				p.indivs[nextIndex] = ind 		// I think a shallow copy is ok, we only copy the pointers to the LB arrays
-			}
-			// else there are no open slots yet, because we have not encountered dead ones yet
-			nextIndex++
-		}
-	}
-	p.indivs = p.indivs[0:nextIndex] 		// readjust the slice to be only the live individuals
-	*/
+	// We can leave the indivs array sparse (with dead individuals in it), because the IndivRefs array only points to live entries in indivs,
+	// and the indivs array will soon be GC'd or reused.
 
 	return
 }
@@ -360,7 +285,8 @@ func (p *Population) getNumDead() uint32 {
 }
 
 
-// FreeParentRefs eliminates the reference to these 2 parents so gc can reclaim them because we don't need them any more
+// FreeParentRefs eliminates the reference to these 2 parents so gc can reclaim them because we don't need them any more.
+// This is called by populationpart.Mate() after mating these 2 parents.
 func (p *Population) FreeParentRefs(dadIndex int, momIndex int) {
 	// Note: the 2 lines to nil out the indiv reference reduce memory usage, because I think the corresponding PopulationPart ptrs are freed in FreeChildrenPtrs
 	//		a ptr to the individual, and we have no way of finding that index (w/o storing more info).
@@ -408,7 +334,6 @@ func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *ra
 	}
 	*/
 
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		if ind.Dead {
@@ -419,7 +344,6 @@ func ApplyUnrestrictProbNoise(p *Population, envNoise float64, uniformRandom *ra
 			//rnd2 := uniformRandom.Float64()
 			ind.PhenoFitness = ind.PhenoFitness / (uniformRandom.Float64() + 1.0e-15)
 		}
-		//config.Verbose(9, " Individual %v: %v + (%v * %v) = %v, UnrestrictProbNoise: %v / (%v + 1.0e-15) = %v", i, ind.GenoFitness, rnd1, envNoise, fit, fit, rnd2, ind.PhenoFitness)
 		//ind.PhenoFitness = fit * uniformRandom.Float64()  // this has also been suggested instead of the line above, the results are pretty similar
 	}
 }
@@ -434,11 +358,9 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 	But it restricts the percentage of the offspring that can survive to approximately 70-80% (it depends on the spread of the fitness).
 	Therefore, when the reproductive_rate is low (approx < 1.4), the number of surviving offspring may not be large enough to sustain a constant population size.
 	 */
-	//config.Verbose(2, "Using ApplyProportProbNoise...")
 
 	// First find max individual fitness (after applying the environmental noise)
 	var maxFitness = 0.0
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		if ind.Dead {
@@ -452,7 +374,6 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 	if maxFitness <= 0.0 { log.Fatalf("Max individual fitness is < 0 (%v), so whole population must be dead. Exiting.", maxFitness) }
 
 	// Normalize the pheno fitness
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		// The 1st division below produces values in the range (minFitness/maxFitness) - 1. The 2nd division gets the ratio of the
@@ -472,7 +393,6 @@ func ApplyPartialTruncationNoise(p *Population, envNoise float64, uniformRandom 
 	probability selection.  The procedure allows for the correct number of individuals to be eliminated to maintain a constant
 	population size.
 	*/
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		if ind.Dead {
@@ -525,14 +445,12 @@ func FoundersPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
 // CalcFitnessStats returns the mean geno fitness and std deviation
 func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
 	// Calc mean (average)
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		genoFitnessMean += ind.GenoFitness
 	}
 	genoFitnessMean = genoFitnessMean / float64(p.GetCurrentSize())
 
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		genoFitnessVariance += math.Pow(ind.GenoFitness-genoFitnessMean, 2)
@@ -551,7 +469,6 @@ func (p *Population) ReportDeadStats() {
 	minFitness = 99.0
 	maxFitness = -99.0
 	var numDead, numDel, numNeut, numFav uint32
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		//todo: stop when i hit the 1st non-dead individual
@@ -565,12 +482,10 @@ func (p *Population) ReportDeadStats() {
 			if ind.GenoFitness < minFitness {
 				minFitness = ind.GenoFitness
 			}
-			d, n, f /*, avD, avF*/ := ind.GetMutationStats()
+			d, n, f := ind.GetMutationStats()
 			numDel += d
 			numNeut += n
 			numFav += f
-			//avgDelFit += float64(d) * avD
-			//avgFavFit += float64(f) * avF
 		}
 	}
 
@@ -581,25 +496,8 @@ func (p *Population) ReportDeadStats() {
 		avgNeut = float64(numNeut) / float64(numDead)
 		avgFav = float64(numFav) / float64(numDead)
 	}
-	//if numDel > 0 { avgDelFit = avgDelFit / float64(numDel) }
-	//if numFav > 0 { avgFavFit = avgFavFit / float64(numFav) }
-	//config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v, del fitness: %v, fav fitness: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav, avgDelFit, avgFavFit)
 	config.Verbose(elimVerboseLevel, "Avgs of the %d indivs eliminated: avg fitness: %v, min fitness: %v, max fitness: %v, del: %v, neut: %v, fav: %v", numDead, avgFitness, minFitness, maxFitness, avgDel, avgNeut, avgFav)
 }
-
-
-/*
-// numAlreadyDead finds how many individuals (if any) have already been marked dead due to their fitness falling below the
-// allowed threshold when mutations were added during mating. They will be at the beginning.
-func (p *Population) numAlreadyDead(sortedIndexes []IndivRef) (numDead uint32) {
-	for _, index := range sortedIndexes {
-		//if ! p.Indivs[index.Index].Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
-		if ! index.Indiv.Dead { return } 		// since it is sorted by fitness in ascending order, once we hit a live indiv, they all will be, so we can stop counting
-		numDead++
-	}
-	return
-}
-*/
 
 
 // GetFitnessStats returns the average of all the individuals fitness levels, as well as the min and max, and total and mean mutations.
@@ -612,7 +510,6 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float
 	p.MeanFitness = 0.0
 	p.TotalNumMutations = 0
 	p.MeanNumMutations = 0.0
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		p.MeanFitness += ind.GenoFitness
@@ -632,22 +529,17 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float
 // GetMutationStats returns the average number of deleterious, neutral, favorable mutations
 func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64, float64*/) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	//config.Verbose(9, "p.MeanNumDeleterious=%v, p.MeanDelFit=%v", p.MeanNumDeleterious, p.MeanDelFit)
-	if p.MeanNumDeleterious > 0 /*&& p.MeanDelFit < 0.0*/ { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable /*, p.MeanDelFit, p.MeanFavFit*/ }
-	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0  //;  p.MeanDelFit=0.0;  p.MeanFavFit=0.0
+	if p.MeanNumDeleterious > 0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable }
+	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0
 
 	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
 	var delet, neut, fav uint32
-	//for _, ind := range p.indivs {
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		d, n, f /*, avD, avF*/ := ind.GetMutationStats()
-		//config.Verbose(9, "pop: avD=%v, avF=%v", avD, avF)
+		d, n, f := ind.GetMutationStats()
 		delet += d
 		neut += n
 		fav += f
-		//p.MeanDelFit += float64(d) * avD
-		//p.MeanFavFit += float64(f) * avF
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
@@ -655,40 +547,30 @@ func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64,
 		p.MeanNumNeutral = float64(neut) / size
 		p.MeanNumFavorable = float64(fav) / size
 	}
-	//if delet > 0 { p.MeanDelFit = p.MeanDelFit / float64(delet) }
-	//if fav > 0 { p.MeanFavFit = p.MeanFavFit / float64(fav) }
-	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable  //, p.MeanDelFit, p.MeanFavFit
+	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable
 }
 
 
 // GetInitialAlleleStats returns the average number of deleterious and favorable initial alleles
-//func (p *Population) GetInitialAlleleStats() (float64, float64, float64,  float64, float64) {
 func (p *Population) GetInitialAlleleStats() (float64, /*float64,*/ float64) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
-	if p.MeanNumDelAllele > 0 /*&& p.MeanDelAlleleFit < 0.0*/ { return p.MeanNumDelAllele, /*p.MeanNumNeutAllele,*/ p.MeanNumFavAllele /*, p.MeanDelAlleleFit, p.MeanFavAlleleFit*/ }
-	p.MeanNumDelAllele=0.0;  /*p.MeanNumNeutAllele=0.0;*/  p.MeanNumFavAllele=0.0  //;  p.MeanDelAlleleFit=0.0;  p.MeanFavAlleleFit=0.0
+	if p.MeanNumDelAllele > 0 { return p.MeanNumDelAllele, p.MeanNumFavAllele }
+	p.MeanNumDelAllele=0.0;  p.MeanNumFavAllele=0.0
 
 	// For each type of allele, get the average fitness factor and number of alleles for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
-	var delet, /*neut,*/ fav uint32
+	var delet, fav uint32
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
-		//d, n, f, avD, avF := ind.GetInitialAlleleStats()
-		d, /*n,*/ f := ind.GetInitialAlleleStats()
+		d, f := ind.GetInitialAlleleStats()
 		delet += d
-		//neut += n
 		fav += f
-		//p.MeanDelAlleleFit += float64(d) * avD
-		//p.MeanFavAlleleFit += float64(f) * avF
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
 		p.MeanNumDelAllele = float64(delet) / size
-		//p.MeanNumNeutAllele = float64(neut) / size
 		p.MeanNumFavAllele = float64(fav) / size
 	}
-	//if delet > 0 { p.MeanDelAlleleFit = p.MeanDelAlleleFit / float64(delet) }
-	//if fav > 0 { p.MeanFavAlleleFit = p.MeanFavAlleleFit / float64(fav) }
-	return p.MeanNumDelAllele, /*p.MeanNumNeutAllele,*/ p.MeanNumFavAllele  //, p.MeanDelAlleleFit, p.MeanFavAlleleFit
+	return p.MeanNumDelAllele, p.MeanNumFavAllele
 }
 
 
@@ -699,8 +581,7 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 	// Report initial alleles if there are any
 	initialVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
 	if config.Cfg.Population.Num_contrasting_alleles > 0 && config.IsVerbose(initialVerboseLevel) {
-		ad, /*an,*/ af /*, avDelAlFit, avFavAlFit*/ := p.GetInitialAlleleStats()
-		//log.Printf(" Indiv initial allele detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v", ad, an, af, avDelAlFit, avFavAlFit)
+		ad, af := p.GetInitialAlleleStats()
 		log.Printf(" Indiv initial allele detail means: deleterious: %v, favorable: %v", ad, af)
 	}
 
@@ -734,8 +615,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()
 		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
-			d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()
-			//log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, del fitness: %v, fav fitness: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, avDelFit, avFavFit, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
+			d, n, f := p.GetMutationStats()
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
@@ -744,7 +624,6 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
-		//for _, ind := range p.indivs { ind.Report(lastGen) }
 		for _, indRef := range p.IndivRefs {
 			ind := indRef.Indiv
 			ind.Report(lastGen)
@@ -753,8 +632,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
-		d, n, f /*, avDelFit, avFavFit*/ := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
-		//aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
+		d, n, f := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
 		fmt.Fprintf(histWriter, "%d  %v  %v  %v\n", genNum, d, n, f)
 		//histWriter.Flush()  // <-- don't need this because we don't use a buffer for the file
@@ -815,7 +693,6 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	// Free up some memory, because this is going to take a lot
 	if lastGen && config.Cfg.Computation.Allele_count_gc_interval > 0 {
 		debug.SetGCPercent(-1) 		// if force_gc=false we didn't do this earlier
-		//PopPool.FreeBeforeAlleleCount()
 	}
 
 	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
@@ -827,20 +704,15 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		gcInterval = utils.MaxUint32( utils.MinUint32(gcInterval, 500), 100 )
 	}
 	for i := range p.IndivRefs {
-		//ind := p.IndivRefs[i].Indiv
 		p.IndivRefs[i].Indiv.CountAlleles(alleles)
 
 		// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
 		// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
-		utils.Measure.CheckMemory()
+		utils.Measure.CheckAmountMemoryUsed()
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
-			if gcInterval > 0 && (i % int(gcInterval)) == 0 {
-				utils.Measure.Start("GC")
-				runtime.GC()
-				utils.Measure.Stop("GC")
-			}
+			if gcInterval > 0 && (i % int(gcInterval)) == 0 { utils.CollectGarbage() }
 		}
 
 		if i != 0 && gcInterval > 0 && (i % int(gcInterval)) == 0 { config.Verbose(1, "Counted alleles in %d individuals", i) }
@@ -907,7 +779,7 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
 	}
 
-	utils.Measure.CheckMemory()
+	utils.Measure.CheckAmountMemoryUsed()
 	utils.Measure.Stop("allele-count")
 }
 
@@ -959,7 +831,6 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 	}
 }
 
-//func fillBuckets(counts map[uintptr]uint32, popSize uint32, bucketCount uint32, buckets []uint32) {
 func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
 	var totalMutns uint32
 
@@ -983,7 +854,6 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 		if floati > trunci - roundingError && floati < trunci + roundingError {
 			i = uint32(trunci) - 1
 		} else {
-			//log.Printf("floati=%v", floati)
 			i = uint32(floati)
 		}
 
@@ -1000,14 +870,6 @@ func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, b
 
 		buckets[i] += 1
 	}
-
-	/*
-	for bucketIndex, bucketValue := range buckets {
-		bucketNumberString := strconv.Itoa(bucketIndex + 1)
-		bucketValueString := strconv.FormatUint(uint64(bucketValue), 10)
-		file.WriteString(bucketNumberString + "\t" + bucketValueString + "\n")
-	}
-	*/
 
 	return totalMutns
 }
@@ -1028,9 +890,7 @@ func (p *Population) makeAndFillIndivRefs() {
 	for _, part := range p.Parts {
 		for j := range part.Indivs {
 			p.IndivRefs[irIndex].Indiv = part.Indivs[j]
-			//if !config.Cfg.Computation.Reuse_populations {
-				part.Indivs[j] = nil    // eliminate this reference to the individual so garbage collection can delete the individual as soon as we use and eliminate the reference in IndivRefs in Mate() of next gen
-			//}
+			part.Indivs[j] = nil    // eliminate this reference to the individual so garbage collection can delete the individual as soon as we use and eliminate the reference in IndivRefs in Mate() of next gen
 			irIndex++
 		}
 	}

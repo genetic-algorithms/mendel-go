@@ -4,6 +4,7 @@ import (
 	"log"
 	"io/ioutil"
 	"math"
+	"runtime"
 )
 
 func CopyFile(fromFile, toFile string) error {
@@ -81,5 +82,14 @@ func RoundToEven(f float64) int {
 		return int(math.Floor(f))
 	}
 }
+
+
+// CollectGarbage runs the Go GC and times it
+func CollectGarbage() {
+	Measure.Start("GC")
+	runtime.GC()
+	Measure.Stop("GC")
+}
+
 
 func NotImplementedYet(what string) { log.Fatalf("Not implemented yet: %v", what) }

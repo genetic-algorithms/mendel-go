@@ -1,12 +1,23 @@
-// Package main is the main program of the golang version of mendel's accountant.
-// It handles cmd line args, reads input files, and contains the main generation loop.
+/*
+Package main is the main program of the golang version of mendel's accountant. It handles cmd line args, reads input files,
+and contains the main generation loop of mating and selection.
+
+The species and genome are modelled with this hierarchy of classes:
+
+- Species
+ - Populations (tribes)
+  - PopulationPart (to enable parallel writes)
+   - Individuals
+    - Chromosomes
+     - LinkageBlocks
+      - Mutations
+*/
 
 /* Order of todos:
 - Compare more runs with mendel-f90
 - Tribes
 - Figure out the delay at the beginning on r4 (and to a lesser extent on m4)
 - (Consider) Add ability for user to specify a change to any input parameter at any generation (need to use reflection)
-- (Maybe not) Make pop reuse work for pop growth runs
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - (When needed) support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
@@ -25,7 +36,6 @@ import (
 	"github.com/genetic-algorithms/mendel-go/dna"
 	"github.com/pkg/profile"
 	"strings"
-	"runtime"
 	"runtime/debug"
 	"github.com/genetic-algorithms/mendel-go/random"
 )
@@ -42,7 +52,6 @@ func initialize() *rand.Rand {
 	utils.Measure.Start("Total")
 
 	utils.GlobalUniqueIntFactory()
-	//pop.PoolFactory()
 
 	// Set all of the function ptrs for the algorithms we want to use.
 	dna.SetModels(config.Cfg)
@@ -55,7 +64,6 @@ func initialize() *rand.Rand {
 // Shutdown does all the stuff necessary at the end of the run.
 func shutdown() {
 	config.Verbose(5, "Shutting down...\n")
-	//config.FMgr.CloseAllFiles()  // <- done with defer instead
 }
 
 // Main handles cmd line args, reads input files, and contains the main generation loop.
@@ -98,24 +106,18 @@ func main() {
 	parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
 	parentPop.GenerateInitialAlleles(uniformRandom)
 	parentPop.ReportInitial(maxGenNum)
-	//var prevPop *pop.Population
 
 	// Main generation loop.
 	popMaxSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
 	popMax := config.Cfg.Population.Max_pop_size
 	for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
-		//childrenPop := pop.PopPool.GetNextGeneration(parentPop, gen)
 		childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
 		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
 		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
+		utils.Measure.CheckAmountMemoryUsed()
 		parentPop = nil 	// give GC a chance to reclaim the previous generation
-		utils.Measure.CheckMemory()
-		if config.Cfg.Computation.Force_gc {
-			utils.Measure.Start("GC")
-			runtime.GC()
-			utils.Measure.Stop("GC")
-		}
+		if config.Cfg.Computation.Force_gc { utils.CollectGarbage() }
 		childrenPop.Select(uniformRandom)
 
 		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
@@ -124,12 +126,9 @@ func main() {
 		}
 
 		childrenPop.ReportEachGen(gen, gen == maxGenNum)
-		if gen >= maxGenNum { break }
-		//pop.PopPool.RecyclePopulation(parentPop) 		// save this for reuse in the next gen
+		//if gen >= maxGenNum { break }
 		parentPop = childrenPop        // for the next iteration
 	}
 
-	// Finish up
-	//population.ReportFinal(maxGenNum)  // <- this is now handled by pop.ReportEachGen()
-	shutdown()
+	shutdown()	// Finish up
 }

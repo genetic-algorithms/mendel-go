@@ -18,7 +18,7 @@ const (
 )
 
 
-// A simple struct that is embedded in the LB arrays. (Not a ptr to it.)
+// A simple struct that is embedded in the LB arrays. (Not a ptr to it.) A lot of mutations exist, so need to keep its size to a minimum.
 type Mutation struct {
 	Id uint64
 	Type MutationType
@@ -31,22 +31,15 @@ type Mutation struct {
 // We depend on mutations being immutable, once created, because we pass them from parent to child.
 // To enforce that, the members are only available thru getter functions.
 type Mutation struct {
-    //fitnessEffect float64
 	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-	//mType         MutationType	// do not need to store this because it is represented by the Mutation subclasses
-	//dominant      bool    // do not need to store this because we apply this influence during mutation factory
-	//expressed     bool    // do not need to store this because we apply this influence during mutation factory
-	//generation uint16	// the generation number in which this mutation was created. Used for statistics of how long the mutations survive in the pop.
 }
 
 // Member access methods
-//func (m *Mutation) GetFitnessEffect() float64 { return float64(m.fitnessEffect) }
 func (m *Mutation) GetFitnessEffect() float32 { return m.fitnessEffect }
 func (m *Mutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
 
 // This interface enables us to hold subclasses of Mutation in a variable of the base class
 type Mutator interface {
-	//GetFitnessEffect() float64
 	GetFitnessEffect() float32
 	GetPointer() uintptr
 }
@@ -55,21 +48,20 @@ type Mutator interface {
 
 // The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
 type AlleleCount struct {
-	Deleterious         map[uint64]uint32    //map[uintptr]uint32
-	Neutral         map[uint64]uint32    //map[uintptr]uint32
-	Favorable         map[uint64]uint32    //map[uintptr]uint32
-	DelInitialAlleles         map[uint64]uint32    //map[uintptr]uint32
-	FavInitialAlleles         map[uint64]uint32    //map[uintptr]uint32
+	Deleterious         map[uint64]uint32
+	Neutral         map[uint64]uint32
+	Favorable         map[uint64]uint32
+	DelInitialAlleles         map[uint64]uint32
+	FavInitialAlleles         map[uint64]uint32
 }
 
-//func AlleleCountFactory(genNum, popSize uint32) *AlleleCount {
 func AlleleCountFactory() *AlleleCount {
 	ac := &AlleleCount{}
-	ac.Deleterious = make(map[uint64]uint32)    //make(map[uintptr]uint32)
-	ac.Neutral = make(map[uint64]uint32)    //make(map[uintptr]uint32)
-	ac.Favorable = make(map[uint64]uint32)    //make(map[uintptr]uint32)
-	ac.DelInitialAlleles = make(map[uint64]uint32)    //make(map[uintptr]uint32)
-	ac.FavInitialAlleles = make(map[uint64]uint32)    //make(map[uintptr]uint32)
+	ac.Deleterious = make(map[uint64]uint32)
+	ac.Neutral = make(map[uint64]uint32)
+	ac.Favorable = make(map[uint64]uint32)
+	ac.DelInitialAlleles = make(map[uint64]uint32)
+	ac.FavInitialAlleles = make(map[uint64]uint32)
 	return ac
 }
 
@@ -88,17 +80,6 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 	} else {
 		mType = NEUTRAL
 	}
-
-	/* This is the old/wrong way i was doing it...
-	rnd := uniformRandom.Float64()
-	if rnd < config.Cfg.Mutations.Frac_fav_mutn {
-		mType = FAVORABLE
-	} else if rnd < config.Cfg.Mutations.Frac_fav_mutn + config.Cfg.Mutations.Fraction_neutral {
-		mType = NEUTRAL
-	} else {
-		mType = DELETERIOUS
-	}
-	*/
 	return
 }
 
@@ -107,8 +88,8 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 // This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
 func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
 	// Determine if this mutation is dominant or recessive and use that to calc the fitness
-	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
-	if (dominant) {
+	dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+	if dominant {
 		fitnessEffect = float32(Mdl.CalcDelMutationFitness(uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
 		fitnessEffect = float32(Mdl.CalcDelMutationFitness(uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
@@ -122,8 +103,8 @@ func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
 // This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
 func calcFavMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
 	// Determine if this mutation is dominant or recessive and use that to calc the fitness
-	dominant := (config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64())
-	if (dominant) {
+	dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+	if dominant {
 		fitnessEffect = float32(Mdl.CalcFavMutationFitness(uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
 		fitnessEffect = float32(Mdl.CalcFavMutationFitness(uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
@@ -178,67 +159,3 @@ func CalcUniformAlleleFitness(uniformRandom *rand.Rand) float64 {
 		return 2.0 * initial_alleles_mean_effect * uniformRandom.Float64()		// so the average works out to be initial_alleles_mean_effect
 	}
 }
-
-/*
-// DeleteriousMutation represents 1 deleterious mutation in 1 individual.
-type DeleteriousMutation struct {
-	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-}
-
-func DeleteriousMutationFactory(fitnessEffect float32, _ *rand.Rand) *DeleteriousMutation {
-	return &DeleteriousMutation{fitnessEffect: fitnessEffect}
-}
-
-func (m *DeleteriousMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
-func (m *DeleteriousMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
-
-// NeutralMutation represents 1 neutral mutation in 1 individual.
-type NeutralMutation struct {
-	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-}
-
-func NeutralMutationFactory(_ *rand.Rand) *NeutralMutation {
-	return &NeutralMutation{}
-}
-
-func (m *NeutralMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
-func (m *NeutralMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
-
-// FavorableMutation represents 1 favorable mutation in 1 individual.
-type FavorableMutation struct {
-	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-}
-
-func FavorableMutationFactory(fitnessEffect float32, _ *rand.Rand) *FavorableMutation {
-	return &FavorableMutation{fitnessEffect: fitnessEffect}
-}
-
-func (m *FavorableMutation) GetFitnessEffect() float32 { return m.fitnessEffect }
-func (m *FavorableMutation) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
-
-
-// DeleteriousAllele represents 1 deleterious allele in 1 individual.
-type DeleteriousAllele struct {
-	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-}
-
-func DeleteriousAlleleFactory(fitnessEffect float64) *DeleteriousAllele {
-	return &DeleteriousAllele{fitnessEffect: float32(fitnessEffect)}
-}
-
-func (m *DeleteriousAllele) GetFitnessEffect() float32 { return m.fitnessEffect }
-func (m *DeleteriousAllele) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
-
-
-// FavorableAllele represents 1 deleterious allele in 1 individual.
-type FavorableAllele struct {
-	fitnessEffect float32 // this is float32 to save space, and doesn't make any difference in the mean fitness in a typical run until the 9th decimal place.
-}
-
-func FavorableAlleleFactory(fitnessEffect float64) *FavorableAllele {
-	return &FavorableAllele{fitnessEffect: float32(fitnessEffect)}
-}
-
-func (m *FavorableAllele) GetFitnessEffect() float32 { return m.fitnessEffect }
-func (m *FavorableAllele) GetPointer() uintptr { return uintptr(unsafe.Pointer(m)) }
-*/

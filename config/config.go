@@ -125,14 +125,6 @@ func ReadFromFile(filename string) error {
 	Cfg = &Config{} 		// create and set the singleton config
 
 	// 1st read defaults and then apply the specified config file values on top of that
-	/* this is the old code when i was using github.com/naoina/toml ...
-	buf, err := ioutil.ReadFile(DEFAULT_INPUT_FILE)
-	if err != nil { return err }
-	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
-	buf, err = ioutil.ReadFile(filename)
-	if err != nil { return err }
-	if err := toml.Unmarshal(buf, Cfg); err != nil { return err }
-	*/
 	defaultFile := FindDefaultFile()
 	if defaultFile == "" { return errors.New("can not find "+DEFAULT_INPUT_FILE) }
 	log.Printf("Using defaults file %v\n", defaultFile) 	// can not use verbosity here because we have not read the config file yet
@@ -166,9 +158,7 @@ func (c *Config) validateAndAdjust() error {
 		log.Printf("Since %v was not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY)
 		c.Computation.Tracking_threshold = 9.0
 	}
-	//if c.Mutations.Fraction_neutral == 0 { c.Computation.Track_neutrals = false }   // do not actually need this
 	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 {
-		//return errors.New("Error: Does not make sense to set both track_neutrals and a non-zero tracking_threshold.")  // override Track_neutrals instead of returning error
 		c.Computation.Track_neutrals = false
 	}
 
@@ -176,20 +166,13 @@ func (c *Config) validateAndAdjust() error {
 
 	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
 
-	/*
-	if c.Computation.Reuse_populations && c.Population.Pop_growth_model != "none" { 	//todo: can't use enum for none, because of circular import
-		log.Println("Forcing reuse_populations to false because population growth was specified")
-		c.Computation.Reuse_populations = false
-	}
-	*/
-
 	if c.Tribes.Num_tribes <= 0 { return errors.New("num_tribes can not be <= 0") }
 
 	return nil
 }
 
 
-// FindDefaultFile looks for the defaults input file and returns the 1st one it finds. It exists with error if it can't find one.
+// FindDefaultFile looks for the defaults input file and returns the 1st one it finds. It exits with error if it can't find one.
 func FindDefaultFile() string {
 	// If they explicitly told us on the cmd line where it is use that
 	if CmdArgs.DefaultFile != "" {
@@ -213,7 +196,7 @@ func FindDefaultFile() string {
 	return ""		// could not find it
 }
 
-/* toml.Marshal writes floats in a long exponention form not convenient
+/* toml.Marshal writes floats in a long exponent form not convenient
 func (c *Config) WriteToFile(filename string) error {
 	log.Printf("Writing %v...\n", filename)
 	buf, err := toml.Marshal(*c)

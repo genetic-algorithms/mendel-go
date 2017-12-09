@@ -18,10 +18,6 @@ func SpeciesFactory() *Species {
 	return s
 }
 
-/* Tribe questions:
-- How do we report stats and write output files for multiple tribes?
- */
-
 // Initialize inits the populations for gen 0
 func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) {
 	for i, p := range s.Populations {
@@ -51,7 +47,6 @@ func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
 	random.NextSeed = config.Cfg.Computation.Random_number_seed		// reset the seed so tribes=1 is the same as pre-tribes
 	childrenS = SpeciesFactory()
 	for i := range parentS.Populations {
-		//childrenS.Populations[i] = PopPool.GetNextGeneration(parentS.Populations[i], gen)	// need to make this not a singleton!
 		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen)	// this creates the PopulationParts too
 	}
 	return
@@ -86,7 +81,6 @@ func (s *Species) Select(uniformRandom *rand.Rand) {
 func (parentS *Species) MoveToNextGeneration(childrenS *Species, gen uint32, lastGen bool) *Species {
 	for i := range parentS.Populations {
 		childrenS.Populations[i].ReportEachGen(gen, lastGen)
-		//PopPool.RecyclePopulation(parentS.Populations[i])	// need to make this not a singleton!
 	}
 	return childrenS
 }

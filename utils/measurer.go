@@ -70,7 +70,7 @@ func (m *Measurer) Stop(codeName string) (delta float64) {
 }
 
 
-func (m *Measurer) CheckMemory() {
+func (m *Measurer) CheckAmountMemoryUsed() {
 	if !m.Track { return }
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
@@ -100,6 +100,6 @@ func (m *Measurer) LogSummary() {
 	}
 	log.Printf("Time measurements: %v", str)
 
-	m.CheckMemory()
+	m.CheckAmountMemoryUsed()
 	log.Printf("Maximum amount of memory used: %.3f MB\n", float32(m.MaxTotalMemory)/1000000.0)
 }
