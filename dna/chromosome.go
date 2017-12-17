@@ -60,13 +60,14 @@ func (c *Chromosome) TransferLB(newChr *Chromosome, lbIndex int) (uint32, uint32
 func (c *Chromosome) GetNumLinkages() uint32 { return uint32(len(c.LinkageBlocks)) }
 
 
+/* Not used right now because it simply calls the crossover model function, but may bring it back if there is more to do...
 // Meiosis fills in a child chromosome as part of reproduction by implementing the crossover model specified in the config file.
 // This is 1 form of Copy for the Chromosome class.
 func (dad *Chromosome) Meiosis(mom *Chromosome, offspr *Chromosome, lBsPerChromosome uint32, uniformRandom *rand.Rand) (uint32, uint32, uint32, uint32, uint32) {
 	//offspr.Reinitialize() 	// In case it is a recycled chromosome
-
 	return Mdl.Crossover(dad, mom, offspr, lBsPerChromosome, uniformRandom)
 }
+*/
 
 
 // The different implementations of LB crossover to another chromosome during meiosis

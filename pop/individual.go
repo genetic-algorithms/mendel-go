@@ -97,7 +97,8 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 		// For your chromosome coming from your dad, combine LBs from his dad and mom
 		var deleterious, neutral, favorable, delAllele, favAllele uint32
 		offsprChr := &offspr.ChromosomesFromDad[c]
-		deleterious, neutral, favorable, delAllele, favAllele = dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		//deleterious, neutral, favorable, delAllele, favAllele = dad.ChromosomesFromDad[c].Meiosis(&dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		deleterious, neutral, favorable, delAllele, favAllele = dna.Mdl.Crossover(&dad.ChromosomesFromDad[c], &dad.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
 		offspr.NumMutations += deleterious + neutral + favorable + delAllele + favAllele
 		offspr.NumDeleterious += deleterious
 		offspr.NumNeutral += neutral
@@ -107,7 +108,8 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 
 		// For your chromosome coming from your mom, combine LBs from her dad and mom
 		offsprChr = &offspr.ChromosomesFromMom[c]
-		deleterious, neutral, favorable, delAllele, favAllele = mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		//deleterious, neutral, favorable, delAllele, favAllele = mom.ChromosomesFromDad[c].Meiosis(&mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
+		deleterious, neutral, favorable, delAllele, favAllele = dna.Mdl.Crossover(&mom.ChromosomesFromDad[c], &mom.ChromosomesFromMom[c], offsprChr, lBsPerChromosome, uniformRandom)
 		offspr.NumMutations += deleterious + neutral + favorable + delAllele + favAllele
 		offspr.NumDeleterious += deleterious
 		offspr.NumNeutral += neutral

@@ -164,7 +164,7 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 
 
 // Mate mates all the pairs of the population, choosing the linkage block at each linkage block position randomly from
-// the mom or dad according to the crossover model (as in meiosis), and then returns the new/resulting population.
+// the mom or dad according to the crossover model (as in meiosis), and fills in the new/resulting population.
 // The mating process is:
 // - randomly choose 2 parents
 // - determine number of offspring

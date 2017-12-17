@@ -98,8 +98,8 @@ type Config struct {
 		Track_neutrals bool
 		Num_threads uint32
 		Random_number_seed int64
-		Restart_case bool
-		Restart_dump_number uint32
+		//Restart_case bool
+		//Restart_dump_number uint32
 		Plot_allele_gens uint32
 		Omit_first_allele_bin bool
 		Count_duplicate_alleles bool

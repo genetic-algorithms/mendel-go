@@ -21,7 +21,6 @@ The species and genome are modelled with this hierarchy of classes:
 - Improve initial alleles: imitate diagnostics.f90:1351 ff which uses variable MNP to limit the number of alleles to 100000 for statistical sampling and normalizing that graph to be so we don't report hard numbers but ratios- (bruce) compare run results with mendel-f90
 - add stats for length of time mutations have been in population (for both eliminated indivs and current pop)
 - (When needed) support num offspring proportional to fitness (fitness_dependent_fertility in mendel-f90)
-- stop execution when any of these are reached: extinction_threshold, max_del_mutn_per_indiv, max_neu_mutn_per_indiv, max_fav_mutn_per_indiv
  */
 package main
 
@@ -120,8 +119,13 @@ func main() {
 		if config.Cfg.Computation.Force_gc { utils.CollectGarbage() }
 		childrenPop.Select(uniformRandom)
 
+		// Check if we should stop the run
 		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
 			log.Println("Population is extinct. Stopping simulation.")
+			break
+		}
+		if aveFit, _, _, _, _ := childrenPop.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
+			log.Printf("Population fitness is below the extinction threshold of %.3f. Stopping simulation.", config.Cfg.Computation.Extinction_threshold)
 			break
 		}
 
