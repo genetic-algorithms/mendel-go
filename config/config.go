@@ -153,14 +153,14 @@ func (c *Config) validateAndAdjust() error {
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("can not set both allow_back_mutn and a non-zero tracking_threshold") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("setting tracking_threshold with multiplicative_weighting is not yet supported") }
 
-	if c.Computation.Tracking_threshold >= 1.0 && FMgr.IsDir(ALLELE_BINS_DIRECTORY) { return errors.New(ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0") }
-	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) {
-		log.Printf("Since %v was not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY)
+	if c.Computation.Tracking_threshold >= 1.0 && (FMgr.IsDir(ALLELE_BINS_DIRECTORY) || FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY)) {
+		return errors.New(ALLELE_BINS_DIRECTORY+" or "+NORMALIZED_ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0")
+	}
+	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) && !FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY) {
+		log.Printf("Since %v and %v were not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY, NORMALIZED_ALLELE_BINS_DIRECTORY)
 		c.Computation.Tracking_threshold = 9.0
 	}
-	if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 {
-		c.Computation.Track_neutrals = false
-	}
+	//if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { c.Computation.Track_neutrals = false }
 
 	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("if num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0") }
 
