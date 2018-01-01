@@ -613,14 +613,14 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()
-		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
+		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, utils.Measure.GetAmountMemoryUsed(), popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			d, n, f := p.GetMutationStats()
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
-		log.Printf("Gen: %d, Time: %.4f, Gen time: %.4f, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v", genNum, totalTime, genTime, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring)
+		log.Printf("Gen: %d, Time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v", genNum, totalTime, genTime, utils.Measure.GetAmountMemoryUsed(), popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")

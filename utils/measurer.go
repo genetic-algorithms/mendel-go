@@ -78,6 +78,12 @@ func (m *Measurer) CheckAmountMemoryUsed() {
 }
 
 
+// GetAmountMemoryUsed returns the max memory used so far in MB
+func (m *Measurer) GetAmountMemoryUsed() float32 {
+	return float32(m.MaxTotalMemory)/1000000.0
+}
+
+
 // LogSummary prints to the log all of the total times.
 func (m *Measurer) LogSummary() {
 	if !m.Track { return }
@@ -101,5 +107,5 @@ func (m *Measurer) LogSummary() {
 	log.Printf("Time measurements: %v", str)
 
 	m.CheckAmountMemoryUsed()
-	log.Printf("Maximum amount of memory used: %.3f MB\n", float32(m.MaxTotalMemory)/1000000.0)
+	log.Printf("Maximum amount of memory used: %.3f MB\n", m.GetAmountMemoryUsed())
 }
