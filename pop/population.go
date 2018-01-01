@@ -533,13 +533,13 @@ func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64,
 	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0
 
 	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
-	var delet, neut, fav uint32
+	var delet, neut, fav uint64
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		d, n, f := ind.GetMutationStats()
-		delet += d
-		neut += n
-		fav += f
+		delet += uint64(d)
+		neut += uint64(n)
+		fav += uint64(f)
 	}
 	size := float64(p.GetCurrentSize())
 	if size > 0 {
