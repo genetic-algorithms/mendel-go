@@ -109,7 +109,8 @@ func main() {
 	// Main generation loop.
 	popMaxSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
 	popMax := config.Cfg.Population.Max_pop_size
-	for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
+	//for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
+	for gen := uint32(1); ; gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
 		childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
 		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
@@ -120,17 +121,24 @@ func main() {
 		childrenPop.Select(uniformRandom)
 
 		// Check if we should stop the run
-		if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
+		lastGen := false
+		if maxGenNum != 0 && gen >= maxGenNum {
+			lastGen = true
+		} else if popMaxSet && childrenPop.GetCurrentSize() >= popMax {
+			log.Printf("Population has reached the max specified value of %d. Stopping simulation.", popMax)
+			lastGen = true
+		} else if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
+			// Chcek if we don't have enough individuals to mate
 			log.Println("Population is extinct. Stopping simulation.")
-			break
-		}
-		if aveFit, _, _, _, _ := childrenPop.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
+			lastGen = true
+		} else if aveFit, _, _, _, _ := childrenPop.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
+			// Check if the pop fitness is below the threashold
 			log.Printf("Population fitness is below the extinction threshold of %.3f. Stopping simulation.", config.Cfg.Computation.Extinction_threshold)
-			break
+			lastGen = true
 		}
 
-		childrenPop.ReportEachGen(gen, gen == maxGenNum)
-		//if gen >= maxGenNum { break }
+		childrenPop.ReportEachGen(gen, lastGen)
+		if lastGen { break }
 		parentPop = childrenPop        // for the next iteration
 	}
 
