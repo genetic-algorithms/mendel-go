@@ -143,11 +143,15 @@ func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *ra
 			mType = child.ChromosomesFromMom[chr].AppendMutation(lbInChr, popPart.MyUniqueInt.NextInt(), uniformRandom)
 		}
 		switch mType {
-		case dna.DELETERIOUS:
+		case dna.DELETERIOUS_DOMINANT:
+			fallthrough
+		case dna.DELETERIOUS_RECESSIVE:
 			child.NumDeleterious++
 		case dna.NEUTRAL:
 			child.NumNeutral++
-		case dna.FAVORABLE:
+		case dna.FAVORABLE_DOMINANT:
+			fallthrough
+		case dna.FAVORABLE_RECESSIVE:
 			child.NumFavorable++
 		}
 	}

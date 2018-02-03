@@ -36,11 +36,13 @@ func (lb *LinkageBlock) GetNumMutations() uint32 {
 func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (mType MutationType, fitnessEffect float32) {
 	mType = CalcMutationType(uniformRandom)
 	switch mType {
-	case DELETERIOUS:
-		fitnessEffect = calcDelMutationAttrs(uniformRandom)
+	case DELETERIOUS_DOMINANT:
+		fallthrough
+	case DELETERIOUS_RECESSIVE:
+		fitnessEffect = calcDelMutationAttrs(mType, uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			lb.appendMutn(Mutation{Id: mutId, Type: DELETERIOUS})
+			lb.appendMutn(Mutation{Id: mutId, Type: mType})
 		}
 		lb.numDeleterious++
 		lb.fitnessEffect += fitnessEffect		// currently only the additive combination model is supported, so this is appropriate
@@ -49,11 +51,13 @@ func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (
 			lb.appendMutn(Mutation{Id: mutId, Type: NEUTRAL})
 		}
 		lb.numNeutrals++
-	case FAVORABLE:
-		fitnessEffect = calcFavMutationAttrs(uniformRandom)
+	case FAVORABLE_DOMINANT:
+		fallthrough
+	case FAVORABLE_RECESSIVE:
+		fitnessEffect = calcFavMutationAttrs(mType, uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			lb.appendMutn(Mutation{Id: mutId, Type: FAVORABLE})
+			lb.appendMutn(Mutation{Id: mutId, Type: mType})
 		}
 		lb.numFavorable++
 		lb.fitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
@@ -134,7 +138,9 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 	for _, m := range lb.mutn {
 		id := m.Id
 		switch m.Type {
-		case DELETERIOUS:
+		case DELETERIOUS_DOMINANT:
+			fallthrough
+		case DELETERIOUS_RECESSIVE:
 			if config.Cfg.Computation.Count_duplicate_alleles {
 				allelesForThisIndiv.Deleterious[id] += 1
 			} else {
@@ -146,7 +152,9 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 			} else {
 				allelesForThisIndiv.Neutral[id] = 1
 			}
-		case FAVORABLE:
+		case FAVORABLE_DOMINANT:
+			fallthrough
+		case FAVORABLE_RECESSIVE:
 			if config.Cfg.Computation.Count_duplicate_alleles {
 				allelesForThisIndiv.Favorable[id] += 1
 			} else {

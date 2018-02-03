@@ -8,12 +8,15 @@ import (
 	//"unsafe"
 )
 
+// Note: we have a lot of mutations, so to keep the size of each to a min, store del/fav and dom/rec in same enum
 type MutationType uint8
 const (
-	DELETERIOUS MutationType = iota
+	DELETERIOUS_DOMINANT MutationType = iota
+	DELETERIOUS_RECESSIVE MutationType = iota
 	NEUTRAL MutationType = iota
-	FAVORABLE MutationType = iota
-	DEL_ALLELE MutationType = iota
+	FAVORABLE_DOMINANT MutationType = iota
+	FAVORABLE_RECESSIVE MutationType = iota
+	DEL_ALLELE MutationType = iota  // Note: for now we assume that all initial contrasting alleles are co-dominant, so we don't have to store dominant/recessive
 	FAV_ALLELE MutationType = iota
 )
 
@@ -74,9 +77,19 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 	// Frac_fav_mutn is the fraction of the non-neutral mutations that are favorable.
 	rnd := uniformRandom.Float64()
 	if rnd < config.Cfg.Mutations.Frac_fav_mutn * (1.0 - config.Cfg.Mutations.Fraction_neutral) {
-		mType = FAVORABLE
+		dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+		if dominant {
+			mType = FAVORABLE_DOMINANT
+		} else {
+			mType = FAVORABLE_RECESSIVE
+		}
 	} else if rnd < 1.0 - config.Cfg.Mutations.Fraction_neutral {
-		mType = DELETERIOUS
+		dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+		if dominant {
+			mType = DELETERIOUS_DOMINANT
+		} else {
+			mType = DELETERIOUS_RECESSIVE
+		}
 	} else {
 		mType = NEUTRAL
 	}
@@ -86,10 +99,11 @@ func CalcMutationType(uniformRandom *rand.Rand) (mType MutationType) {
 
 // calcDelMutationAttrs determines the attributes of a new mutation, based on a random number and the config params.
 // This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
-func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+//func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+func calcDelMutationAttrs(mType MutationType, uniformRandom *rand.Rand) (fitnessEffect float32) {
 	// Determine if this mutation is dominant or recessive and use that to calc the fitness
-	dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
-	if dominant {
+	//dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+	if mType == DELETERIOUS_DOMINANT {
 		fitnessEffect = float32(Mdl.CalcDelMutationFitness(uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
 		fitnessEffect = float32(Mdl.CalcDelMutationFitness(uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
@@ -101,10 +115,11 @@ func calcDelMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
 
 // calcFavMutationAttrs determines the attributes of a new mutation, based on a random number and the config params.
 // This is used in the subclass factory to initialize the base Mutation class members, and in LB AppendMutation() if it is untracked.
-func calcFavMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+//func calcFavMutationAttrs(uniformRandom *rand.Rand) (fitnessEffect float32) {
+func calcFavMutationAttrs(mType MutationType, uniformRandom *rand.Rand) (fitnessEffect float32) {
 	// Determine if this mutation is dominant or recessive and use that to calc the fitness
-	dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
-	if dominant {
+	//dominant := config.Cfg.Mutations.Fraction_recessive < uniformRandom.Float64()
+	if mType == FAVORABLE_DOMINANT {
 		fitnessEffect = float32(Mdl.CalcFavMutationFitness(uniformRandom) * config.Cfg.Mutations.Dominant_hetero_expression)
 	} else {
 		fitnessEffect = float32(Mdl.CalcFavMutationFitness(uniformRandom) * config.Cfg.Mutations.Recessive_hetero_expression)
