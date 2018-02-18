@@ -9,20 +9,14 @@ import (
 
 // Supported file names. Do we need to make this a literal map to be able to check inputted file names??
 const (
-	HISTORY_FILENAME string = "mendel.hst"
-	FITNESS_FILENAME string = "mendel.fit"		// this one is faster to produce than mendel.hst
-	ALLELE_BINS_DIRECTORY string = "allele-bins/"
-	NORMALIZED_ALLELE_BINS_DIRECTORY string = "normalized-allele-bins/"
-	/*
-	DELETERIOUS_CSV string = "deleterious.csv"
-	NEUTRAL_CSV string = "neutral.csv"
-	FAVORABLE_CSV string = "favorable.csv"
-	DEL_ALLELE_CSV string = "del_allele.csv"
-	FAV_ALLELE_CSV string = "fav_allele.csv"
-	*/
+	HISTORY_FILENAME = "mendel.hst"
+	FITNESS_FILENAME = "mendel.fit"		// this one is faster to produce than mendel.hst
+	ALLELE_BINS_DIRECTORY = "allele-bins/"
+	NORMALIZED_ALLELE_BINS_DIRECTORY = "normalized-allele-bins/"
+	DISTRIBUTION_DIRECTORY = "allele-distribution/"
 )
 // Apparently this can't be a const because a map literal isn't a const in go
-var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1,}
+var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DIRECTORY: 1,}
 
 // Not using buffered io because we need write to be flushed every generation to support restart
 //type FileElem struct {
@@ -47,13 +41,22 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 	if filesToOutput == "" { return FMgr }
 
 	// Open all of the files and put in the map
-	fileNames := regexp.MustCompile(`,\s*`).Split(filesToOutput, -1)
+	var fileNames []string
+	if filesToOutput == "*" {
+		// They want all files/dirs output
+		fileNames = make([]string, 0, len(VALID_FILE_NAMES))
+		for k := range VALID_FILE_NAMES {
+			fileNames = append(fileNames, k)
+		}
+	} else {
+		// They gave us a list of file/dir names
+		fileNames = regexp.MustCompile(`,\s*`).Split(filesToOutput, -1)
+	}
 	Verbose(5, "Opening files for writing: %v", fileNames)
 	if len(fileNames) > 0 {
 		// Make sure output directory exists
 		if err := os.MkdirAll(dataFilePath, 0755); err != nil { log.Fatalf("Error creating data_file_path %v: %v", dataFilePath, err) }
 	}
-	//FMgr.Files = make(map[string]*os.File)
 	for _, f := range fileNames {
 		// Check the input file name against our list of valid ones
 		if _, ok := VALID_FILE_NAMES[f]; !ok { log.Fatalf("Error: %v specified in files_to_output is not an output file or directory name we support.", f) }
@@ -66,7 +69,6 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 		} else {
 			// f is a single file, open it
 			filePath := dataFilePath + "/" + f
-			//file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0664)
 			file, err := os.Create(filePath)
 			if err != nil { log.Fatal(err) } 	// for now, if we can't open a file, just bail
 			//FMgr.Files[f] = FileElem{file, bufio.NewWriter(file)}

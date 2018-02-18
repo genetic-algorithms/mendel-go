@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"runtime"
+	"github.com/genetic-algorithms/mendel-go/utils"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -119,6 +120,19 @@ type Config struct {
 // It gets set in ReadFromFile().
 var Cfg *Config
 
+// These values are computed from the Config params and used in several places in the code
+type ComputedValues struct {
+	Lb_modulo float64
+	Alpha_del float64
+	Alpha_fav float64
+	Gamma_del float64
+	Gamma_fav float64
+	Del_scale float64		// not sure if i really need these
+	Fav_scale float64
+}
+
+var Computed *ComputedValues
+
 // ReadFromFile reads the specified input file and parses all of the values into the Config struct.
 // This is also the factory method for the Config class and will store the created instance in this packages Cfg var.
 func ReadFromFile(filename string) error {
@@ -139,6 +153,7 @@ func ReadFromFile(filename string) error {
 	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 
 	if err := Cfg.validateAndAdjust(); err != nil { log.Fatalln(err) }
+	Computed = ComputedValuesFactory()
 	return nil
 }
 
@@ -153,11 +168,11 @@ func (c *Config) validateAndAdjust() error {
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("can not set both allow_back_mutn and a non-zero tracking_threshold") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("setting tracking_threshold with multiplicative_weighting is not yet supported") }
 
-	if c.Computation.Tracking_threshold >= 1.0 && (FMgr.IsDir(ALLELE_BINS_DIRECTORY) || FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY)) {
-		return errors.New(ALLELE_BINS_DIRECTORY+" or "+NORMALIZED_ALLELE_BINS_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0")
+	if c.Computation.Tracking_threshold >= 1.0 && (FMgr.IsDir(ALLELE_BINS_DIRECTORY) || FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY) || FMgr.IsDir(DISTRIBUTION_DIRECTORY)) {
+		return errors.New(ALLELE_BINS_DIRECTORY+", "+NORMALIZED_ALLELE_BINS_DIRECTORY+", or "+DISTRIBUTION_DIRECTORY+" file output was requested, but no alleles can be plotted when tracking_threshold >= 1.0")
 	}
-	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) && !FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY) {
-		log.Printf("Since %v and %v were not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY, NORMALIZED_ALLELE_BINS_DIRECTORY)
+	if !FMgr.IsDir(ALLELE_BINS_DIRECTORY) && !FMgr.IsDir(NORMALIZED_ALLELE_BINS_DIRECTORY) && !FMgr.IsDir(DISTRIBUTION_DIRECTORY) {
+		log.Printf("Since %v, %v, and %v were not requested to be written, setting tracking_threshold=9.0 to save space/time\n", ALLELE_BINS_DIRECTORY, NORMALIZED_ALLELE_BINS_DIRECTORY, DISTRIBUTION_DIRECTORY)
 		c.Computation.Tracking_threshold = 9.0
 	}
 	//if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { c.Computation.Track_neutrals = false }
@@ -169,6 +184,47 @@ func (c *Config) validateAndAdjust() error {
 	if c.Tribes.Num_tribes <= 0 { return errors.New("num_tribes can not be <= 0") }
 
 	return nil
+}
+
+
+func ComputedValuesFactory() (c *ComputedValues) {
+	c = &ComputedValues{}
+	Log := math.Log		// can't use log() because there is a package named that
+	exp := math.Exp
+	pow := math.Pow
+	max_fav_fitness_gain := Cfg.Mutations.Max_fav_fitness_gain
+	tracking_threshold := utils.MaxFloat64(1.0/Cfg.Mutations.Genome_size, float64(Cfg.Computation.Tracking_threshold))
+	high_impact_mutn_threshold := Cfg.Mutations.High_impact_mutn_threshold
+	high_impact_mutn_fraction := Cfg.Mutations.High_impact_mutn_fraction
+
+	// Taken from mendel-f90/init.f90
+	c.Lb_modulo = (pow(2,30)-2) / float64(Cfg.Population.Num_linkage_subunits)
+
+	c.Alpha_del = Log(Cfg.Mutations.Genome_size)
+	if Cfg.Mutations.Max_fav_fitness_gain > 0.0 {
+		c.Alpha_fav = Log(Cfg.Mutations.Genome_size * Cfg.Mutations.Max_fav_fitness_gain)
+	} else {
+		c.Alpha_fav = c.Alpha_del
+	}
+
+	c.Gamma_del = Log(-Log(high_impact_mutn_threshold) / c.Alpha_del) / Log(high_impact_mutn_fraction)
+	c.Gamma_fav = Log(-Log(high_impact_mutn_threshold) / c.Alpha_fav) / Log(high_impact_mutn_fraction)
+
+	if tracking_threshold <= 1.0/Cfg.Mutations.Genome_size {
+		c.Del_scale = 1. / (c.Lb_modulo - 2)
+		c.Fav_scale = 1. / (c.Lb_modulo - 2)
+	} else if tracking_threshold >= 1.0 {
+		c.Del_scale = 0. // dont track any mutations
+		c.Fav_scale = 0.
+	} else {
+		c.Del_scale = exp(Log(-Log(tracking_threshold)/c.Alpha_del) / c.Gamma_del) / (c.Lb_modulo - 2)
+		if Cfg.Mutations.Max_fav_fitness_gain > 0. {
+			c.Fav_scale = exp(Log(-Log(tracking_threshold / max_fav_fitness_gain)/c.Alpha_fav)/c.Gamma_fav) / (c.Lb_modulo - 2)
+		} else {
+			c.Fav_scale = 0.
+		}
+	}
+	return
 }
 
 

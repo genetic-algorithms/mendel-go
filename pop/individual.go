@@ -320,11 +320,27 @@ func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 
 	// Add the alleles found for this individual to the alleles map for the whole population
 	// Note: map returns the zero value of the value type for keys which are not yet in the map (zero value for int is 0), so we do not need to check if it is there with: if count, ok := alleles.Deleterious[id]; ok {
-	for id, num := range allelesForThisIndiv.Deleterious { alleles.Deleterious[id] += num }
-	for id, num := range allelesForThisIndiv.Neutral { alleles.Neutral[id] += num }
-	for id, num := range allelesForThisIndiv.Favorable { alleles.Favorable[id] += num }
-	for id, num := range allelesForThisIndiv.DelInitialAlleles { alleles.DelInitialAlleles[id] += num }
-	for id, num := range allelesForThisIndiv.FavInitialAlleles { alleles.FavInitialAlleles[id] += num }
+	for id, al := range allelesForThisIndiv.DeleteriousDom {
+		alleles.DeleteriousDom[id] = dna.Allele{Count: alleles.DeleteriousDom[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.DeleteriousRec {
+		alleles.DeleteriousRec[id] = dna.Allele{Count: alleles.DeleteriousRec[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.Neutral {
+		alleles.Neutral[id] = dna.Allele{Count: alleles.Neutral[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.FavorableDom {
+		alleles.FavorableDom[id] = dna.Allele{Count: alleles.FavorableDom[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.FavorableRec {
+		alleles.FavorableRec[id] = dna.Allele{Count: alleles.FavorableRec[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.DelInitialAlleles {
+		alleles.DelInitialAlleles[id] = dna.Allele{Count: alleles.DelInitialAlleles[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
+	for id, al := range allelesForThisIndiv.FavInitialAlleles {
+		alleles.FavInitialAlleles[id] = dna.Allele{Count: alleles.FavInitialAlleles[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
+	}
 }
 
 

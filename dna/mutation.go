@@ -25,7 +25,7 @@ const (
 type Mutation struct {
 	Id uint64
 	Type MutationType
-	// When created, we add the fitness effect to the LB, so we don't have to store it here.
+	FitnessEffect float32	// even tho we accumulate the fitness in the LB as we go, we need to save this for allele analysis
 }
 
 /* We don't get much benefit from having this as a base class (only 1 common field), and i think it is more efficient to
@@ -48,23 +48,32 @@ type Mutator interface {
 }
 */
 
+type Allele struct {
+	Count         uint32
+	FitnessEffect float32
+}
 
-// The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. Note: this is defined here instead of population.go to avoid circular dependencies
+// The number of occurrences of each allele (both mutations and initial alleles) in 1 generation. The map key is the unique id of mutation.
+// Note: this is defined here instead of population.go to avoid circular dependencies
 type AlleleCount struct {
-	Deleterious         map[uint64]uint32
-	Neutral         map[uint64]uint32
-	Favorable         map[uint64]uint32
-	DelInitialAlleles         map[uint64]uint32
-	FavInitialAlleles         map[uint64]uint32
+	DeleteriousDom         map[uint64]Allele
+	DeleteriousRec         map[uint64]Allele
+	Neutral         map[uint64]Allele
+	FavorableDom         map[uint64]Allele
+	FavorableRec         map[uint64]Allele
+	DelInitialAlleles         map[uint64]Allele
+	FavInitialAlleles         map[uint64]Allele
 }
 
 func AlleleCountFactory() *AlleleCount {
 	ac := &AlleleCount{}
-	ac.Deleterious = make(map[uint64]uint32)
-	ac.Neutral = make(map[uint64]uint32)
-	ac.Favorable = make(map[uint64]uint32)
-	ac.DelInitialAlleles = make(map[uint64]uint32)
-	ac.FavInitialAlleles = make(map[uint64]uint32)
+	ac.DeleteriousDom = make(map[uint64]Allele)
+	ac.DeleteriousRec = make(map[uint64]Allele)
+	ac.Neutral = make(map[uint64]Allele)
+	ac.FavorableDom = make(map[uint64]Allele)
+	ac.FavorableRec = make(map[uint64]Allele)
+	ac.DelInitialAlleles = make(map[uint64]Allele)
+	ac.FavInitialAlleles = make(map[uint64]Allele)
 	return ac
 }
 
@@ -140,15 +149,16 @@ func CalcUniformFavMutationFitness(uniformRandom *rand.Rand) float64 { return un
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311
 func CalcWeibullDelMutationFitness(uniformRandom *rand.Rand) float64 {
-	alphaDel := math.Log(config.Cfg.Mutations.Genome_size)
-	gammaDel := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alphaDel) /
-	             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
+	//alphaDel := math.Log(config.Cfg.Mutations.Genome_size)
+	//gammaDel := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / config.Computed.alpha_del) /
+	//             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return -math.Exp(-alphaDel * math.Pow(uniformRandom.Float64(), gammaDel))
+	return -math.Exp(-config.Computed.Alpha_del * math.Pow(uniformRandom.Float64(), config.Computed.Gamma_del))
 }
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311 and mutation.f90 line 104
 func CalcWeibullFavMutationFitness(uniformRandom *rand.Rand) float64 {
+	/*
 	var alphaFav float64
 	if config.Cfg.Mutations.Max_fav_fitness_gain > 0.0 {
 		alphaFav = math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
@@ -157,8 +167,9 @@ func CalcWeibullFavMutationFitness(uniformRandom *rand.Rand) float64 {
 	}
 	gammaFav := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / alphaFav) /
 	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
+	*/
 
-	return config.Cfg.Mutations.Max_fav_fitness_gain * math.Exp(-alphaFav * math.Pow(uniformRandom.Float64(), gammaFav))
+	return config.Cfg.Mutations.Max_fav_fitness_gain * math.Exp(-config.Computed.Alpha_fav* math.Pow(uniformRandom.Float64(), config.Computed.Gamma_fav))
 }
 
 

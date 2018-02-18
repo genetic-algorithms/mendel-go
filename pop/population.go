@@ -653,8 +653,13 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 
 	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
-	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
-		p.outputAlleles(genNum, popSize, lastGen)
+	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+		utils.Measure.Start("allele-count")
+		alleles := p.getAlleles(genNum, popSize, lastGen)
+		p.outputAlleleBins(genNum, popSize, lastGen, alleles)
+		p.outputAlleleDistribution(genNum, popSize, lastGen, alleles)
+		utils.Measure.CheckAmountMemoryUsed()
+		utils.Measure.Stop("allele-count")
 	}
 
 	utils.Measure.Stop("ReportEachGen")
@@ -685,18 +690,15 @@ type NormalizedBuckets struct {
 }
 
 
-// outputAlleles gathers all of the alleles in this generation, calculates the bins, and outputs them to a file
-func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
-	utils.Measure.Start("allele-count")
-	var deleterious, neutral, favorable, delAllele, favAllele uint32
-
+// getAlleles gathers all of the alleles in this generation and returns them
+func (p *Population) getAlleles(genNum, popSize uint32, lastGen bool) (alleles *dna.AlleleCount) {
 	// Free up some memory, because this is going to take a lot
 	if lastGen && config.Cfg.Computation.Allele_count_gc_interval > 0 {
 		debug.SetGCPercent(-1) 		// if force_gc=false we didn't do this earlier
 	}
 
 	// Count the alleles from all individuals. We end up with maps of mutation ids and the number of times each occurred
-	alleles := dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
+	alleles = dna.AlleleCountFactory() 		// as we count, the totals are gathered in this struct
 	gcInterval := config.Cfg.Computation.Allele_count_gc_interval
 	if gcInterval > 0 && gcInterval < 100 {
 		// Interpret this as a %, with a min and max bound
@@ -717,6 +719,13 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 
 		if i != 0 && gcInterval > 0 && (i % int(gcInterval)) == 0 { config.Verbose(1, "Counted alleles in %d individuals", i) }
 	}
+	return
+}
+
+
+// outputAlleleBins calculates the bins using the alleles struct, and outputs them to a file
+func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alleles *dna.AlleleCount) {
+	var deleteriousDom, deleteriousRec, neutral, favorableDom, favorableRec, delAllele, favAllele uint32
 
 	// Write the plot file for each type of mutation/allele
 	bucketCount := uint32(100)		// we could put this in the config file if we need to
@@ -730,14 +739,16 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	}
 
 	bucketJson.Deleterious = make([]uint32, bucketCount)
-	deleterious = fillBuckets(alleles.Deleterious, popSize, bucketCount, bucketJson.Deleterious)
+	deleteriousDom = fillBuckets(alleles.DeleteriousDom, popSize, bucketCount, bucketJson.Deleterious)
+	deleteriousRec = fillBuckets(alleles.DeleteriousRec, popSize, bucketCount, bucketJson.Deleterious)
 
 	// Note: we do this even when there are no neutrals, because the plotting software needs all 0's in that case
 	bucketJson.Neutral = make([]uint32, bucketCount)
 	neutral = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 
 	bucketJson.Favorable = make([]uint32, bucketCount)
-	favorable = fillBuckets(alleles.Favorable, popSize, bucketCount, bucketJson.Favorable)
+	favorableDom = fillBuckets(alleles.FavorableDom, popSize, bucketCount, bucketJson.Favorable)
+	favorableRec = fillBuckets(alleles.FavorableRec, popSize, bucketCount, bucketJson.Favorable)
 
 	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
 	delAllele = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
@@ -755,14 +766,14 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 		// This will affect both the allele bin output and the normalized output
 	}
 
-	totalMutns := deleterious + neutral + favorable + delAllele + favAllele
+	totalMutns := deleteriousDom + deleteriousRec + neutral + favorableDom + favorableRec + delAllele + favAllele
 	var countingStr string
 	if config.Cfg.Computation.Count_duplicate_alleles {
 		countingStr = "counting duplicates"
 	} else {
 		countingStr = "filtering out duplicates"
 	}
-	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleterious: %d, neutral: %d, favorable: %d, del initial: %d, fav initial: %d", countingStr, totalMutns, deleterious, neutral, favorable, delAllele, favAllele)
+	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleteriousDom: %d, deleteriousRec: %d, neutral: %d, favorableDom: %d, favorableRec: %d, del initial: %d, fav initial: %d", countingStr, totalMutns, deleteriousDom, deleteriousRec, neutral, favorableDom, favorableRec, delAllele, favAllele)
 
 	fileName := fmt.Sprintf("%08d.json", genNum)
 
@@ -776,18 +787,15 @@ func (p *Population) outputAlleles(genNum, popSize uint32, lastGen bool) {
 	}
 
 	if config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) {
-		outputNormalizedAlleles(alleles, bucketJson, bucketCount, genNum, fileName)
+		outputNormalizedAlleleBins(alleles, bucketJson, bucketCount, genNum, fileName)
 	}
-
-	utils.Measure.CheckAmountMemoryUsed()
-	utils.Measure.Stop("allele-count")
 }
 
-// outputNormalizedAlleles uses the absolute data gathered in outputAlleles() and normalizes all of the bin counts (by dividing them by the total number of alleles)
-func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
+// outputNormalizedAlleleBins uses the absolute data gathered in outputAlleleBins() and normalizes all of the bin counts (by dividing them by the total number of alleles)
+func outputNormalizedAlleleBins(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
 	// Note: even when Omit_first_allele_bin==true we are still dividing all bin counts by the total number of mutations
-	totalAlleles := len(alleles.Deleterious) + len(alleles.Neutral) + len(alleles.Favorable) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
+	totalAlleles := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
 	normalizedBucketJson := &NormalizedBuckets{}
 
 	normalizedBucketJson.Generation = genNum
@@ -831,12 +839,14 @@ func outputNormalizedAlleles(alleles *dna.AlleleCount, bucketJson *Buckets, buck
 	}
 }
 
-func fillBuckets(counts map[uint64]uint32, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
+
+// fillBuckets takes the number of occurrences of each mutation id, determines which bucket it belongs in, and adds 1 to that bucket
+func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
 	var totalMutns uint32
 
 	for _, count := range counts {
-		totalMutns += count
-		percentage := float64(count) / float64(popSize)
+		totalMutns += count.Count
+		percentage := float64(count.Count) / float64(popSize)
 		var i uint32
 		floati := percentage * float64(bucketCount)
 
@@ -907,5 +917,197 @@ func (p *Population) sortIndexByPhenoFitness() {
 		for i,ind := range p.IndivRefs { fitSlice[i] = ind.Indiv.PhenoFitness
 		}
 		config.Verbose(9, "fitSlice: %v", fitSlice)
+	}
+}
+
+
+// outputAlleleDistribution computes the distribution of alleles according to the fitness.
+func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bool, alleles *dna.AlleleCount) {
+	if !config.FMgr.IsDir(config.DISTRIBUTION_DIRECTORY) { return }
+
+	/*
+	Taken from diagnostics.diagnostics_mutn_bins_plot() - lines 291-793, to produce file 8, .dst, distribution of accumulated del/fav mutns
+	For reference, in dmutn(i,j,k):
+	  i: 1 is the num of mutns in that individual, rest are the mutns in that indiv:
+	    recessive (-) or dominant (+)
+	    which linkage block the mutation resides in: abs(mutn)/lb_modulo
+	    the fitness effect of the mutation: mod(abs(mutn),lb_modulo) / lb_modulo
+	  j: 1 (dad) or 2 (mom)
+	  k: which individual
+	*/
+
+	// Use same variable names as mendel-f90 to make it easier to port those formulas
+	Log := math.Log		// can't use log() because there is a package named that
+	exp := math.Exp
+	pow := math.Pow
+	abs := math.Abs
+	//current_pop_size := int(p.GetCurrentSize())
+	//mutn_sum := float64(p.TotalNumMutations)   // a comment in diagnostices.f90 says this should be the expected number of mutns w/o selection
+	mutn_sum := float64(p.GetCurrentSize() * genNum) * config.Cfg.Mutations.Mutn_rate
+	frac_fav_mutn := config.Cfg.Mutations.Frac_fav_mutn
+	tracking_threshold := utils.MaxFloat64(1.0/config.Cfg.Mutations.Genome_size, float64(config.Cfg.Computation.Tracking_threshold))
+	max_fav_fitness_gain := config.Cfg.Mutations.Max_fav_fitness_gain
+	alpha_del := config.Computed.Alpha_del
+	alpha_fav := config.Computed.Alpha_fav
+	gamma_del := config.Computed.Gamma_del
+	gamma_fav := config.Computed.Gamma_fav
+	//del_scale := config.Computed.Del_scale
+
+	// Compute the bin widths
+	del_bin_width := -Log(tracking_threshold) / 50
+	var fav_bin_width float64
+	if max_fav_fitness_gain > 0.0 {
+		fav_bin_width = -Log(tracking_threshold / max_fav_fitness_gain) / 50
+	} else {
+		fav_bin_width = del_bin_width
+	}
+
+	// Two differences between diagnostices.f90 and here: they put del info in the 1st 50 elements of the arrays and fav info in the 2nd 50,
+	// and they have a 2nd dimension to the array to hold both recessive and dominant info. We use separate arrays for all 4 of those aspects.
+	var del_refr_bins, fav_refr_bins [51]float64	// we are ignoring the 0th element to match fortran
+	x0 := 0.0
+	y0 := 0.0
+	for k := 1; k <= 50; k++ {
+		x1 := pow(del_bin_width * float64(k) / alpha_del, 1. / gamma_del)
+		del_refr_bins[k] = (1. - frac_fav_mutn) * mutn_sum * (x1 - x0)
+		y1 := pow(fav_bin_width * float64(k) / alpha_fav, 1. / gamma_fav)
+		fav_refr_bins[k] = frac_fav_mutn * mutn_sum * (y1 - y0)
+		x0 = x1
+		y0 = y1
+	}
+
+	// Compute statistics on deleterious and favorable mutations
+	// In diagnostices.f90, fitness_bins(k,l): k<=10 is del, k>50 is fav, l=1 is rec, l=2 is dom
+	del_rec_fitness_bins := make([]float64, 51)	// we are ignoring the 0th element to match fortran
+	del_dom_fitness_bins := make([]float64, 51)
+	fav_rec_fitness_bins := make([]float64, 51)
+	fav_dom_fitness_bins := make([]float64, 51)
+	fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
+	fillInFitnessBins(alleles.DeleteriousDom, alpha_del, gamma_del, del_bin_width, del_dom_fitness_bins)
+	fillInFitnessBins(alleles.FavorableRec, alpha_fav, gamma_fav, fav_bin_width, fav_rec_fitness_bins)
+	fillInFitnessBins(alleles.FavorableDom, alpha_fav, gamma_fav, fav_bin_width, fav_dom_fitness_bins)
+
+	// Compute fitness values for bin boundaries and bin centers
+	var del_bin_fitness, del_bin_fitness_boxwidth, del_bin_fitness_midpoint, fav_bin_fitness, fav_bin_fitness_boxwidth, fav_bin_fitness_midpoint [52]float64	// we are ignoring the 0th element to match fortran
+	for k := 1; k <= 51; k++ {
+		del_bin_fitness[k] = exp(-del_bin_width * float64(k - 1))
+		if k > 1 {
+			del_bin_fitness_boxwidth[k - 1] = abs(del_bin_fitness[k] - del_bin_fitness[k-1])
+			del_bin_fitness_midpoint[k - 1] = (del_bin_fitness[k] + del_bin_fitness[k-1]) / 2.
+		}
+	}
+	for k := 1; k <= 51; k++ {
+		fav_bin_fitness[k] = max_fav_fitness_gain * exp(-fav_bin_width * float64(k - 1))
+		if k > 1 {
+			fav_bin_fitness_boxwidth[k - 1] = abs(fav_bin_fitness[k] - fav_bin_fitness[k-1])
+			fav_bin_fitness_midpoint[k - 1] = (fav_bin_fitness[k] + fav_bin_fitness[k-1]) / 2.
+		}
+	}
+
+	// Normalize the binned mutations by the reciprocal of the expected number of mutations per bin in the absence of selection
+	x := 1. - config.Cfg.Mutations.Fraction_neutral
+	if x == 0 { x = 1. }	// don't scale data if fraction_neutral = 1
+	fraction_recessive := config.Cfg.Mutations.Fraction_recessive
+	for k := 1; k <= 50; k++ {
+		// Deleterious
+		if del_refr_bins[k] > 0. && fraction_recessive > 0.{
+			del_rec_fitness_bins[k] = del_rec_fitness_bins[k] / (fraction_recessive * del_refr_bins[k]) / x
+		} else {
+			del_rec_fitness_bins[k] = 0.
+		}
+		if del_refr_bins[k] > 0. && fraction_recessive < 1.{
+			del_dom_fitness_bins[k] = del_dom_fitness_bins[k] / ((1. - fraction_recessive) * del_refr_bins[k]) / x
+		} else {
+			del_dom_fitness_bins[k] = 0.
+		}
+
+		// Favorable
+		if fav_refr_bins[k] > 0. && fraction_recessive > 0.{
+			fav_rec_fitness_bins[k] = fav_rec_fitness_bins[k] / (fraction_recessive * fav_refr_bins[k]) / x
+		} else {
+			fav_rec_fitness_bins[k] = 0.
+		}
+		if fav_refr_bins[k] > 0. && fraction_recessive < 1.{
+			fav_dom_fitness_bins[k] = fav_dom_fitness_bins[k] / ((1. - fraction_recessive) * fav_refr_bins[k]) / x
+		} else {
+			fav_dom_fitness_bins[k] = 0.
+		}
+	}
+
+	// For deleterious perform 3 iterations of smoothing on the fitness_bin values using a three-point average
+	var rec_work, dom_work [51]float64
+	for i := 1; i <= 3; i++ {
+		fm1 := del_rec_fitness_bins[1]
+		fm2 := del_dom_fitness_bins[1]
+		for k := 2; k <= 49; k++ {
+			av1 := del_rec_fitness_bins[k] + 0.5 * (fm1 + del_rec_fitness_bins[k+1])
+			fm1 = del_rec_fitness_bins[k]
+			rec_work[k] = 0.5 * av1
+			av2 := del_dom_fitness_bins[k] + 0.5 * (fm2 + del_dom_fitness_bins[k+1])
+			fm2 = del_dom_fitness_bins[k]
+			dom_work[k] = 0.5 * av2
+		}
+		del_rec_fitness_bins[50] = 0.5 * (del_rec_fitness_bins[49] + del_rec_fitness_bins[50])
+		del_dom_fitness_bins[50] = 0.5 * (del_dom_fitness_bins[49] + del_dom_fitness_bins[50])
+		for k := 2; k <= 49; k++ {
+			del_rec_fitness_bins[k] = rec_work[k]
+			del_dom_fitness_bins[k] = dom_work[k]
+		}
+	}
+
+	// For favorable distribution, limit maximum to a value of 100. To increase the smoothness, iterate the smoothing two times.
+	for k := 1; k <= 50; k++ {
+		fav_rec_fitness_bins[k] = utils.MinFloat64(100., fav_rec_fitness_bins[k])
+		fav_dom_fitness_bins[k] = utils.MinFloat64(100., fav_dom_fitness_bins[k])
+	}
+	for i := 1; i <= 2; i++ {
+		fm1 := fav_rec_fitness_bins[1]
+		fm2 := fav_dom_fitness_bins[1]
+		for k := 2; k <= 49; k++ {
+			av1 := fav_rec_fitness_bins[k] + 0.5*(fm1+fav_rec_fitness_bins[k+1])
+			fm1 = fav_rec_fitness_bins[k]
+			rec_work[k] = 0.5 * av1
+			av2 := fav_dom_fitness_bins[k] + 0.5*(fm2+fav_dom_fitness_bins[k+1])
+			fm2 = fav_dom_fitness_bins[k]
+			dom_work[k] = 0.5 * av2
+		}
+		fav_rec_fitness_bins[50] = 0.5 * (fav_rec_fitness_bins[49] + fav_rec_fitness_bins[50])
+		fav_dom_fitness_bins[50] = 0.5 * (fav_dom_fitness_bins[49] + fav_dom_fitness_bins[50])
+		for k := 2; k <= 49; k++ {
+			fav_rec_fitness_bins[k] = rec_work[k]
+			fav_dom_fitness_bins[k] = dom_work[k]
+		}
+	}
+
+	// Output the deleterious and favorable distribution files
+	delFileName := fmt.Sprintf("%08d.deldst", genNum)
+	favFileName := fmt.Sprintf("%08d.favdst", genNum)
+	config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, delFileName); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, delFileName)
+		fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
+		fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width")
+		for k := 1; k <= 50; k++ {
+			fmt.Fprintf(alleleWriter, "%v  %v  %v  %v\n", del_bin_fitness_midpoint[k], del_rec_fitness_bins[k], del_dom_fitness_bins[k], del_bin_fitness_boxwidth[k])
+		}
+	}
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, favFileName); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, favFileName)
+		fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
+		fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width  fav_refr_bins")
+		for k := 1; k <= 50; k++ {
+			fmt.Fprintf(alleleWriter, "%v  %v  %v  %v %v\n", fav_bin_fitness_midpoint[k], fav_rec_fitness_bins[k], fav_dom_fitness_bins[k], fav_bin_fitness_boxwidth[k], fav_refr_bins[k])
+		}
+	}
+}
+
+func fillInFitnessBins(alleles map[uint64]dna.Allele, alpha, gamma, bin_width float64, fitness_bins []float64) {
+	pow := math.Pow
+	for _, allele := range alleles {
+		x := float64(allele.FitnessEffect)
+		d := alpha * pow(x, gamma)
+		k := 1 + int(d/bin_width)
+		fmt.Printf("k=%d\n",k)
+		if k >= 0 && k < 50 { fitness_bins[k] += 1 }
 	}
 }
