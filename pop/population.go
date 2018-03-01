@@ -1107,7 +1107,7 @@ func fillInFitnessBins(alleles map[uint64]dna.Allele, alpha, gamma, bin_width fl
 		x := float64(allele.FitnessEffect)
 		d := alpha * pow(x, gamma)
 		k := 1 + int(d/bin_width)
-		fmt.Printf("k=%d\n",k)
+		//fmt.Printf("k=%d\n",k)
 		if k >= 0 && k < 50 { fitness_bins[k] += 1 }
 	}
 }
