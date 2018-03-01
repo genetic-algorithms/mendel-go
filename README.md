@@ -30,7 +30,8 @@ wget https://github.com/Masterminds/glide/releases/download/v${GLIDE_LATEST_STAB
 tar -xzvf glide-v${GLIDE_LATEST_STABLE}-linux-amd64.tar.gz
 ln -s $GOPATH/glide/linux-amd64/glide $HOME/bin
 ```
-- Clone mendel-go:
+- Clone and build mendel-go:
+
 ```bash
 mkdir $GOPATH/src/github.com/genetic-algorithms
 cd $GOPATH/src/github.com/genetic-algorithms
@@ -65,6 +66,10 @@ Test some of the packages:
 ```
 make test-pkgs
 ```
+
+# Run in SPC and View Plot Files
+
+[SPC](https://github.com/whbrewer/spc) is an open source platform for running scientific programs and visualization the output. You can download it to run your own instance of it, and install the [mendel-go SPC plugin](https://github.com/genetic-algorithms/mendel-go-spc), or you can do some small runs of mendel_go on the [public instance of SPC](http://ec2-52-43-51-28.us-west-2.compute.amazonaws.com:8580/myapps).
 
 # View godoc info of the project
 
