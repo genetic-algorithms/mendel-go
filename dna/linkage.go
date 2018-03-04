@@ -36,11 +36,13 @@ func (lb *LinkageBlock) GetNumMutations() uint32 {
 func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (mType MutationType, fitnessEffect float32) {
 	mType = CalcMutationType(uniformRandom)
 	switch mType {
-	case DELETERIOUS:
-		fitnessEffect = calcDelMutationAttrs(uniformRandom)
+	case DELETERIOUS_DOMINANT:
+		fallthrough
+	case DELETERIOUS_RECESSIVE:
+		fitnessEffect = calcDelMutationAttrs(mType, uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect < -config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			lb.appendMutn(Mutation{Id: mutId, Type: DELETERIOUS})
+			lb.appendMutn(Mutation{Id: mutId, Type: mType, FitnessEffect: fitnessEffect})
 		}
 		lb.numDeleterious++
 		lb.fitnessEffect += fitnessEffect		// currently only the additive combination model is supported, so this is appropriate
@@ -49,11 +51,13 @@ func (lb *LinkageBlock) AppendMutation(mutId uint64, uniformRandom *rand.Rand) (
 			lb.appendMutn(Mutation{Id: mutId, Type: NEUTRAL})
 		}
 		lb.numNeutrals++
-	case FAVORABLE:
-		fitnessEffect = calcFavMutationAttrs(uniformRandom)
+	case FAVORABLE_DOMINANT:
+		fallthrough
+	case FAVORABLE_RECESSIVE:
+		fitnessEffect = calcFavMutationAttrs(mType, uniformRandom)
 		if config.Cfg.Computation.Tracking_threshold == 0.0 || fitnessEffect > config.Cfg.Computation.Tracking_threshold {
 			// We are tracking this mutation, so create it and append
-			lb.appendMutn(Mutation{Id: mutId, Type: FAVORABLE})
+			lb.appendMutn(Mutation{Id: mutId, Type: mType, FitnessEffect: fitnessEffect})
 		}
 		lb.numFavorable++
 		lb.fitnessEffect += fitnessEffect	// currently only the additive combination model is supported, so this is appropriate
@@ -94,15 +98,15 @@ func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.Un
 
 	// Add a favorable allele to the 1st LB
 	// Note: we assume that if initial alleles are being created, they are being tracked
-	lb1.mutn = append(lb1.mutn, Mutation{Id: uniqueInt.NextInt(), Type: FAV_ALLELE})
-	lb1.numFavAllele++
 	fitnessEffect1 = float32(fitnessEffect)
+	lb1.mutn = append(lb1.mutn, Mutation{Id: uniqueInt.NextInt(), Type: FAV_ALLELE, FitnessEffect: fitnessEffect1})
+	lb1.numFavAllele++
 	lb1.fitnessEffect += fitnessEffect1
 
 	// Add a deleterious allele to the 2nd LB
-	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt()+1, Type: DEL_ALLELE})
-	lb2.numDelAllele++
 	fitnessEffect2 = float32(-fitnessEffect)
+	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt()+1, Type: DEL_ALLELE, FitnessEffect: fitnessEffect2})
+	lb2.numDelAllele++
 	lb2.fitnessEffect += fitnessEffect2
 	return
 }
@@ -134,35 +138,75 @@ func (lb *LinkageBlock) CountAlleles(allelesForThisIndiv *AlleleCount) {
 	for _, m := range lb.mutn {
 		id := m.Id
 		switch m.Type {
-		case DELETERIOUS:
-			if config.Cfg.Computation.Count_duplicate_alleles {
-				allelesForThisIndiv.Deleterious[id] += 1
+		case DELETERIOUS_DOMINANT:
+			if allele, ok := allelesForThisIndiv.DeleteriousDom[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			} else {
-				allelesForThisIndiv.Deleterious[id] = 1
+				allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
+			}
+		case DELETERIOUS_RECESSIVE:
+			if allele, ok := allelesForThisIndiv.DeleteriousRec[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.DeleteriousRec[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
+			} else {
+				allelesForThisIndiv.DeleteriousRec[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			}
 		case NEUTRAL:
-			if config.Cfg.Computation.Count_duplicate_alleles {
-				allelesForThisIndiv.Neutral[id] += 1
+			if allele, ok := allelesForThisIndiv.Neutral[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.Neutral[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			} else {
-				allelesForThisIndiv.Neutral[id] = 1
+				allelesForThisIndiv.Neutral[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			}
-		case FAVORABLE:
-			if config.Cfg.Computation.Count_duplicate_alleles {
-				allelesForThisIndiv.Favorable[id] += 1
+		case FAVORABLE_DOMINANT:
+			if allele, ok := allelesForThisIndiv.FavorableDom[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.FavorableDom[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			} else {
-				allelesForThisIndiv.Favorable[id] = 1
+				allelesForThisIndiv.FavorableDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
+			}
+		case FAVORABLE_RECESSIVE:
+			if allele, ok := allelesForThisIndiv.FavorableRec[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.FavorableRec[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
+			} else {
+				allelesForThisIndiv.FavorableRec[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			}
 		case DEL_ALLELE:
-			if config.Cfg.Computation.Count_duplicate_alleles {
-				allelesForThisIndiv.DelInitialAlleles[id] += 1
+			if allele, ok := allelesForThisIndiv.DelInitialAlleles[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.DelInitialAlleles[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			} else {
-				allelesForThisIndiv.DelInitialAlleles[id] = 1
+				allelesForThisIndiv.DelInitialAlleles[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			}
 		case FAV_ALLELE:
-			if config.Cfg.Computation.Count_duplicate_alleles {
-				allelesForThisIndiv.FavInitialAlleles[id] += 1
+			if allele, ok := allelesForThisIndiv.FavInitialAlleles[id]; ok {
+				// It already exists, update it
+				if config.Cfg.Computation.Count_duplicate_alleles {
+					allelesForThisIndiv.FavInitialAlleles[id] = Allele{Count: allele.Count+1, FitnessEffect: m.FitnessEffect}
+				}
+				// else we already did this: allelesForThisIndiv.DeleteriousDom[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			} else {
-				allelesForThisIndiv.FavInitialAlleles[id] = 1
+				allelesForThisIndiv.FavInitialAlleles[id] = Allele{Count: 1, FitnessEffect: m.FitnessEffect}
 			}
 		default:
 			log.Fatalf("Error: unknown Mutation type %v found when counting alleles.", m.Type)
