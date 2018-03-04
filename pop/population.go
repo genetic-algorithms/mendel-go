@@ -936,8 +936,9 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	  k: which individual
 	*/
 
+	// This computes the data for distribution of alleles according to the fitness, files .deldst and .favdst
 	// Use same variable names as mendel-f90 to make it easier to port those formulas
-	Log := math.Log		// can't use log() because there is a package named that
+	logn := math.Log // can't use log() because there is a package named that
 	exp := math.Exp
 	pow := math.Pow
 	abs := math.Abs
@@ -954,10 +955,10 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	//del_scale := config.Computed.Del_scale
 
 	// Compute the bin widths
-	del_bin_width := -Log(tracking_threshold) / 50
+	del_bin_width := -logn(tracking_threshold) / 50
 	var fav_bin_width float64
 	if max_fav_fitness_gain > 0.0 {
-		fav_bin_width = -Log(tracking_threshold / max_fav_fitness_gain) / 50
+		fav_bin_width = -logn(tracking_threshold / max_fav_fitness_gain) / 50
 	} else {
 		fav_bin_width = del_bin_width
 	}
@@ -982,9 +983,14 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	del_dom_fitness_bins := make([]float64, 51)
 	fav_rec_fitness_bins := make([]float64, 51)
 	fav_dom_fitness_bins := make([]float64, 51)
+	//fmt.Printf("DEBUG: alpha_del=%v, alpha_fav=%v, gamma_del=%v, gamma_fav=%v\n", alpha_del, alpha_fav, gamma_del, gamma_fav)
+	//fmt.Println("DEBUG: Deleterious Recessive:")
 	fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
+	//fmt.Println("DEBUG: Deleterious Dominant:")
 	fillInFitnessBins(alleles.DeleteriousDom, alpha_del, gamma_del, del_bin_width, del_dom_fitness_bins)
+	//fmt.Println("DEBUG: Favorable Recessive:")
 	fillInFitnessBins(alleles.FavorableRec, alpha_fav, gamma_fav, fav_bin_width, fav_rec_fitness_bins)
+	//fmt.Println("DEBUG: Favorable Dominant:")
 	fillInFitnessBins(alleles.FavorableDom, alpha_fav, gamma_fav, fav_bin_width, fav_dom_fitness_bins)
 
 	// Compute fitness values for bin boundaries and bin centers
@@ -1099,15 +1105,35 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 			fmt.Fprintf(alleleWriter, "%v  %v  %v  %v %v\n", fav_bin_fitness_midpoint[k], fav_rec_fitness_bins[k], fav_dom_fitness_bins[k], fav_bin_fitness_boxwidth[k], fav_refr_bins[k])
 		}
 	}
+
+	// Compute the current values of the selection thresholds, file mendel.thr. This is a single file for the whole
+	// run, where each row is for a different generation when this function is run.
+	// Compute estimate for the current deleterious dominant threshold
+	/*
+	k := 1
+	k0 := 0
+	sum := (1. - fraction_recessive) * del_refr_bins[50]
+	del_dom_thres := 0.0
+	*/
+
 }
 
-func fillInFitnessBins(alleles map[uint64]dna.Allele, alpha, gamma, bin_width float64, fitness_bins []float64) {
-	pow := math.Pow
+func fillInFitnessBins(alleles map[uint64]dna.Allele, _, _, bin_width float64, fitness_bins []float64) {
+	//pow := math.Pow
+	abs := math.Abs
+	logn := math.Log
+	//debugI := 1
 	for _, allele := range alleles {
-		x := float64(allele.FitnessEffect)
-		d := alpha * pow(x, gamma)
+		//x := abs(float64(allele.FitnessEffect))
+		//d := alpha * pow(x, gamma)
+		d := -logn(abs(float64(allele.FitnessEffect)))
 		k := 1 + int(d/bin_width)
-		//fmt.Printf("k=%d\n",k)
-		if k >= 0 && k < 50 { fitness_bins[k] += 1 }
+		//if debugI <= 20 { fmt.Printf("DEBUG: x=%v, d=%v, k=%d\n", x, d, k); debugI++ }
+		//if debugI <= 20 { fmt.Printf("DEBUG: d=%v, k=%d\n", d, k); debugI++ }
+		if k > 0 && k <= 50 {
+			fitness_bins[k] += float64(allele.Count)	// we had this many of the same id, so same fitness
+		} /*else {
+			config.Verbose(1, "k out of range: %d", k)
+		}*/
 	}
 }
