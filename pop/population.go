@@ -230,7 +230,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 	// Save off the average num offspring for stats, before we select out individuals
 	newP.ActualAvgOffspring = float64(newP.GetCurrentSize()) / float64(p.GetCurrentSize())
 
-	newP.PreSelGenoFitnessMean, newP.PreSelGenoFitnessVariance, newP.PreSelGenoFitnessStDev = newP.CalcFitnessStats()
+	newP.PreSelGenoFitnessMean, newP.PreSelGenoFitnessVariance, newP.PreSelGenoFitnessStDev = newP.PreSelectFitnessStats()
 }
 
 
@@ -442,8 +442,8 @@ func FoundersPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
 	return newTargetSize
 }
 
-// CalcFitnessStats returns the mean geno fitness and std deviation
-func (p *Population) CalcFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
+// PreSelectFitnessStats returns the mean geno fitness and std deviation
+func (p *Population) PreSelectFitnessStats() (genoFitnessMean, genoFitnessVariance, genoFitnessStDev float64) {
 	// Calc mean (average)
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
@@ -851,10 +851,12 @@ func outputNormalizedAlleleBins(alleles *dna.AlleleCount, bucketJson *Buckets, b
 // fillBuckets takes the number of occurrences of each mutation id, determines which bucket it belongs in, and adds 1 to that bucket
 func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
 	var totalMutns uint32
+	poolSize := float64(2 * popSize)
+	if !config.Cfg.Computation.Count_duplicate_alleles { poolSize = float64(popSize)}	// in this case, each allele count is a measure of how many individuals it occurred in
 
 	for _, count := range counts {
 		totalMutns += count.Count
-		percentage := float64(count.Count) / float64(popSize)
+		percentage := float64(count.Count) / poolSize
 		var i uint32
 		floati := percentage * float64(bucketCount)
 

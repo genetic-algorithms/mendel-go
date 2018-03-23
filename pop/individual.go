@@ -314,25 +314,32 @@ func (ind *Individual) GetInitialAlleleStats() (uint32, uint32) {
 // CountAlleles counts all of this individual's alleles (both mutations and initial alleles) and adds them to the given struct
 func (ind *Individual) CountAlleles(alleles *dna.AlleleCount) {
 	// Get the alleles for this individual
-	allelesForThisIndiv := dna.AlleleCountFactory()		// so we don't double count the same allele from both parents, the count in this map for each allele found is always 1
+	// Note: even when Count_duplicate_alleles=true, we won't find duplicate allele ids in 1 LB, because it is only ever inherited from 1 parent or the other
+	//todo: if we decide Count_duplicate_alleles should always be true, we can eliminate this struct and add them directly to alleles
+	allelesForThisIndiv := dna.AlleleCountFactory()		// so we don't double count the same allele from both parents if Count_duplicate_alleles=false (in this case, the count in this map for each allele id found is always 1)
 	for _, c := range ind.ChromosomesFromDad { c.CountAlleles(allelesForThisIndiv) }
 	for _, c := range ind.ChromosomesFromMom { c.CountAlleles(allelesForThisIndiv) }
 
 	// Add the alleles found for this individual to the alleles map for the whole population
 	// Note: map returns the zero value of the value type for keys which are not yet in the map (zero value for int is 0), so we do not need to check if it is there with: if count, ok := alleles.Deleterious[id]; ok {
 	for id, al := range allelesForThisIndiv.DeleteriousDom {
+		//if al.Count > 2 { log.Printf("warning: individual's allele %d has count %d", id, al.Count) }
 		alleles.DeleteriousDom[id] = dna.Allele{Count: alleles.DeleteriousDom[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
 	}
 	for id, al := range allelesForThisIndiv.DeleteriousRec {
+		//if al.Count > 2 { log.Printf("warning: individual's allele %d has count %d", id, al.Count) }
 		alleles.DeleteriousRec[id] = dna.Allele{Count: alleles.DeleteriousRec[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
 	}
 	for id, al := range allelesForThisIndiv.Neutral {
+		//if al.Count > 2 { log.Printf("warning: individual's allele %d has count %d", id, al.Count) }
 		alleles.Neutral[id] = dna.Allele{Count: alleles.Neutral[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
 	}
 	for id, al := range allelesForThisIndiv.FavorableDom {
+		//if al.Count > 2 { log.Printf("warning: individual's allele %d has count %d", id, al.Count) }
 		alleles.FavorableDom[id] = dna.Allele{Count: alleles.FavorableDom[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
 	}
 	for id, al := range allelesForThisIndiv.FavorableRec {
+		//if al.Count > 2 { log.Printf("warning: individual's allele %d has count %d", id, al.Count) }
 		alleles.FavorableRec[id] = dna.Allele{Count: alleles.FavorableRec[id].Count+al.Count, FitnessEffect: al.FitnessEffect}
 	}
 	for id, al := range allelesForThisIndiv.DelInitialAlleles {
