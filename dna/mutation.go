@@ -147,13 +147,13 @@ func CalcFixedFavMutationFitness(_ *rand.Rand) float64 { return config.Cfg.Mutat
 func CalcUniformDelMutationFitness(uniformRandom *rand.Rand) float64 {return -(uniformRandom.Float64() * config.Cfg.Mutations.Uniform_fitness_effect_del) }
 func CalcUniformFavMutationFitness(uniformRandom *rand.Rand) float64 { return uniformRandom.Float64() * config.Cfg.Mutations.Uniform_fitness_effect_fav }
 
-// Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311
+// Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311 and mutation.f90 lines 102-109
 func CalcWeibullDelMutationFitness(uniformRandom *rand.Rand) float64 {
 	//alphaDel := math.Log(config.Cfg.Mutations.Genome_size)
 	//gammaDel := math.Log(-math.Log(config.Cfg.Mutations.High_impact_mutn_threshold) / config.Computed.alpha_del) /
 	//             math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 
-	return -math.Exp(-config.Computed.Alpha_del * math.Pow(uniformRandom.Float64(), config.Computed.Gamma_del))
+	return -math.Exp( -config.Computed.Alpha_del * math.Pow(uniformRandom.Float64(),config.Computed.Gamma_del) )
 }
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311 and mutation.f90 line 104

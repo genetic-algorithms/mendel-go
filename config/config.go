@@ -189,7 +189,7 @@ func (c *Config) validateAndAdjust() error {
 
 func ComputedValuesFactory() (c *ComputedValues) {
 	c = &ComputedValues{}
-	Log := math.Log		// can't use log() because there is a package named that
+	logn := math.Log // can't use log() because there is a package named that
 	exp := math.Exp
 	pow := math.Pow
 	max_fav_fitness_gain := Cfg.Mutations.Max_fav_fitness_gain
@@ -200,15 +200,15 @@ func ComputedValuesFactory() (c *ComputedValues) {
 	// Taken from mendel-f90/init.f90
 	c.Lb_modulo = (pow(2,30)-2) / float64(Cfg.Population.Num_linkage_subunits)
 
-	c.Alpha_del = Log(Cfg.Mutations.Genome_size)
-	if Cfg.Mutations.Max_fav_fitness_gain > 0.0 {
-		c.Alpha_fav = Log(Cfg.Mutations.Genome_size * Cfg.Mutations.Max_fav_fitness_gain)
+	c.Alpha_del = logn(Cfg.Mutations.Genome_size)		// this is the lower bound of how small (close to 0) a del mutn can be when using weibull
+	if Cfg.Mutations.Max_fav_fitness_gain > 0.0 {		// Alpha_fav is also the bound of how small a fav mutn fitness can be
+		c.Alpha_fav = logn(Cfg.Mutations.Genome_size * Cfg.Mutations.Max_fav_fitness_gain)
 	} else {
 		c.Alpha_fav = c.Alpha_del
 	}
 
-	c.Gamma_del = Log(-Log(high_impact_mutn_threshold) / c.Alpha_del) / Log(high_impact_mutn_fraction)
-	c.Gamma_fav = Log(-Log(high_impact_mutn_threshold) / c.Alpha_fav) / Log(high_impact_mutn_fraction)
+	c.Gamma_del = logn(-logn(high_impact_mutn_threshold) / c.Alpha_del) / logn(high_impact_mutn_fraction)
+	c.Gamma_fav = logn(-logn(high_impact_mutn_threshold) / c.Alpha_fav) / logn(high_impact_mutn_fraction)
 
 	if tracking_threshold <= 1.0/Cfg.Mutations.Genome_size {
 		c.Del_scale = 1. / (c.Lb_modulo - 2)
@@ -217,9 +217,9 @@ func ComputedValuesFactory() (c *ComputedValues) {
 		c.Del_scale = 0. // dont track any mutations
 		c.Fav_scale = 0.
 	} else {
-		c.Del_scale = exp(Log(-Log(tracking_threshold)/c.Alpha_del) / c.Gamma_del) / (c.Lb_modulo - 2)
+		c.Del_scale = exp(logn(-logn(tracking_threshold)/c.Alpha_del) / c.Gamma_del) / (c.Lb_modulo - 2)
 		if Cfg.Mutations.Max_fav_fitness_gain > 0. {
-			c.Fav_scale = exp(Log(-Log(tracking_threshold / max_fav_fitness_gain)/c.Alpha_fav)/c.Gamma_fav) / (c.Lb_modulo - 2)
+			c.Fav_scale = exp(logn(-logn(tracking_threshold / max_fav_fitness_gain)/c.Alpha_fav)/c.Gamma_fav) / (c.Lb_modulo - 2)
 		} else {
 			c.Fav_scale = 0.
 		}

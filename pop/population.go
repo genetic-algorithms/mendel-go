@@ -689,6 +689,14 @@ type NormalizedBuckets struct {
 	FavInitialAlleles []float64 `json:"favInitialAlleles"`
 }
 
+type DistributionBuckets struct {
+	Generation uint32 `json:"generation"`
+	Bins []uint32 `json:"bins"`
+	BinMidpointFitness []float64 `json:"binmidpointfitness"`
+	Recessive []float64 `json:"recessive"`
+	Dominant []float64 `json:"dominant"`
+}
+
 
 // getAlleles gathers all of the alleles in this generation and returns them
 func (p *Population) getAlleles(genNum, popSize uint32, lastGen bool) (alleles *dna.AlleleCount) {
@@ -962,6 +970,8 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	} else {
 		fav_bin_width = del_bin_width
 	}
+	//fmt.Printf("DEBUG: del_bin_width=%v, alpha_del=%v, gamma_del=%v\n", del_bin_width, alpha_del, gamma_del)
+	//fmt.Printf("DEBUG: fav_bin_width=%v, alpha_fav=%v, gamma_fav=%v\n", fav_bin_width, alpha_fav, gamma_fav)
 
 	// Two differences between diagnostices.f90 and here: they put del info in the 1st 50 elements of the arrays and fav info in the 2nd 50,
 	// and they have a 2nd dimension to the array to hold both recessive and dominant info. We use separate arrays for all 4 of those aspects.
@@ -978,12 +988,11 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	}
 
 	// Compute statistics on deleterious and favorable mutations
-	// In diagnostices.f90, fitness_bins(k,l): k<=10 is del, k>50 is fav, l=1 is rec, l=2 is dom
+	// In diagnostices.f90, fitness_bins(k,l): k<=50 is del, k>50 is fav, l=1 is rec, l=2 is dom
 	del_rec_fitness_bins := make([]float64, 51)	// we are ignoring the 0th element to match fortran
 	del_dom_fitness_bins := make([]float64, 51)
 	fav_rec_fitness_bins := make([]float64, 51)
 	fav_dom_fitness_bins := make([]float64, 51)
-	//fmt.Printf("DEBUG: alpha_del=%v, alpha_fav=%v, gamma_del=%v, gamma_fav=%v\n", alpha_del, alpha_fav, gamma_del, gamma_fav)
 	//fmt.Println("DEBUG: Deleterious Recessive:")
 	fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
 	//fmt.Println("DEBUG: Deleterious Dominant:")
@@ -1088,25 +1097,49 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	// Output the deleterious and favorable distribution files
 	delFileName := fmt.Sprintf("%08d.deldst", genNum)
 	favFileName := fmt.Sprintf("%08d.favdst", genNum)
-	config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
+	//config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
 	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, delFileName); alleleWriter != nil {
 		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, delFileName)
-		fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
-		fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width")
+		bucketJson := &DistributionBuckets{Generation:genNum}
+		bucketJson.Bins = make([]uint32, 50)
+		bucketJson.BinMidpointFitness = make([]float64, 50)
+		bucketJson.Recessive = make([]float64, 50)
+		bucketJson.Dominant = make([]float64, 50)
+		//fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
+		//fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width")
 		for k := 1; k <= 50; k++ {
-			fmt.Fprintf(alleleWriter, "%v  %v  %v  %v\n", del_bin_fitness_midpoint[k], del_rec_fitness_bins[k], del_dom_fitness_bins[k], del_bin_fitness_boxwidth[k])
+			bucketJson.Bins[k-1] = uint32(k)
+			bucketJson.BinMidpointFitness[k-1] = del_bin_fitness_midpoint[k]
+			bucketJson.Recessive[k-1] = del_rec_fitness_bins[k]
+			bucketJson.Dominant[k-1] = del_dom_fitness_bins[k]
+			//fmt.Fprintf(alleleWriter, "%v  %v  %v  %v\n", del_bin_fitness_midpoint[k], del_rec_fitness_bins[k], del_dom_fitness_bins[k], del_bin_fitness_boxwidth[k])
 		}
+		newJson, err := json.Marshal(bucketJson)
+		if err != nil { log.Fatalf("error marshaling allele distribution bins to json: %v", err)	}
+		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", delFileName, err) }
 	}
 	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, favFileName); alleleWriter != nil {
 		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, favFileName)
-		fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
-		fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width  fav_refr_bins")
+		bucketJson := &DistributionBuckets{Generation:genNum}
+		bucketJson.Bins = make([]uint32, 50)
+		bucketJson.BinMidpointFitness = make([]float64, 50)
+		bucketJson.Recessive = make([]float64, 50)
+		bucketJson.Dominant = make([]float64, 50)
+		//fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
+		//fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width  fav_refr_bins")
 		for k := 1; k <= 50; k++ {
-			fmt.Fprintf(alleleWriter, "%v  %v  %v  %v %v\n", fav_bin_fitness_midpoint[k], fav_rec_fitness_bins[k], fav_dom_fitness_bins[k], fav_bin_fitness_boxwidth[k], fav_refr_bins[k])
+			bucketJson.Bins[k-1] = uint32(k)
+			bucketJson.BinMidpointFitness[k-1] = fav_bin_fitness_midpoint[k]
+			bucketJson.Recessive[k-1] = fav_rec_fitness_bins[k]
+			bucketJson.Dominant[k-1] = fav_dom_fitness_bins[k]
+			//fmt.Fprintf(alleleWriter, "%v  %v  %v  %v %v\n", fav_bin_fitness_midpoint[k], fav_rec_fitness_bins[k], fav_dom_fitness_bins[k], fav_bin_fitness_boxwidth[k], fav_refr_bins[k])
 		}
+		newJson, err := json.Marshal(bucketJson)
+		if err != nil { log.Fatalf("error marshaling allele distribution bins to json: %v", err)	}
+		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", favFileName, err) }
 	}
 
-	// Compute the current values of the selection thresholds, file mendel.thr. This is a single file for the whole
+	//todo: Compute the current values of the selection thresholds, file mendel.thr. This is a single file for the whole
 	// run, where each row is for a different generation when this function is run.
 	// Compute estimate for the current deleterious dominant threshold
 	/*
@@ -1119,17 +1152,24 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 }
 
 func fillInFitnessBins(alleles map[uint64]dna.Allele, _, _, bin_width float64, fitness_bins []float64) {
-	//pow := math.Pow
 	abs := math.Abs
 	logn := math.Log
 	//debugI := 1
 	for _, allele := range alleles {
-		//x := abs(float64(allele.FitnessEffect))
-		//d := alpha * pow(x, gamma)
+		/* diagnostics.f90, lines 331-393 does:
+            x = mod(abs(dmutn(j,1,i)),lb_modulo)*del_scale
+            d = alpha_del*x**gamma_del
+		  but mutation.f90 decode_mutn_del() also does:
+		    -dexp(-d)
+		  to get the mutn fitness. So for us to get from our fitness f bacl to diagnostic.f90's value d:
+		    f = -dexp(-d)
+		    -f = dexp(-d)
+		    logn(-f) = -d
+		    -logn(-f) = d
+		 */
 		d := -logn(abs(float64(allele.FitnessEffect)))
 		k := 1 + int(d/bin_width)
-		//if debugI <= 20 { fmt.Printf("DEBUG: x=%v, d=%v, k=%d\n", x, d, k); debugI++ }
-		//if debugI <= 20 { fmt.Printf("DEBUG: d=%v, k=%d\n", d, k); debugI++ }
+		//if debugI <= 40 { fmt.Printf("DEBUG: f=%v, d=%v, k=%d\n", allele.FitnessEffect, d, k); debugI++ }
 		if k > 0 && k <= 50 {
 			fitness_bins[k] += float64(allele.Count)	// we had this many of the same id, so same fitness
 		} /*else {
