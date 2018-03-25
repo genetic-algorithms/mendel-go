@@ -126,6 +126,7 @@ func (dad *Individual) OneOffspring(mom *Individual, newPopPart *PopulationPart,
 func (child *Individual) AddMutations(lBsPerChromosome uint32, uniformRandom *rand.Rand) {
 	// Apply new mutations
 	numMutations := Mdl.CalcNumMutations(uniformRandom)
+	//log.Printf("DEBUG: adding %d mutations to this individual", numMutations)
 	popPart := child.popPart
 	for m:=uint32(1); m<=numMutations; m++ {
 		// Note: we are choosing the LB this way to keep the random number generation the same as when we didn't have chromosomes.
@@ -264,7 +265,9 @@ func CalcSemiFixedNumMutations (uniformRandom *rand.Rand) uint32 {
 
 // Use a poisson distribution to choose a number of mutations, with the mean of number of mutations for all individuals being Mutn_rate
 func CalcPoissonNumMutations (uniformRandom *rand.Rand) uint32 {
-	return uint32(random.Poisson(uniformRandom, config.Cfg.Mutations.Mutn_rate))
+	numMutations := uint32(random.Poisson(uniformRandom, config.Cfg.Mutations.Mutn_rate))
+	if config.Cfg.Mutations.Mutn_rate == 0.0 { numMutations = 0 }		// no positive Poisson() will always return 0 for a 0.0 mutn rate
+	return numMutations
 }
 
 

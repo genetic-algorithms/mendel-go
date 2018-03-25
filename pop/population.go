@@ -211,6 +211,8 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 
 			// Choose a range of the mutation id's for this part - have to make sure it won't exceed this
 			numMuts := uint64(float64(endIndex - beginIndex + 1) * p.Num_offspring * config.Cfg.Mutations.Mutn_rate * 1.5)
+			if numMuts <= 100 { numMuts = numMuts * 2}		// with small number the randomness of Poisson distribution can vary more
+			//log.Printf("DEBUG: donating %d mutation ids for %d individuals", numMuts, endIndex - beginIndex + 1)
 
 			// Start the concurrent routine for this part of the pop
 			waitGroup.Add(1)
@@ -253,6 +255,7 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	}
 
 	currentSize := uint32(len(p.IndivRefs))
+	//log.Printf("DEBUG: eliminating %d individuals in selection", int32(currentSize) - int32(p.TargetSize))
 
 	if currentSize > p.TargetSize {
 		numEliminate := currentSize - p.TargetSize
@@ -733,7 +736,7 @@ func (p *Population) getAlleles(genNum, popSize uint32, lastGen bool) (alleles *
 
 // outputAlleleBins calculates the bins using the alleles struct, and outputs them to a file
 func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alleles *dna.AlleleCount) {
-	var deleteriousDom, deleteriousRec, neutral, favorableDom, favorableRec, delAllele, favAllele uint32
+	//var deleteriousDom, deleteriousRec, neutral, favorableDom, favorableRec, delAllele, favAllele uint32
 
 	// Write the plot file for each type of mutation/allele
 	bucketCount := uint32(100)		// we could put this in the config file if we need to
@@ -747,21 +750,21 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	}
 
 	bucketJson.Deleterious = make([]uint32, bucketCount)
-	deleteriousDom = fillBuckets(alleles.DeleteriousDom, popSize, bucketCount, bucketJson.Deleterious)
-	deleteriousRec = fillBuckets(alleles.DeleteriousRec, popSize, bucketCount, bucketJson.Deleterious)
+	deleteriousDom, delDomFitness := fillBuckets(alleles.DeleteriousDom, popSize, bucketCount, bucketJson.Deleterious)
+	deleteriousRec, delRecFitness := fillBuckets(alleles.DeleteriousRec, popSize, bucketCount, bucketJson.Deleterious)
 
 	// Note: we do this even when there are no neutrals, because the plotting software needs all 0's in that case
 	bucketJson.Neutral = make([]uint32, bucketCount)
-	neutral = fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
+	neutral, _ := fillBuckets(alleles.Neutral, popSize, bucketCount, bucketJson.Neutral)
 
 	bucketJson.Favorable = make([]uint32, bucketCount)
-	favorableDom = fillBuckets(alleles.FavorableDom, popSize, bucketCount, bucketJson.Favorable)
-	favorableRec = fillBuckets(alleles.FavorableRec, popSize, bucketCount, bucketJson.Favorable)
+	favorableDom, favDomFitness := fillBuckets(alleles.FavorableDom, popSize, bucketCount, bucketJson.Favorable)
+	favorableRec, favRecFitness := fillBuckets(alleles.FavorableRec, popSize, bucketCount, bucketJson.Favorable)
 
 	bucketJson.DelInitialAlleles = make([]uint32, bucketCount)
-	delAllele = fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
+	delAllele, delAlleleFitness := fillBuckets(alleles.DelInitialAlleles, popSize, bucketCount, bucketJson.DelInitialAlleles)
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
-	favAllele = fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
+	favAllele, favAlleleFitness := fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
 
 	if config.Cfg.Computation.Omit_first_allele_bin {
 		// Shift all slices 1 to the left
@@ -781,7 +784,14 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	} else {
 		countingStr = "filtering out duplicates"
 	}
-	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleteriousDom: %d, deleteriousRec: %d, neutral: %d, favorableDom: %d, favorableRec: %d, del initial: %d, fav initial: %d", countingStr, totalMutns, deleteriousDom, deleteriousRec, neutral, favorableDom, favorableRec, delAllele, favAllele)
+	if deleteriousDom > 0 { delDomFitness = delDomFitness/float64(deleteriousDom) }
+	if deleteriousRec > 0 { delRecFitness = delRecFitness/float64(deleteriousRec) }
+	if favorableDom > 0 { favDomFitness = favDomFitness/float64(favorableDom) }
+	if favorableRec > 0 { favRecFitness = favRecFitness/float64(favorableRec) }
+	if delAllele > 0 { delAlleleFitness = delAlleleFitness/float64(delAllele) }
+	if favAllele > 0 { favAlleleFitness = favAlleleFitness/float64(favAllele) }
+	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleteriousDom: %d, delDomFitness: %v, deleteriousRec: %d, delDomRec: %v, neutral: %d, favorableDom: %d, favDomFitness: %v, favorableRec: %d, favRecFitness: %v, del initial: %d, del initial fitness: %v, fav initial: %d, fav initial fitness: %v",
+		countingStr, totalMutns, deleteriousDom, delDomFitness, deleteriousRec, delRecFitness, neutral, favorableDom, favDomFitness, favorableRec, favRecFitness, delAllele, delAlleleFitness, favAllele, favAlleleFitness)
 
 	fileName := fmt.Sprintf("%08d.json", genNum)
 
@@ -849,13 +859,13 @@ func outputNormalizedAlleleBins(alleles *dna.AlleleCount, bucketJson *Buckets, b
 
 
 // fillBuckets takes the number of occurrences of each mutation id, determines which bucket it belongs in, and adds 1 to that bucket
-func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) uint32 {
-	var totalMutns uint32
+func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) (totalMutns uint32, totalFitness float64) {
 	poolSize := float64(2 * popSize)
 	if !config.Cfg.Computation.Count_duplicate_alleles { poolSize = float64(popSize)}	// in this case, each allele count is a measure of how many individuals it occurred in
 
 	for _, count := range counts {
 		totalMutns += count.Count
+		totalFitness += float64(count.FitnessEffect) * float64(count.Count)
 		percentage := float64(count.Count) / poolSize
 		var i uint32
 		floati := percentage * float64(bucketCount)
@@ -891,7 +901,7 @@ func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint3
 		buckets[i] += 1
 	}
 
-	return totalMutns
+	return
 }
 
 
