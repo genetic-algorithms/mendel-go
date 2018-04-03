@@ -656,7 +656,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	}
 
 	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
-	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
+	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_DEL_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_FAV_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
 		utils.Measure.Start("allele-count")
 		alleles := p.getAlleles(genNum, popSize, lastGen)
 		p.outputAlleleBins(genNum, popSize, lastGen, alleles)
@@ -694,7 +694,6 @@ type NormalizedBuckets struct {
 
 type DistributionBuckets struct {
 	Generation uint32 `json:"generation"`
-	Bins []uint32 `json:"bins"`
 	BinMidpointFitness []float64 `json:"binmidpointfitness"`
 	Recessive []float64 `json:"recessive"`
 	Dominant []float64 `json:"dominant"`
@@ -943,7 +942,7 @@ func (p *Population) sortIndexByPhenoFitness() {
 
 // outputAlleleDistribution computes the distribution of alleles according to the fitness.
 func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bool, alleles *dna.AlleleCount) {
-	if !config.FMgr.IsDir(config.DISTRIBUTION_DIRECTORY) { return }
+	if !(config.FMgr.IsDir(config.DISTRIBUTION_DEL_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_FAV_DIRECTORY)) { return }
 
 	/*
 	Taken from diagnostics.diagnostics_mutn_bins_plot() - lines 291-793, to produce file 8, .dst, distribution of accumulated del/fav mutns
@@ -1107,20 +1106,20 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	}
 
 	// Output the deleterious and favorable distribution files
-	delFileName := fmt.Sprintf("%08d.deldst", genNum)
-	favFileName := fmt.Sprintf("%08d.favdst", genNum)
+	//delFileName := fmt.Sprintf("%08d.deldst", genNum)
+	//favFileName := fmt.Sprintf("%08d.favdst", genNum)
+	delFileName := fmt.Sprintf("%08d.json", genNum)
+	favFileName := fmt.Sprintf("%08d.json", genNum)
 	//config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
-	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, delFileName); alleleWriter != nil {
-		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, delFileName)
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName)
 		bucketJson := &DistributionBuckets{Generation:genNum}
-		bucketJson.Bins = make([]uint32, 50)
 		bucketJson.BinMidpointFitness = make([]float64, 50)
 		bucketJson.Recessive = make([]float64, 50)
 		bucketJson.Dominant = make([]float64, 50)
 		//fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
 		//fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width")
 		for k := 1; k <= 50; k++ {
-			bucketJson.Bins[k-1] = uint32(k)
 			bucketJson.BinMidpointFitness[k-1] = del_bin_fitness_midpoint[k]
 			bucketJson.Recessive[k-1] = del_rec_fitness_bins[k]
 			bucketJson.Dominant[k-1] = del_dom_fitness_bins[k]
@@ -1130,17 +1129,15 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 		if err != nil { log.Fatalf("error marshaling allele distribution bins to json: %v", err)	}
 		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", delFileName, err) }
 	}
-	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DIRECTORY, favFileName); alleleWriter != nil {
-		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DIRECTORY, favFileName)
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName)
 		bucketJson := &DistributionBuckets{Generation:genNum}
-		bucketJson.Bins = make([]uint32, 50)
 		bucketJson.BinMidpointFitness = make([]float64, 50)
 		bucketJson.Recessive = make([]float64, 50)
 		bucketJson.Dominant = make([]float64, 50)
 		//fmt.Fprintf(alleleWriter, "# generation = %d\n", genNum)
 		//fmt.Fprintln(alleleWriter, "# bin_fitness   recessive  dominant   box_width  fav_refr_bins")
 		for k := 1; k <= 50; k++ {
-			bucketJson.Bins[k-1] = uint32(k)
 			bucketJson.BinMidpointFitness[k-1] = fav_bin_fitness_midpoint[k]
 			bucketJson.Recessive[k-1] = fav_rec_fitness_bins[k]
 			bucketJson.Dominant[k-1] = fav_dom_fitness_bins[k]

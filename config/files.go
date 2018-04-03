@@ -13,10 +13,11 @@ const (
 	FITNESS_FILENAME = "mendel.fit"		// this one is faster to produce than mendel.hst
 	ALLELE_BINS_DIRECTORY = "allele-bins/"
 	NORMALIZED_ALLELE_BINS_DIRECTORY = "normalized-allele-bins/"
-	DISTRIBUTION_DIRECTORY = "allele-distribution/"
+	DISTRIBUTION_DEL_DIRECTORY = "allele-distribution-del/"
+	DISTRIBUTION_FAV_DIRECTORY = "allele-distribution-fav/"
 )
 // Apparently this can't be a const because a map literal isn't a const in go
-var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DIRECTORY: 1,}
+var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
 
 // Not using buffered io because we need write to be flushed every generation to support restart
 //type FileElem struct {
