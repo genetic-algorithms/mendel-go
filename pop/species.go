@@ -29,7 +29,7 @@ func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) {
 			newRandom = random.RandFactory()
 		}
 		p = PopulationFactory(nil, 0) 		// genesis population
-		p.GenerateInitialAlleles(newRandom)
+		Mdl.GenerateInitialAlleles(p, newRandom)
 		p.ReportInitial(maxGenNum)
 	}
 }

@@ -64,8 +64,9 @@ type Config struct {
 		Recombination_model uint32
 		Fraction_self_fertilization float64
 		Num_contrasting_alleles uint32
-		Initial_alleles_pop_frac float64
 		Initial_allele_fitness_model string
+		Initial_alleles_pop_frac float64
+		Initial_alleles_frequencies string
 		Max_total_fitness_increase float64
 		Crossover_model string
 		Mean_num_crossovers uint32
@@ -176,8 +177,6 @@ func (c *Config) validateAndAdjust() error {
 		c.Computation.Tracking_threshold = 9.0
 	}
 	//if c.Computation.Track_neutrals && c.Computation.Tracking_threshold != 0.0 { c.Computation.Track_neutrals = false }
-
-	if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { return errors.New("if num_contrasting_alleles is > 0, then initial_alleles_pop_frac must be > 0 and <= 1.0") }
 
 	if c.Computation.Num_threads == 0 { c.Computation.Num_threads = uint32(runtime.NumCPU()) }
 

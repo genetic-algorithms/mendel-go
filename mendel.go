@@ -103,7 +103,7 @@ func main() {
 
 	maxGenNum := config.Cfg.Basic.Num_generations
 	parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
-	parentPop.GenerateInitialAlleles(uniformRandom)
+	pop.Mdl.GenerateInitialAlleles(parentPop, uniformRandom)
 	parentPop.ReportInitial(maxGenNum)
 
 	// Main generation loop.

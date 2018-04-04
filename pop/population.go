@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"runtime/debug"
 	"github.com/genetic-algorithms/mendel-go/random"
+	"strings"
+	"strconv"
 )
 
 type RecombinationType uint8
@@ -132,11 +134,15 @@ func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Populatio
 
 // Size returns the current number of individuals in this population
 func (p *Population) GetCurrentSize() uint32 {
-	return uint32(len(p.IndivRefs)) }
+	return uint32(len(p.IndivRefs))
+}
 
 
-// GenerateInitialAlleles creates the initial contrasting allele pairs (if specified by the config file) and adds them to the population
-func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
+// These are the different algorithms for generating initial alleles
+type GenerateInitialAllelesType func(p *Population, uniformRandom *rand.Rand)
+
+// GenerateInitialAlleles creates unique initial contrasting allele pairs (if specified by the config file) on indivs in the population
+func GenerateUniformInitialAlleles(p *Population, uniformRandom *rand.Rand) {
 	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
 	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
@@ -162,6 +168,39 @@ func (p *Population) GenerateInitialAlleles(uniformRandom *rand.Rand) {
 	config.Verbose(2, "Initial alleles given to faction %v of individuals (%v/%v). Each individual got alleles on fraction %v of LBs (%v/%v)", float64(numWithAlleles)/float64(p.GetCurrentSize()), numWithAlleles, p.GetCurrentSize(),float64(numLBsWithAlleles)/float64(numProcessedLBs), numLBsWithAlleles, numProcessedLBs)
 }
 
+type FractionFrequency struct {
+	alleleFraction float64
+	frequency float64
+}
+
+func ParseInitialAllelesFrequencies(frequencies string) (freqList []FractionFrequency) {
+	// The input parameter should look like: 0.25:0.1, 0.5:0.25, 0.25:0.5
+	errorStr := fmt.Sprintf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, ...", string(VARIABLE_FREQ_INITIAL_ALLELES))
+	if strings.TrimSpace(frequencies) == "" { log.Fatal(errorStr) }
+	freqList = make([]FractionFrequency, 0)
+	pairs := strings.Split(frequencies, ",")
+	for _, p := range pairs {
+		parts := strings.Split(p, ":")
+		if len(parts) < 2 { log.Fatal(errorStr) }
+		var alleleFraction, frequency float64
+		var err error
+		alleleFraction, err = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		if err != nil  { log.Fatalf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		frequency, err = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err != nil  { log.Fatalf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		freqList = append(freqList, FractionFrequency{alleleFraction:alleleFraction, frequency:frequency})
+	}
+	return
+}
+
+// GenerateVariableFreqInitialAlleles creates initial contrasting allele pairs according to the frequencies specified in Initial_alleles_frequencies
+func GenerateVariableFreqInitialAlleles(_ *Population, _ *rand.Rand) {
+	freqMap := ParseInitialAllelesFrequencies(config.Cfg.Population.Initial_alleles_frequencies)
+	config.Verbose(1, "Generating initial contrasting alleles for: %v", freqMap)
+	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
+
+	//todo: actually add the initial alleles
+}
 
 // Mate mates all the pairs of the population, choosing the linkage block at each linkage block position randomly from
 // the mom or dad according to the crossover model (as in meiosis), and fills in the new/resulting population.
