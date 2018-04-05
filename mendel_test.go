@@ -81,6 +81,11 @@ func TestMendelCase11(t *testing.T) {
 	mendelCase(t, 11, 11)
 }
 
+// Same as TestMendelCase3 except with initial alleles
+func TestMendelCase12(t *testing.T) {
+	mendelCaseBin(t, 12, 12, "00000050.json")
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

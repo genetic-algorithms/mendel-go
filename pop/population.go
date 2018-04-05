@@ -175,31 +175,71 @@ type FractionFrequency struct {
 
 func ParseInitialAllelesFrequencies(frequencies string) (freqList []FractionFrequency) {
 	// The input parameter should look like: 0.25:0.1, 0.5:0.25, 0.25:0.5
-	errorStr := fmt.Sprintf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, ...", string(VARIABLE_FREQ_INITIAL_ALLELES))
+	errorStr := fmt.Sprintf("Error: if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, ...", string(VARIABLE_FREQ_INITIAL_ALLELES))
 	if strings.TrimSpace(frequencies) == "" { log.Fatal(errorStr) }
 	freqList = make([]FractionFrequency, 0)
 	pairs := strings.Split(frequencies, ",")
+	var alleleTotal float64
 	for _, p := range pairs {
 		parts := strings.Split(p, ":")
 		if len(parts) < 2 { log.Fatal(errorStr) }
 		var alleleFraction, frequency float64
 		var err error
 		alleleFraction, err = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-		if err != nil  { log.Fatalf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		if err != nil  { log.Fatalf("Error: if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		if alleleFraction <= 0.0 || alleleFraction > 1.0 { log.Fatalf("Error: initial_alleles_frequencies must contain allele fractions that are > 0.0 and <= 1.0. Bad allele fraction: %v", alleleFraction) }
 		frequency, err = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err != nil  { log.Fatalf("if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		if err != nil  { log.Fatalf("Error: if initial_allele_fitness_model==%s, then initial_alleles_frequencies must be like: alfrac1:freq1, alfrac2:freq2, .... Parsing error: %v", string(VARIABLE_FREQ_INITIAL_ALLELES), err) }
+		if frequency <= 0.0 || frequency > 0.5 { log.Fatalf("Error: initial_alleles_frequencies must contain frequences that are > 0.0 and <= 0.5. Bad frequency: %v", frequency) }
 		freqList = append(freqList, FractionFrequency{alleleFraction:alleleFraction, frequency:frequency})
+		alleleTotal += alleleFraction
 	}
+	if alleleTotal != 1.0 { log.Fatalf("Error: the allele fractions specified in initial_alleles_frequencies must add up to 1.0, not %v", alleleTotal) }
 	return
 }
 
 // GenerateVariableFreqInitialAlleles creates initial contrasting allele pairs according to the frequencies specified in Initial_alleles_frequencies
-func GenerateVariableFreqInitialAlleles(_ *Population, _ *rand.Rand) {
-	freqMap := ParseInitialAllelesFrequencies(config.Cfg.Population.Initial_alleles_frequencies)
-	config.Verbose(1, "Generating initial contrasting alleles for: %v", freqMap)
+func GenerateVariableFreqInitialAlleles(p *Population, uniformRandom *rand.Rand) {
+	// Parse the input parameter
+	freqList := ParseInitialAllelesFrequencies(config.Cfg.Population.Initial_alleles_frequencies)
+	config.Verbose(1, "Generating initial contrasting alleles for: %v", freqList)
 	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
-	//todo: actually add the initial alleles
+	// Loop thru each fraction/fequency pair
+	for _, fracFreq := range freqList {
+		numAlleles := utils.RoundInt(float64(config.Cfg.Population.Num_contrasting_alleles) * fracFreq.alleleFraction)
+		numIndivs := utils.RoundInt(float64(p.GetCurrentSize()) * fracFreq.frequency * 2.0)		// times 2.0 because frequency is the fraction of chromosone sets (twice the pop) and each initial allele only goes on 1 LB in each indiv
+		if numIndivs > int(p.GetCurrentSize()) {
+			if numIndivs > int(p.GetCurrentSize() + 1) { log.Printf("Internal Error: numIndivs of %d is > than population size", numIndivs) }
+			numIndivs = int(p.GetCurrentSize())
+		}
+		allIndivs := numIndivs == int(p.GetCurrentSize())
+
+		// Create numAlleles and put each of them on numIndivs
+		for i:=1; i<=numAlleles; i++ {
+			favMutn, delMutn := dna.CreateInitialAllelePair(utils.GlobalUniqueInt, uniformRandom)
+
+			// Randomly choose a chromosome and LB position for this allele pair to go on
+			lbIndex := uniformRandom.Intn(int(config.Cfg.Population.Num_linkage_subunits - 1))   // 0 to numLBs-1
+			chromoIndex := lbIndex / int(p.LBsPerChromosome) 	// 0 to numChr-1
+			lbIndexOnChr := lbIndex % int(p.LBsPerChromosome) 	// 0 to LBsPerChromosome-1
+
+			// To avoid always adding alleles to the same indivs, create a shuffled slice of indices into the population
+			var indivIndices []int
+			if !allIndivs { indivIndices = uniformRandom.Perm(int(p.GetCurrentSize())) }  // as optimization don't mix pop order if we are going to give the allele to everyone anyway
+
+			// Loop thru the correct number of indivs, adding the allele pair to each indiv
+			for j := 0; j < numIndivs; j++ {
+				var ind *Individual
+				if allIndivs {
+					ind = p.IndivRefs[j].Indiv
+				} else {
+					ind = p.IndivRefs[indivIndices[j]].Indiv
+				}
+				ind.AddInitialAllelePair(chromoIndex, lbIndexOnChr, favMutn, delMutn)
+			}
+		}
+	}
 }
 
 // Mate mates all the pairs of the population, choosing the linkage block at each linkage block position randomly from

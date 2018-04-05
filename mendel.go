@@ -106,10 +106,21 @@ func main() {
 	pop.Mdl.GenerateInitialAlleles(parentPop, uniformRandom)
 	parentPop.ReportInitial(maxGenNum)
 
-	// Main generation loop.
-	popMaxSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
+	popMaxIsSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
 	popMax := config.Cfg.Population.Max_pop_size
-	//for gen := uint32(1); (maxGenNum == 0 || gen <= maxGenNum) && (!popMaxSet || parentPop.GetCurrentSize() < popMax); gen++ {
+
+	// If num gens is 0 and not exponential growth, only report on genesis pop and then exit
+	zeroGens := maxGenNum == 0 && !popMaxIsSet
+	if config.Cfg.Population.Num_contrasting_alleles > 0 && (zeroGens || config.Cfg.Computation.Plot_allele_gens == 1) {
+		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
+		parentPop.ReportEachGen(0, zeroGens)
+		if zeroGens {
+			shutdown() // Finish up
+			os.Exit(0)
+		}
+	}
+
+	// Main generation loop.
 	for gen := uint32(1); ; gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
 		childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
@@ -124,7 +135,7 @@ func main() {
 		lastGen := false
 		if maxGenNum != 0 && gen >= maxGenNum {
 			lastGen = true
-		} else if popMaxSet && childrenPop.GetCurrentSize() >= popMax {
+		} else if popMaxIsSet && childrenPop.GetCurrentSize() >= popMax {
 			log.Printf("Population has reached the max specified value of %d. Stopping simulation.", popMax)
 			lastGen = true
 		} else if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {

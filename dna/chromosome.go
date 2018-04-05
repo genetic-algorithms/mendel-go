@@ -192,6 +192,13 @@ func ChrAppendInitialContrastingAlleles(chr1, chr2 *Chromosome, lbIndex int, uni
 	chr2.FitnessEffect += fitnessEffect2
 }
 
+// ChrAppendInitialAllelePair adds an initial contrasting allele pair to 2 LBs on 2 chromosomes (favorable to 1, deleterious to the other).
+func ChrAppendInitialAllelePair(chr1, chr2 *Chromosome, lbIndex int, favMutn, delMutn Mutation) {
+	AppendInitialAllelePair(&chr1.LinkageBlocks[lbIndex], &chr2.LinkageBlocks[lbIndex], favMutn, delMutn)
+	chr1.FitnessEffect += favMutn.FitnessEffect
+	chr2.FitnessEffect += delMutn.FitnessEffect
+}
+
 // SumFitness combines the fitness effect of all of its LBs in the additive method
 func (c *Chromosome) SumFitness() float64 {
 	// Now we keep a running total instead

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"log"
 	//"unsafe"
+	"github.com/genetic-algorithms/mendel-go/utils"
 )
 
 // Note: we have a lot of mutations, so to keep the size of each to a min, store del/fav and dom/rec in same enum
@@ -184,4 +185,15 @@ func CalcUniformAlleleFitness(uniformRandom *rand.Rand) float64 {
 	} else {
 		return 2.0 * initial_alleles_mean_effect * uniformRandom.Float64()		// so the average works out to be initial_alleles_mean_effect
 	}
+}
+
+func CreateInitialAllelePair(uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) (favMutn, delMutn Mutation) {
+	// Note: for now we assume that all initial contrasting alleles are co-dominant so that in the homozygous case (2 of the same favorable
+	//		allele (or 2 of the deleterious allele) - 1 from each parent), the combined fitness effect is 1.0 * the allele fitness.
+	expression := 0.5
+	fitnessEffect := Mdl.CalcAlleleFitness(uniformRandom) * expression
+
+	favMutn = Mutation{Id: uniqueInt.NextInt(), Type: FAV_ALLELE, FitnessEffect: float32(fitnessEffect)}
+	delMutn = Mutation{Id: uniqueInt.NextInt(), Type: DEL_ALLELE, FitnessEffect: float32(-fitnessEffect)}
+	return
 }

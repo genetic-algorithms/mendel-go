@@ -88,7 +88,7 @@ func (lb *LinkageBlock) appendMutn(mutn Mutation) {
 }
 
 
-// AppendInitialContrastingAlleles adds an initial contrasting allele pair to 2 LBs (favorable to 1, deleterious to the other).
+// AppendInitialContrastingAlleles adds a random initial contrasting allele pair to 2 LBs (favorable to 1, deleterious to the other).
 // The 2 LBs passed in are typically the same LB position on the same chromosome number, 1 from each parent.
 func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.UniqueInt, uniformRandom *rand.Rand) (fitnessEffect1, fitnessEffect2 float32) {
 	// Note: for now we assume that all initial contrasting alleles are co-dominant so that in the homozygous case (2 of the same favorable
@@ -105,10 +105,24 @@ func AppendInitialContrastingAlleles(lb1, lb2 *LinkageBlock, uniqueInt *utils.Un
 
 	// Add a deleterious allele to the 2nd LB
 	fitnessEffect2 = float32(-fitnessEffect)
-	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt()+1, Type: DEL_ALLELE, FitnessEffect: fitnessEffect2})
+	lb2.mutn = append(lb2.mutn, Mutation{Id: uniqueInt.NextInt(), Type: DEL_ALLELE, FitnessEffect: fitnessEffect2})
 	lb2.numDelAllele++
 	lb2.fitnessEffect += fitnessEffect2
 	return
+}
+
+// AppendInitialAllelePair adds an initial contrasting allele pair to 2 LBs (favorable to 1, deleterious to the other).
+// The 2 LBs passed in are typically the same LB position on the same chromosome number, 1 from each parent.
+func AppendInitialAllelePair(lb1, lb2 *LinkageBlock, favMutn, delMutn Mutation) {
+	// Add a favorable allele to the 1st LB
+	lb1.mutn = append(lb1.mutn, favMutn)
+	lb1.numFavAllele++
+	lb1.fitnessEffect += favMutn.FitnessEffect
+
+	// Add a deleterious allele to the 2nd LB
+	lb2.mutn = append(lb2.mutn, delMutn)
+	lb2.numDelAllele++
+	lb2.fitnessEffect += delMutn.FitnessEffect
 }
 
 

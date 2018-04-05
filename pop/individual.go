@@ -210,6 +210,14 @@ func (ind *Individual) AddInitialContrastingAlleles(numAlleles uint32, uniformRa
 	return numWithAllelesRemainder + numWithAllelesEvenly, numProcessedLBs
 }
 
+// AddInitialAllelePair adds 1 pair of contrasting alleles to this individual
+func (ind *Individual) AddInitialAllelePair(chromoIndex, lbIndexOnChr int, favMutn, delMutn dna.Mutation) {
+	dna.ChrAppendInitialAllelePair(&ind.ChromosomesFromDad[chromoIndex], &ind.ChromosomesFromMom[chromoIndex], lbIndexOnChr, favMutn, delMutn)
+	ind.NumMutations += 2
+	ind.NumDelAllele += 1
+	ind.NumFavAllele += 1
+}
+
 
 // Various algorithms for determining the random number of offspring for a mating pair of individuals
 type CalcNumOffspringType func(ind *Individual, uniformRandom *rand.Rand) uint32
