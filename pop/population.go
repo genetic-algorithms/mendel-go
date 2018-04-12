@@ -763,7 +763,8 @@ type Buckets struct {
 
 type NormalizedBuckets struct {
 	Generation uint32 `json:"generation"`
-	Bins []float64 `json:"bins"`
+	//Bins []float64 `json:"bins"`
+	Bins []uint32 `json:"bins"`
 	Deleterious []float64 `json:"deleterious"`
 	Neutral []float64 `json:"neutral"`
 	Favorable []float64 `json:"favorable"`
@@ -868,7 +869,8 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	if favorableRec > 0 { favRecFitness = favRecFitness/float64(favorableRec) }
 	if delAllele > 0 { delAlleleFitness = delAlleleFitness/float64(delAllele) }
 	if favAllele > 0 { favAlleleFitness = favAlleleFitness/float64(favAllele) }
-	config.Verbose(1, "Allele bin stats (%s): total alleles: %d, deleteriousDom: %d, delDomFitness: %v, deleteriousRec: %d, delDomRec: %v, neutral: %d, favorableDom: %d, favDomFitness: %v, favorableRec: %d, favRecFitness: %v, del initial: %d, del initial fitness: %v, fav initial: %d, fav initial fitness: %v",
+	config.Verbose(1, "---------")
+	config.Verbose(1, "Total allele stats (%s): total alleles: %d, deleteriousDom: %d, delDomFitness: %v, deleteriousRec: %d, delDomRec: %v, neutral: %d, favorableDom: %d, favDomFitness: %v, favorableRec: %d, favRecFitness: %v, del initial: %d, del initial fitness: %v, fav initial: %d, fav initial fitness: %v",
 		countingStr, totalMutns, deleteriousDom, delDomFitness, deleteriousRec, delRecFitness, neutral, favorableDom, favDomFitness, favorableRec, favRecFitness, delAllele, delAlleleFitness, favAllele, favAlleleFitness)
 
 	fileName := fmt.Sprintf("%08d.json", genNum)
@@ -890,40 +892,61 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 // outputNormalizedAlleleBins uses the absolute data gathered in outputAlleleBins() and normalizes all of the bin counts (by dividing them by the total number of alleles)
 func outputNormalizedAlleleBins(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
-	// Note: even when Omit_first_allele_bin==true we are still dividing all bin counts by the total number of mutations
-	totalAlleles := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
+	if config.Cfg.Computation.Omit_first_allele_bin {
+		// The slices in bucketJson have already be shifted left, so decrement our count so we effectively show bins 1-49, instead of 0-49
+		normalizedBucketCount--
+	}
+
+	// Even when Omit_first_allele_bin==true this would have us dividing all bin counts by the total number of unique mutations. This value is equal to the sum of all buckets in bucketJson
+	totalUniqueAlleles := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
+
+	var minorAlleleTotal uint32
+	for i := uint32(0); i < normalizedBucketCount; i++ {
+		// These buckets are already adjusted for Omit_first_allele_bin
+		minorAlleleTotal += bucketJson.Deleterious[i]
+		minorAlleleTotal += bucketJson.Neutral[i]
+		minorAlleleTotal += bucketJson.Favorable[i]
+		minorAlleleTotal += bucketJson.DelInitialAlleles[i]
+		minorAlleleTotal += bucketJson.FavInitialAlleles[i]
+	}
+	config.Verbose(1, "Unique allele stats: total unique alleles: %d, minor unique alleles: %d", totalUniqueAlleles, minorAlleleTotal)
+	config.Verbose(1, "---------")
+	//minorAlleleTotal = uint32(totalUniqueAlleles)
+
 	normalizedBucketJson := &NormalizedBuckets{}
 
 	normalizedBucketJson.Generation = genNum
 
-	normalizedBucketJson.Bins = make([]float64, normalizedBucketCount)
+	//normalizedBucketJson.Bins = make([]float64, normalizedBucketCount)
+	normalizedBucketJson.Bins = make([]uint32, normalizedBucketCount)
 	for i := range normalizedBucketJson.Bins {
-		normalizedBucketJson.Bins[i] = float64(i + 1) / float64(bucketCount)
+		//normalizedBucketJson.Bins[i] = float64(i + 1) / float64(bucketCount)
+		normalizedBucketJson.Bins[i] = uint32(i + 1)
 	}
 
 	normalizedBucketJson.Deleterious = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
-		normalizedBucketJson.Deleterious[i] = float64(bucketJson.Deleterious[i]) / float64(totalAlleles)
+		normalizedBucketJson.Deleterious[i] = float64(bucketJson.Deleterious[i]) / float64(minorAlleleTotal)
 	}
 
 	normalizedBucketJson.Neutral = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
-		normalizedBucketJson.Neutral[i] = float64(bucketJson.Neutral[i]) / float64(totalAlleles)
+		normalizedBucketJson.Neutral[i] = float64(bucketJson.Neutral[i]) / float64(minorAlleleTotal)
 	}
 
 	normalizedBucketJson.Favorable = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
-		normalizedBucketJson.Favorable[i] = float64(bucketJson.Favorable[i]) / float64(totalAlleles)
+		normalizedBucketJson.Favorable[i] = float64(bucketJson.Favorable[i]) / float64(minorAlleleTotal)
 	}
 
 	normalizedBucketJson.DelInitialAlleles = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
-		normalizedBucketJson.DelInitialAlleles[i] = float64(bucketJson.DelInitialAlleles[i]) / float64(totalAlleles)
+		normalizedBucketJson.DelInitialAlleles[i] = float64(bucketJson.DelInitialAlleles[i]) / float64(minorAlleleTotal)
 	}
 
 	normalizedBucketJson.FavInitialAlleles = make([]float64, normalizedBucketCount)
 	for i := uint32(0); i < normalizedBucketCount; i++ {
-		normalizedBucketJson.FavInitialAlleles[i] = float64(bucketJson.FavInitialAlleles[i]) / float64(totalAlleles)
+		normalizedBucketJson.FavInitialAlleles[i] = float64(bucketJson.FavInitialAlleles[i]) / float64(minorAlleleTotal)
 	}
 
 	newJson, err := json.Marshal(normalizedBucketJson)
