@@ -863,16 +863,16 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 		countingStr, totalMutns, deleterious, delFitness, neutral, favorable, favFitness, delAllele, delAlleleFitness, favAllele, favAlleleFitness)
 
 	// Collect unique allele stats
-	firstBinMutns := bucketJson.Deleterious[0] + bucketJson.Neutral[0] + bucketJson.Favorable[0]
-	firstBinAlleles := bucketJson.DelInitialAlleles[0] + bucketJson.FavInitialAlleles[0]
+	firstBinMutns := uint64(bucketJson.Deleterious[0] + bucketJson.Neutral[0] + bucketJson.Favorable[0])
+	firstBinAlleles := uint64(bucketJson.DelInitialAlleles[0] + bucketJson.FavInitialAlleles[0])
 	lastIndex := bucketCount-1
-	lastBinMutns := bucketJson.Deleterious[lastIndex] + bucketJson.Neutral[lastIndex] + bucketJson.Favorable[lastIndex]
-	lastBinAlleles := bucketJson.DelInitialAlleles[lastIndex] + bucketJson.FavInitialAlleles[lastIndex]
+	lastBinMutns := uint64(bucketJson.Deleterious[lastIndex] + bucketJson.Neutral[lastIndex] + bucketJson.Favorable[lastIndex])
+	lastBinAlleles := uint64(bucketJson.DelInitialAlleles[lastIndex] + bucketJson.FavInitialAlleles[lastIndex])
 	// FYI, the total of these 2 values is equal to the sum of all buckets in bucketJson
-	totalUniqueMutns := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec)
-	totalUniqueAlleles := len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
-	polyMutns := totalUniqueMutns - int(firstBinMutns + lastBinMutns)
-	polyAlleles := totalUniqueAlleles - int(firstBinAlleles + lastBinAlleles)
+	totalUniqueMutns := uint64(len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec))
+	totalUniqueAlleles := uint64(len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles))
+	polyMutns := totalUniqueMutns - uint64(firstBinMutns + lastBinMutns)
+	polyAlleles := totalUniqueAlleles - uint64(firstBinAlleles + lastBinAlleles)
 	config.Verbose(1, "Allele bin stats: rare alleles (0-1%%) total/mutns/alleles: %d/%d/%d, polymorphic alleles (1-99%%) total/mutns/alleles: %d/%d/%d, fixed alleles (99-100%%) total/mutns/alleles: %d/%d/%d",
 		firstBinMutns+firstBinAlleles, firstBinMutns, firstBinAlleles, polyMutns+polyAlleles, polyMutns, polyAlleles, lastBinMutns+lastBinAlleles, lastBinMutns, lastBinAlleles)
 
@@ -913,14 +913,14 @@ func outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum 
 	}
 
 	// Normalize by dividing by the number of alleles we are plotting (the minor alleles, omitting the 1st bin if Omit_first_allele_bin==true
-	var minorAlleleTotal, minorMutns, minorAlleles uint32
+	var minorAlleleTotal, minorMutns, minorAlleles uint64
 	for i := uint32(0); i < normalizedBucketCount; i++ {
 		// These buckets are already adjusted for Omit_first_allele_bin
-		minorMutns += bucketJson.Deleterious[i]
-		minorMutns += bucketJson.Neutral[i]
-		minorMutns += bucketJson.Favorable[i]
-		minorAlleles += bucketJson.DelInitialAlleles[i]
-		minorAlleles += bucketJson.FavInitialAlleles[i]
+		minorMutns += uint64(bucketJson.Deleterious[i])
+		minorMutns += uint64(bucketJson.Neutral[i])
+		minorMutns += uint64(bucketJson.Favorable[i])
+		minorAlleles += uint64(bucketJson.DelInitialAlleles[i])
+		minorAlleles += uint64(bucketJson.FavInitialAlleles[i])
 	}
 	minorAlleleTotal = minorMutns + minorAlleles
 	config.Verbose(1, "Unique minor alleles (%s): total: %d, mutations: %d, initial alleles: %d", omitStr, minorAlleleTotal, minorMutns, minorAlleles)
@@ -971,12 +971,12 @@ func outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum 
 
 
 // fillBuckets takes the number of occurrences of each mutation id, determines which bucket it belongs in, and adds 1 to that bucket
-func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) (totalMutns uint32, totalFitness float64) {
+func fillBuckets(counts map[uint64]dna.Allele, popSize uint32, bucketCount uint32, buckets []uint32) (totalMutns uint64, totalFitness float64) {
 	poolSize := float64(2 * popSize)
 	if !config.Cfg.Computation.Count_duplicate_alleles { poolSize = float64(popSize)}	// in this case, each allele count is a measure of how many individuals it occurred in
 
 	for _, count := range counts {
-		totalMutns += count.Count
+		totalMutns += uint64(count.Count)
 		totalFitness += float64(count.FitnessEffect) * float64(count.Count)
 		percentage := float64(count.Count) / poolSize
 		var i uint32
