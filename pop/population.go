@@ -845,33 +845,46 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	bucketJson.FavInitialAlleles = make([]uint32, bucketCount)
 	favAllele, favAlleleFitness := fillBuckets(alleles.FavInitialAlleles, popSize, bucketCount, bucketJson.FavInitialAlleles)
 
+	// Output allele totals stats that we collected during fillBuckets()
+	totalMutns := deleteriousDom + deleteriousRec + neutral + favorableDom + favorableRec + delAllele + favAllele
+	countingStr := "counting duplicates"
+	if !config.Cfg.Computation.Count_duplicate_alleles {
+		countingStr = "filtering out duplicates"
+	}
+	var delFitness, favFitness float64
+	deleterious := deleteriousDom + deleteriousRec
+	if deleterious > 0 { delFitness = (delDomFitness+delRecFitness)/float64(deleterious) }
+	favorable := favorableDom + favorableRec
+	if favorable > 0 { favFitness = (favDomFitness+favRecFitness)/float64(favorable) }
+	if delAllele > 0 { delAlleleFitness = delAlleleFitness/float64(delAllele) }
+	if favAllele > 0 { favAlleleFitness = favAlleleFitness/float64(favAllele) }
+	config.Verbose(1, "---------")
+	config.Verbose(1, "Total tracked allele stats (%s): total alleles: %d, deleterious: %d, delFitness: %v, neutral: %d, favorable: %d, favFitness: %v, del initial: %d, del initial fitness: %v, fav initial: %d, fav initial fitness: %v",
+		countingStr, totalMutns, deleterious, delFitness, neutral, favorable, favFitness, delAllele, delAlleleFitness, favAllele, favAlleleFitness)
+
+	// Collect unique allele stats
+	firstBinMutns := bucketJson.Deleterious[0] + bucketJson.Neutral[0] + bucketJson.Favorable[0]
+	firstBinAlleles := bucketJson.DelInitialAlleles[0] + bucketJson.FavInitialAlleles[0]
+	lastIndex := bucketCount-1
+	lastBinMutns := bucketJson.Deleterious[lastIndex] + bucketJson.Neutral[lastIndex] + bucketJson.Favorable[lastIndex]
+	lastBinAlleles := bucketJson.DelInitialAlleles[lastIndex] + bucketJson.FavInitialAlleles[lastIndex]
+	// FYI, the total of these 2 values is equal to the sum of all buckets in bucketJson
+	totalUniqueMutns := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec)
+	totalUniqueAlleles := len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
+	polyMutns := totalUniqueMutns - int(firstBinMutns + lastBinMutns)
+	polyAlleles := totalUniqueAlleles - int(firstBinAlleles + lastBinAlleles)
+	config.Verbose(1, "Allele bin stats: rare alleles (0-1%%) total/mutns/alleles: %d/%d/%d, polymorphic alleles (1-99%%) total/mutns/alleles: %d/%d/%d, fixed alleles (99-100%%) total/mutns/alleles: %d/%d/%d",
+		firstBinMutns+firstBinAlleles, firstBinMutns, firstBinAlleles, polyMutns+polyAlleles, polyMutns, polyAlleles, lastBinMutns+lastBinAlleles, lastBinMutns, lastBinAlleles)
+
 	if config.Cfg.Computation.Omit_first_allele_bin {
-		// Shift all slices 1 to the left
+		// Shift all slices 1 to the left. This will affect both the allele bin output and the normalized output
 		bucketJson.Bins = bucketJson.Bins[1:]
 		bucketJson.Deleterious = bucketJson.Deleterious[1:]
 		bucketJson.Neutral = bucketJson.Neutral[1:]
 		bucketJson.Favorable = bucketJson.Favorable[1:]
 		bucketJson.DelInitialAlleles = bucketJson.DelInitialAlleles[1:]
 		bucketJson.FavInitialAlleles = bucketJson.FavInitialAlleles[1:]
-		// This will affect both the allele bin output and the normalized output
 	}
-
-	totalMutns := deleteriousDom + deleteriousRec + neutral + favorableDom + favorableRec + delAllele + favAllele
-	var countingStr string
-	if config.Cfg.Computation.Count_duplicate_alleles {
-		countingStr = "counting duplicates"
-	} else {
-		countingStr = "filtering out duplicates"
-	}
-	if deleteriousDom > 0 { delDomFitness = delDomFitness/float64(deleteriousDom) }
-	if deleteriousRec > 0 { delRecFitness = delRecFitness/float64(deleteriousRec) }
-	if favorableDom > 0 { favDomFitness = favDomFitness/float64(favorableDom) }
-	if favorableRec > 0 { favRecFitness = favRecFitness/float64(favorableRec) }
-	if delAllele > 0 { delAlleleFitness = delAlleleFitness/float64(delAllele) }
-	if favAllele > 0 { favAlleleFitness = favAlleleFitness/float64(favAllele) }
-	config.Verbose(1, "---------")
-	config.Verbose(1, "Total allele stats (%s): total alleles: %d, deleteriousDom: %d, delDomFitness: %v, deleteriousRec: %d, delDomRec: %v, neutral: %d, favorableDom: %d, favDomFitness: %v, favorableRec: %d, favRecFitness: %v, del initial: %d, del initial fitness: %v, fav initial: %d, fav initial fitness: %v",
-		countingStr, totalMutns, deleteriousDom, delDomFitness, deleteriousRec, delRecFitness, neutral, favorableDom, favDomFitness, favorableRec, favRecFitness, delAllele, delAlleleFitness, favAllele, favAlleleFitness)
 
 	fileName := fmt.Sprintf("%08d.json", genNum)
 
@@ -885,42 +898,40 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	}
 
 	if config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) {
-		outputNormalizedAlleleBins(alleles, bucketJson, bucketCount, genNum, fileName)
+		outputNormalizedAlleleBins(bucketJson, bucketCount, genNum, fileName)
 	}
 }
 
 // outputNormalizedAlleleBins uses the absolute data gathered in outputAlleleBins() and normalizes all of the bin counts (by dividing them by the total number of alleles)
-func outputNormalizedAlleleBins(alleles *dna.AlleleCount, bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
+func outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
+	omitStr := "including first bin"
 	if config.Cfg.Computation.Omit_first_allele_bin {
 		// The slices in bucketJson have already be shifted left, so decrement our count so we effectively show bins 1-49, instead of 0-49
 		normalizedBucketCount--
+		omitStr = "excluding first bin"
 	}
 
-	// Even when Omit_first_allele_bin==true this would have us dividing all bin counts by the total number of unique mutations. This value is equal to the sum of all buckets in bucketJson
-	totalUniqueAlleles := len(alleles.DeleteriousDom) + len(alleles.DeleteriousRec) + len(alleles.Neutral) + len(alleles.FavorableDom) + len(alleles.FavorableRec) + len(alleles.DelInitialAlleles) + len(alleles.FavInitialAlleles)
-
-	var minorAlleleTotal uint32
+	// Normalize by dividing by the number of alleles we are plotting (the minor alleles, omitting the 1st bin if Omit_first_allele_bin==true
+	var minorAlleleTotal, minorMutns, minorAlleles uint32
 	for i := uint32(0); i < normalizedBucketCount; i++ {
 		// These buckets are already adjusted for Omit_first_allele_bin
-		minorAlleleTotal += bucketJson.Deleterious[i]
-		minorAlleleTotal += bucketJson.Neutral[i]
-		minorAlleleTotal += bucketJson.Favorable[i]
-		minorAlleleTotal += bucketJson.DelInitialAlleles[i]
-		minorAlleleTotal += bucketJson.FavInitialAlleles[i]
+		minorMutns += bucketJson.Deleterious[i]
+		minorMutns += bucketJson.Neutral[i]
+		minorMutns += bucketJson.Favorable[i]
+		minorAlleles += bucketJson.DelInitialAlleles[i]
+		minorAlleles += bucketJson.FavInitialAlleles[i]
 	}
-	config.Verbose(1, "Unique allele stats: total unique alleles: %d, minor unique alleles: %d", totalUniqueAlleles, minorAlleleTotal)
+	minorAlleleTotal = minorMutns + minorAlleles
+	config.Verbose(1, "Unique minor alleles (%s): total: %d, mutations: %d, initial alleles: %d", omitStr, minorAlleleTotal, minorMutns, minorAlleles)
 	config.Verbose(1, "---------")
-	//minorAlleleTotal = uint32(totalUniqueAlleles)
 
 	normalizedBucketJson := &NormalizedBuckets{}
 
 	normalizedBucketJson.Generation = genNum
 
-	//normalizedBucketJson.Bins = make([]float64, normalizedBucketCount)
 	normalizedBucketJson.Bins = make([]uint32, normalizedBucketCount)
 	for i := range normalizedBucketJson.Bins {
-		//normalizedBucketJson.Bins[i] = float64(i + 1) / float64(bucketCount)
 		normalizedBucketJson.Bins[i] = uint32(i + 1)
 	}
 
