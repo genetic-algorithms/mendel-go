@@ -1059,13 +1059,14 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 
 	/*
 	Taken from diagnostics.diagnostics_mutn_bins_plot() - lines 291-793, to produce file 8, .dst, distribution of accumulated del/fav mutns
-	For reference, in dmutn(i,j,k):
+	For reference, in dmutn(i,j,k) and fmutn(i,j,k):
 	  i: 1 is the num of mutns in that individual, rest are the mutns in that indiv:
+	  j: 1 (dad) or 2 (mom)
+	  k: which individual
+	  mutn value:
 	    recessive (-) or dominant (+)
 	    which linkage block the mutation resides in: abs(mutn)/lb_modulo
 	    the fitness effect of the mutation: mod(abs(mutn),lb_modulo) / lb_modulo
-	  j: 1 (dad) or 2 (mom)
-	  k: which individual
 	*/
 
 	// This computes the data for distribution of alleles according to the fitness, files .deldst and .favdst
@@ -1073,7 +1074,7 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	logn := math.Log // can't use log() because there is a package named that
 	exp := math.Exp
 	pow := math.Pow
-	abs := math.Abs
+	//abs := math.Abs
 	//current_pop_size := int(p.GetCurrentSize())
 	//mutn_sum := float64(p.TotalNumMutations)   // a comment in diagnostices.f90 says this should be the expected number of mutns w/o selection
 	mutn_sum := float64(p.GetCurrentSize() * genNum) * config.Cfg.Mutations.Mutn_rate
@@ -1117,28 +1118,32 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	del_dom_fitness_bins := make([]float64, 51)
 	fav_rec_fitness_bins := make([]float64, 51)
 	fav_dom_fitness_bins := make([]float64, 51)
-	//fmt.Println("DEBUG: Deleterious Recessive:")
-	fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
-	//fmt.Println("DEBUG: Deleterious Dominant:")
-	fillInFitnessBins(alleles.DeleteriousDom, alpha_del, gamma_del, del_bin_width, del_dom_fitness_bins)
-	//fmt.Println("DEBUG: Favorable Recessive:")
-	fillInFitnessBins(alleles.FavorableRec, alpha_fav, gamma_fav, fav_bin_width, fav_rec_fitness_bins)
-	//fmt.Println("DEBUG: Favorable Dominant:")
-	fillInFitnessBins(alleles.FavorableDom, alpha_fav, gamma_fav, fav_bin_width, fav_dom_fitness_bins)
+	fmt.Println("DEBUG: Deleterious Recessive:")
+	//fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
+	fillInFitnessBins(alleles.DeleteriousRec, 0.0, del_bin_width, del_rec_fitness_bins)
+	fmt.Println("DEBUG: Deleterious Dominant:")
+	//fillInFitnessBins(alleles.DeleteriousDom, alpha_del, gamma_del, del_bin_width, del_dom_fitness_bins)
+	fillInFitnessBins(alleles.DeleteriousDom, 0.0, del_bin_width, del_dom_fitness_bins)
+	fmt.Println("DEBUG: Favorable Recessive:")
+	//fillInFitnessBins(alleles.FavorableRec, alpha_fav, gamma_fav, fav_bin_width, fav_rec_fitness_bins)
+	fillInFitnessBins(alleles.FavorableRec, max_fav_fitness_gain, fav_bin_width, fav_rec_fitness_bins)
+	fmt.Println("DEBUG: Favorable Dominant:")
+	//fillInFitnessBins(alleles.FavorableDom, alpha_fav, gamma_fav, fav_bin_width, fav_dom_fitness_bins)
+	fillInFitnessBins(alleles.FavorableDom, max_fav_fitness_gain, fav_bin_width, fav_dom_fitness_bins)
 
 	// Compute fitness values for bin boundaries and bin centers
-	var del_bin_fitness, del_bin_fitness_boxwidth, del_bin_fitness_midpoint, fav_bin_fitness, fav_bin_fitness_boxwidth, fav_bin_fitness_midpoint [52]float64	// we are ignoring the 0th element to match fortran
+	var del_bin_fitness, /*del_bin_fitness_boxwidth,*/ del_bin_fitness_midpoint, fav_bin_fitness, /*fav_bin_fitness_boxwidth,*/ fav_bin_fitness_midpoint [52]float64	// we are ignoring the 0th element to match fortran
 	for k := 1; k <= 51; k++ {
 		del_bin_fitness[k] = exp(-del_bin_width * float64(k - 1))
 		if k > 1 {
-			del_bin_fitness_boxwidth[k - 1] = abs(del_bin_fitness[k] - del_bin_fitness[k-1])
+			//del_bin_fitness_boxwidth[k - 1] = abs(del_bin_fitness[k] - del_bin_fitness[k-1])    // <- this doesn't seem to actually be used for the plots
 			del_bin_fitness_midpoint[k - 1] = (del_bin_fitness[k] + del_bin_fitness[k-1]) / 2.
 		}
 	}
 	for k := 1; k <= 51; k++ {
 		fav_bin_fitness[k] = max_fav_fitness_gain * exp(-fav_bin_width * float64(k - 1))
 		if k > 1 {
-			fav_bin_fitness_boxwidth[k - 1] = abs(fav_bin_fitness[k] - fav_bin_fitness[k-1])
+			//fav_bin_fitness_boxwidth[k - 1] = abs(fav_bin_fitness[k] - fav_bin_fitness[k-1])
 			fav_bin_fitness_midpoint[k - 1] = (fav_bin_fitness[k] + fav_bin_fitness[k-1]) / 2.
 		}
 	}
@@ -1219,8 +1224,6 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	}
 
 	// Output the deleterious and favorable distribution files
-	//delFileName := fmt.Sprintf("%08d.deldst", genNum)
-	//favFileName := fmt.Sprintf("%08d.favdst", genNum)
 	delFileName := fmt.Sprintf("%08d.json", genNum)
 	favFileName := fmt.Sprintf("%08d.json", genNum)
 	//config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
@@ -1273,25 +1276,37 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 
 }
 
-func fillInFitnessBins(alleles map[uint64]dna.Allele, _, _, bin_width float64, fitness_bins []float64) {
+func fillInFitnessBins(alleles map[uint64]dna.Allele, max_fav_fitness_gain, bin_width float64, fitness_bins []float64) {
 	abs := math.Abs
 	logn := math.Log
-	//debugI := 1
+	debugI := 1
 	for _, allele := range alleles {
 		/* diagnostics.f90, lines 331-393 does:
             x = mod(abs(dmutn(j,1,i)),lb_modulo)*del_scale
             d = alpha_del*x**gamma_del
 		  but mutation.f90 decode_mutn_del() also does:
 		    -dexp(-d)
-		  to get the mutn fitness. So for us to get from our fitness f bacl to diagnostic.f90's value d:
+		  to get the mutn fitness. So for us to get from our fitness f back to diagnostic.f90's value d:
 		    f = -dexp(-d)
 		    -f = dexp(-d)
 		    logn(-f) = -d
 		    -logn(-f) = d
+		  decode_fitness_fav() does:
+		    max_fav_fitness_gain*dexp(-d)
+		  So for us to get from our fav fitness f back to diagnostic.f90's value d:
+		    f = max_fav_fitness_gain*dexp(-d)
+		    f / max_fav_fitness_gain = dexp(-d)
+		    logn(f / max_fav_fitness_gain) = -d
+		    -logn(f / max_fav_fitness_gain) = d
 		 */
-		d := -logn(abs(float64(allele.FitnessEffect)))
+		var d float64
+		if max_fav_fitness_gain <= 0.0 {		// deleterious
+			d = -logn(abs(float64(allele.FitnessEffect)))
+		} else {								// favorable
+			d = -logn(float64(allele.FitnessEffect) / max_fav_fitness_gain)
+		}
 		k := 1 + int(d/bin_width)
-		//if debugI <= 40 { fmt.Printf("DEBUG: f=%v, d=%v, k=%d\n", allele.FitnessEffect, d, k); debugI++ }
+		if debugI <= 40 { fmt.Printf("DEBUG: f=%v, d=%v, w=%v, k=%d\n", allele.FitnessEffect, d, bin_width, k); debugI++ }
 		if k > 0 && k <= 50 {
 			fitness_bins[k] += float64(allele.Count)	// we had this many of the same id, so same fitness
 		} /*else {

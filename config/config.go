@@ -166,6 +166,8 @@ func (c *Config) validateAndAdjust() error {
 
 	c.Selection.Heritability = math.Max(1.e-20, c.Selection.Heritability)   // Limit the minimum value of heritability to be 10**-20
 
+	if c.Mutations.Max_fav_fitness_gain <= 0.0	{ return errors.New("max_fav_fitness_gain must be > 0.0") }
+
 	if c.Mutations.Allow_back_mutn && c.Computation.Tracking_threshold != 0.0 { return errors.New("can not set both allow_back_mutn and a non-zero tracking_threshold") }
 	if c.Mutations.Multiplicative_weighting != 0.0 && c.Computation.Tracking_threshold != 0.0 { return errors.New("setting tracking_threshold with multiplicative_weighting is not yet supported") }
 

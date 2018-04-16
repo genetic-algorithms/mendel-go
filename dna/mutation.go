@@ -159,7 +159,7 @@ func CalcWeibullDelMutationFitness(uniformRandom *rand.Rand) float64 {
 
 // Algorithm according to Wes and the Fortran version. See init.f90 lines 300-311 and mutation.f90 line 104
 func CalcWeibullFavMutationFitness(uniformRandom *rand.Rand) float64 {
-	/*
+	/* these are now computed in config.ComputedValuesFactory()
 	var alphaFav float64
 	if config.Cfg.Mutations.Max_fav_fitness_gain > 0.0 {
 		alphaFav = math.Log(config.Cfg.Mutations.Genome_size * config.Cfg.Mutations.Max_fav_fitness_gain)
@@ -170,7 +170,7 @@ func CalcWeibullFavMutationFitness(uniformRandom *rand.Rand) float64 {
 	            math.Log(config.Cfg.Mutations.High_impact_mutn_fraction)
 	*/
 
-	return config.Cfg.Mutations.Max_fav_fitness_gain * math.Exp(-config.Computed.Alpha_fav* math.Pow(uniformRandom.Float64(), config.Computed.Gamma_fav))
+	return config.Cfg.Mutations.Max_fav_fitness_gain * math.Exp(-config.Computed.Alpha_fav * math.Pow(uniformRandom.Float64(), config.Computed.Gamma_fav))
 }
 
 

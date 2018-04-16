@@ -8,14 +8,18 @@ import (
 	"bytes"
 	"strconv"
 	"os"
+	"github.com/genetic-algorithms/mendel-go/config"
 )
 
 const (
 	IN_FILE_BASE string = "test/input/mendel-testcase"
 	OUT_FILE_BASE string = "test/output/testcase"
 	EXP_FILE_BASE string = "test/expected/testcase"
-	BIN_SUBDIR string = "/allele-bins/"
-	NORM_SUBDIR string = "/normalized-allele-bins/"
+	//BIN_SUBDIR string = "/allele-bins/"
+	BIN_SUBDIR string = "/" + config.ALLELE_BINS_DIRECTORY
+	NORM_SUBDIR string = "/" + config.NORMALIZED_ALLELE_BINS_DIRECTORY
+	DIST_DEL_SUBDIR string = "/" + config.DISTRIBUTION_DEL_DIRECTORY
+	DIST_FAV_SUBDIR string = "/" + config.DISTRIBUTION_FAV_DIRECTORY
 )
 
 // Typical small run
@@ -35,15 +39,7 @@ func TestMendelCase3(t *testing.T) {
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase4(t *testing.T) {
-	mendelCaseBin(t, 4, 4, "00000050.json")
-	// Also compare the allele-bins files
-	//outFileDir := "test/output/testcase4"
-	//expFileDir := "test/expected/testcase4"
-	//subdir := "/allele-bins/"
-	//f := "00000050.json"
-	//compareFiles(t, outFileDir+subdir+f, expFileDir+subdir+f)
-	//subdir = "/normalized-allele-bins/"
-	//compareFiles(t, outFileDir+subdir+f, expFileDir+subdir+f)
+	mendelCaseBin(t, 4, 4, "00000050.json", false)
 }
 
 // Same as TestMendelCase3 except with selection_model=ups, and heritability and non_scaling_noise back to default
@@ -53,7 +49,7 @@ func TestMendelCase5(t *testing.T) {
 
 // Same as TestMendelCase5 except with selection_model=spps and omit_first_allele_bin=true
 func TestMendelCase6(t *testing.T) {
-	mendelCaseBin(t, 6, 6, "00000020.json")
+	mendelCaseBin(t, 6, 6, "00000020.json", false)
 }
 
 // Same as TestMendelCase5 except with selection_model=partialtrunc
@@ -63,7 +59,7 @@ func TestMendelCase7(t *testing.T) {
 
 // Same as TestMendelCase6 except with 4 threads
 func TestMendelCase8(t *testing.T) {
-	mendelCaseBin(t, 8, 8, "00000020.json")
+	mendelCaseBin(t, 8, 8, "00000020.json", false)
 }
 
 // Same as TestMendelCase8 except with exponential pop growth
@@ -73,7 +69,7 @@ func TestMendelCase9(t *testing.T) {
 
 // Same as TestMendelCase8 except with carrying capacity pop growth
 func TestMendelCase10(t *testing.T) {
-	mendelCaseBin(t, 10, 10, "00000010.json")
+	mendelCaseBin(t, 10, 10, "00000010.json", false)
 }
 
 // Same as TestMendelCase8 except with founders pop growth with bottleneck, and weibull
@@ -83,7 +79,7 @@ func TestMendelCase11(t *testing.T) {
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase12(t *testing.T) {
-	mendelCaseBin(t, 12, 12, "00000050.json")
+	mendelCaseBin(t, 12, 12, "00000050.json", true)
 }
 
 
@@ -123,18 +119,19 @@ func mendelCase(t *testing.T, num, expNum int) {
 }
 
 
-func mendelCaseBin(t *testing.T, num, expNum int, binFile string) {
+func mendelCaseBin(t *testing.T, num, expNum int, binFile string, andDistBins bool) {
 	mendelCase(t, num, expNum)
 	// Also compare the allele-bins files
 	numStr := strconv.Itoa(num)
 	expNumStr := strconv.Itoa(expNum)
 	outFileDir := OUT_FILE_BASE + numStr
 	expFileDir := EXP_FILE_BASE + expNumStr
-	//subdir := "/allele-bins/"
-	//f := "00000050.json"
 	compareFiles(t, outFileDir+BIN_SUBDIR+binFile, expFileDir+BIN_SUBDIR+binFile)
-	//subdir = "/normalized-allele-bins/"
 	compareFiles(t, outFileDir+NORM_SUBDIR+binFile, expFileDir+NORM_SUBDIR+binFile)
+	if andDistBins {
+		compareFiles(t, outFileDir+DIST_DEL_SUBDIR+binFile, expFileDir+DIST_DEL_SUBDIR+binFile)
+		compareFiles(t, outFileDir+DIST_FAV_SUBDIR+binFile, expFileDir+DIST_FAV_SUBDIR+binFile)
+	}
 }
 
 
