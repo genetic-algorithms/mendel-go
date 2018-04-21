@@ -1118,16 +1118,16 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	del_dom_fitness_bins := make([]float64, 51)
 	fav_rec_fitness_bins := make([]float64, 51)
 	fav_dom_fitness_bins := make([]float64, 51)
-	fmt.Println("DEBUG: Deleterious Recessive:")
+	//fmt.Println("DEBUG: Deleterious Recessive:")
 	//fillInFitnessBins(alleles.DeleteriousRec, alpha_del, gamma_del, del_bin_width, del_rec_fitness_bins)
 	fillInFitnessBins(alleles.DeleteriousRec, 0.0, del_bin_width, del_rec_fitness_bins)
-	fmt.Println("DEBUG: Deleterious Dominant:")
+	//fmt.Println("DEBUG: Deleterious Dominant:")
 	//fillInFitnessBins(alleles.DeleteriousDom, alpha_del, gamma_del, del_bin_width, del_dom_fitness_bins)
 	fillInFitnessBins(alleles.DeleteriousDom, 0.0, del_bin_width, del_dom_fitness_bins)
-	fmt.Println("DEBUG: Favorable Recessive:")
+	//fmt.Println("DEBUG: Favorable Recessive:")
 	//fillInFitnessBins(alleles.FavorableRec, alpha_fav, gamma_fav, fav_bin_width, fav_rec_fitness_bins)
 	fillInFitnessBins(alleles.FavorableRec, max_fav_fitness_gain, fav_bin_width, fav_rec_fitness_bins)
-	fmt.Println("DEBUG: Favorable Dominant:")
+	//fmt.Println("DEBUG: Favorable Dominant:")
 	//fillInFitnessBins(alleles.FavorableDom, alpha_fav, gamma_fav, fav_bin_width, fav_dom_fitness_bins)
 	fillInFitnessBins(alleles.FavorableDom, max_fav_fitness_gain, fav_bin_width, fav_dom_fitness_bins)
 
@@ -1279,7 +1279,7 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 func fillInFitnessBins(alleles map[uint64]dna.Allele, max_fav_fitness_gain, bin_width float64, fitness_bins []float64) {
 	abs := math.Abs
 	logn := math.Log
-	debugI := 1
+	//debugI := 1
 	for _, allele := range alleles {
 		/* diagnostics.f90, lines 331-393 does:
             x = mod(abs(dmutn(j,1,i)),lb_modulo)*del_scale
@@ -1306,7 +1306,7 @@ func fillInFitnessBins(alleles map[uint64]dna.Allele, max_fav_fitness_gain, bin_
 			d = -logn(float64(allele.FitnessEffect) / max_fav_fitness_gain)
 		}
 		k := 1 + int(d/bin_width)
-		if debugI <= 40 { fmt.Printf("DEBUG: f=%v, d=%v, w=%v, k=%d\n", allele.FitnessEffect, d, bin_width, k); debugI++ }
+		//if debugI <= 40 { fmt.Printf("DEBUG: f=%v, d=%v, w=%v, k=%d\n", allele.FitnessEffect, d, bin_width, k); debugI++ }
 		if k > 0 && k <= 50 {
 			fitness_bins[k] += float64(allele.Count)	// we had this many of the same id, so same fitness
 		} /*else {
