@@ -141,8 +141,8 @@ func (p *Population) GetCurrentSize() uint32 {
 // These are the different algorithms for generating initial alleles
 type GenerateInitialAllelesType func(p *Population, uniformRandom *rand.Rand)
 
-// GenerateInitialAlleles creates unique initial contrasting allele pairs (if specified by the config file) on indivs in the population
-func GenerateUniformInitialAlleles(p *Population, uniformRandom *rand.Rand) {
+// GenerateAllUniqueInitialAlleles creates unique initial contrasting allele pairs (if specified by the config file) on indivs in the population
+func GenerateAllUniqueInitialAlleles(p *Population, uniformRandom *rand.Rand) {
 	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
 	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
@@ -200,6 +200,7 @@ func ParseInitialAllelesFrequencies(frequencies string) (freqList []FractionFreq
 
 // GenerateVariableFreqInitialAlleles creates initial contrasting allele pairs according to the frequencies specified in Initial_alleles_frequencies
 func GenerateVariableFreqInitialAlleles(p *Population, uniformRandom *rand.Rand) {
+	if config.Cfg.Population.Num_contrasting_alleles == 0 { return }	// nothing to do
 	// Parse the input parameter
 	freqList := ParseInitialAllelesFrequencies(config.Cfg.Population.Initial_alleles_frequencies)
 	config.Verbose(1, "Generating initial contrasting alleles for: %v", freqList)

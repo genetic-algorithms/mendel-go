@@ -39,7 +39,7 @@ const (
 
 type InitialAlleleModelType string
 const (
-	UNIFORM_INITIAL_ALLELES InitialAlleleModelType = "uniform"
+	ALLUNIQUE_INITIAL_ALLELES     InitialAlleleModelType = "allunique"
 	VARIABLE_FREQ_INITIAL_ALLELES InitialAlleleModelType = "variablefreq"
 )
 
@@ -141,11 +141,11 @@ func SetModels(c *config.Config) {
 	}
 
 	switch InitialAlleleModelType(strings.ToLower(c.Population.Initial_allele_fitness_model)) {
-	case UNIFORM_INITIAL_ALLELES:
-		if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { log.Fatalf("if num_contrasting_alleles is > 0 and initial_allele_fitness_model==%s, then initial_alleles_pop_frac must be > 0 and <= 1.0", string(UNIFORM_INITIAL_ALLELES)) }
-		if c.Population.Num_contrasting_alleles > 0 && c.Population.Max_total_fitness_increase <= 0.0 { log.Fatalf("Error: if initial_allele_fitness_model==%s, then max_total_fitness_increase must be > 0.", string(UNIFORM_INITIAL_ALLELES)) }
-		Mdl.GenerateInitialAlleles = GenerateUniformInitialAlleles
-		mdlNames = append(mdlNames, "GenerateUniformInitialAlleles")
+	case ALLUNIQUE_INITIAL_ALLELES:
+		if c.Population.Num_contrasting_alleles > 0 && (c.Population.Initial_alleles_pop_frac <= 0.0 || c.Population.Initial_alleles_pop_frac > 1.0) { log.Fatalf("if num_contrasting_alleles is > 0 and initial_allele_fitness_model==%s, then initial_alleles_pop_frac must be > 0 and <= 1.0", string(ALLUNIQUE_INITIAL_ALLELES)) }
+		if c.Population.Num_contrasting_alleles > 0 && c.Population.Max_total_fitness_increase <= 0.0 { log.Fatalf("Error: if initial_allele_fitness_model==%s, then max_total_fitness_increase must be > 0.", string(ALLUNIQUE_INITIAL_ALLELES)) }
+		Mdl.GenerateInitialAlleles = GenerateAllUniqueInitialAlleles
+		mdlNames = append(mdlNames, "GenerateAllUniqueInitialAlleles")
 		dna.Mdl.CalcAlleleFitness = dna.CalcUniformAlleleFitness
 		mdlNames = append(mdlNames, "CalcUniformAlleleFitness")
 	case VARIABLE_FREQ_INITIAL_ALLELES:
