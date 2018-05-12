@@ -79,7 +79,7 @@ func TestMendelCase11(t *testing.T) {
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase12(t *testing.T) {
-	mendelCaseBin(t, 12, 12, "00000050.json", true)
+	mendelCaseBin(t, 12, 12, "00000100.json", true)
 }
 
 
