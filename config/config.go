@@ -31,7 +31,6 @@ type Config struct {
 		Genome_size float64
 		High_impact_mutn_fraction float64
 		High_impact_mutn_threshold float64
-		Num_initial_fav_mutn uint32
 		Max_fav_fitness_gain float64
 		Uniform_fitness_effect_del float64
 		Uniform_fitness_effect_fav float64
