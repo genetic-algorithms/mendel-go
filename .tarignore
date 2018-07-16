@@ -1,0 +1,14 @@
+# This is used in the package build in: tar -X .gitignore ...
+.tarignore
+
+mendel-go
+vendor/
+
+user/input/
+test/output/
+
+pprof/
+
+.idea/
+mendel-go.iml
+projectFilesBackup/

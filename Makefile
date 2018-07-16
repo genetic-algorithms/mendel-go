@@ -1,5 +1,8 @@
-SHELL = /bin/bash -e
-BINARY = mendel-go
+SHELL ?= /bin/bash -e
+BINARY ?= mendel-go
+export VERSION ?= 1.0.0
+RPMROOT ?= $(HOME)/rpmbuild
+RPMNAME ?= mendel-go
 
 # Make will search this relative paths for input and target files
 VPATH=pprof
@@ -7,8 +10,9 @@ VPATH=pprof
 default: run
 
 $(BINARY): mendel.go */*.go
+	@echo GOOS=$$GOOS
 	glide --quiet install
-	go build
+	go build -o $@
 
 run: $(BINARY)
 	time ./$? -f test/input/mendel-case1.ini
@@ -24,6 +28,16 @@ mem.pprof: run
 
 run-defaults: $(BINARY)
 	time ./$(BINARY) -d
+
+# Remember to up VERSION above. If building the rpm on mac, first: brew install rpm
+# Note: during rpmbuild, get this benign msg: error: Couldn't exec /usr/local/Cellar/rpm/4.14.1_1/lib/rpm/elfdeps: No such file or directory
+rpmbuild:
+	mkdir -p $(RPMROOT)/{SOURCES,SRPMS,SRPMS}
+	rm -f $(RPMNAME)-$(VERSION); ln -s . $(RPMNAME)-$(VERSION)
+	tar --exclude '.git*' -X .tarignore -H -czf $(RPMROOT)/SOURCES/$(RPMNAME)-$(VERSION).tar.gz $(RPMNAME)-$(VERSION)
+	rm -f $(RPMROOT)/SRPMS/$(RPMNAME)*rpm $(RPMROOT)/d/x86_64/$(RPMNAME)*rpm
+	GOOS=linux rpmbuild --target x86_64-linux -ba $(RPMNAME).spec
+	rm -f $(RPMNAME)-$(VERSION)
 
 test-main: mendel_test.go $(BINARY)
 	glide --quiet install

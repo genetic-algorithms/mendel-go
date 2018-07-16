@@ -1,3 +1,4 @@
 package: github.com/genetic-algorithms/mendel-go
 import:
 - package: github.com/BurntSushi/toml
+- package: github.com/pkg/profile
