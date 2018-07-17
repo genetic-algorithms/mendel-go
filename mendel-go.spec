@@ -1,14 +1,14 @@
 Summary: Mendel's Accountant genetic evolution simulation
 Name: mendel-go
 Version: %{getenv:VERSION}
-Release: 1
+Release: %{getenv:RELEASE}
 Epoch: 1
 License: GNU GPL v3
 Source: mendel-go-%{version}.tar.gz
 Packager: Bruce Potter
 #Vendor: ?
 #Distribution: ?
-Prefix: /usr
+Prefix: /usr/local
 #BuildRoot: ?
 BuildArch: x86_64
 
@@ -33,6 +33,7 @@ GOPATH=$RPM_BUILD_DIR make mendel-go
 # The install phase puts all of the files in the paths they should be in when the rpm is installed on a system.
 # The $RPM_BUILD_ROOT is a simulated root file system and usually has a value like: ~/rpmbuild/BUILDROOT/mendel-go-1.0.0-1.x86_64
 #TODO: put this in the Makefile instead
+# Following the LSB Filesystem Hierarchy Standard: https://refspecs.linuxfoundation.org/FHS_3.0/fhs-3.0.pdf
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{prefix}/bin $RPM_BUILD_ROOT%{prefix}/share/mendel-go
 cp mendel-go $RPM_BUILD_ROOT%{prefix}/bin
@@ -41,8 +42,8 @@ cp mendel-defaults.ini LICENSE COPYRIGHT $RPM_BUILD_ROOT%{prefix}/share/mendel-g
 %files
 #%defattr(-, root, root)
 #%doc LICENSE COPYRIGHT
-/usr/bin/mendel-go
-/usr/share/mendel-go
+%{prefix}/bin/mendel-go
+%{prefix}/share/mendel-go
 
 %clean
 # This step happens *after* the %files packaging

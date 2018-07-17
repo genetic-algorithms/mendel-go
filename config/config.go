@@ -140,7 +140,7 @@ func ReadFromFile(filename string) error {
 
 	// 1st read defaults and then apply the specified config file values on top of that
 	defaultFile := FindDefaultFile()
-	if defaultFile == "" { return errors.New("can not find "+DEFAULT_INPUT_FILE) }
+	if defaultFile == "" { return errors.New("can not find "+ DEFAULTS_INPUT_FILE) }
 	log.Printf("Using defaults file %v\n", defaultFile) 	// can not use verbosity here because we have not read the config file yet
 	if _, err := toml.DecodeFile(defaultFile, Cfg); err != nil { return err }
 	if filename != defaultFile {
@@ -237,22 +237,37 @@ func FindDefaultFile() string {
 	}
 
 	// Check for it in the current directory
-	if _, err := os.Stat(DEFAULT_INPUT_FILE); err == nil { return DEFAULT_INPUT_FILE }
+	if _, err := os.Stat(DEFAULTS_INPUT_FILE); err == nil { return DEFAULTS_INPUT_FILE
+	}
 	lookedIn := []string{"."}
 
-	canonicalPath, err := filepath.EvalSymlinks(os.Args[0])
-	if err != nil { log.Fatal(err) }
-	executableDir, err := filepath.Abs(filepath.Dir(canonicalPath))   // the result of EvalSymlinks can be relative in some situations
-	if err != nil { log.Fatal(err) }
-	defaultsFile := executableDir + "/" + DEFAULT_INPUT_FILE
-	if _, err := os.Stat(defaultsFile); err == nil { return defaultsFile }
-	lookedIn = append(lookedIn, executableDir)
+	// Check in the directory where the executable is
+	//fmt.Printf("arg 0: %s\n", os.Args[0])
+	if strings.Contains(os.Args[0], "/") {
+		canonicalPath, err := filepath.EvalSymlinks(os.Args[0])
+		if err != nil { log.Fatal(err) }
+		//fmt.Println("here1")
+		executableDir, err := filepath.Abs(filepath.Dir(canonicalPath)) // the result of EvalSymlinks can be relative in some situations
+		if err != nil { log.Fatal(err) }
+		defaultsFile := executableDir + "/" + DEFAULTS_INPUT_FILE
+		if _, err := os.Stat(defaultsFile); err == nil { return defaultsFile }
+		lookedIn = append(lookedIn, executableDir)
+	}
+	// else the executable came from the path, so we don't know where from, so can't look for the defaults file there
 
-	log.Fatalf("Error: can not find %v. Looked in: %v", DEFAULT_INPUT_FILE, strings.Join(lookedIn, " and "))
+	// Now check in the dirs listed in DEFAULTS_INPUT_DIRS (these are where the built pkgs install them on various linuxes)
+	for _, dir := range DEFAULTS_INPUT_DIRS {
+		// we assume these dirs are already canonical and absolute
+		defaultsFile := dir + "/" + DEFAULTS_INPUT_FILE
+		if _, err := os.Stat(defaultsFile); err == nil { return defaultsFile }
+		lookedIn = append(lookedIn, dir)
+	}
+
+	log.Fatalf("Error: can not find %v. Looked in: %v", DEFAULTS_INPUT_FILE, strings.Join(lookedIn, ", "))
 	return ""		// could not find it
 }
 
-/* toml.Marshal writes floats in a long exponent form not convenient
+/* toml.Marshal writes floats in a long exponent form not convenient, so we are not using it...
 func (c *Config) WriteToFile(filename string) error {
 	log.Printf("Writing %v...\n", filename)
 	buf, err := toml.Marshal(*c)

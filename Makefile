@@ -1,6 +1,7 @@
 SHELL ?= /bin/bash -e
 BINARY ?= mendel-go
 export VERSION ?= 1.0.0
+export RELEASE ?= 5
 RPMROOT ?= $(HOME)/rpmbuild
 RPMNAME ?= mendel-go
 
@@ -35,7 +36,7 @@ rpmbuild:
 	mkdir -p $(RPMROOT)/{SOURCES,SRPMS,SRPMS}
 	rm -f $(RPMNAME)-$(VERSION); ln -s . $(RPMNAME)-$(VERSION)
 	tar --exclude '.git*' -X .tarignore -H -czf $(RPMROOT)/SOURCES/$(RPMNAME)-$(VERSION).tar.gz $(RPMNAME)-$(VERSION)
-	rm -f $(RPMROOT)/SRPMS/$(RPMNAME)*rpm $(RPMROOT)/d/x86_64/$(RPMNAME)*rpm
+	rm -f $(RPMROOT)/SRPMS/$(RPMNAME)*rpm $(RPMROOT)/RPMS/x86_64/$(RPMNAME)*rpm
 	GOOS=linux rpmbuild --target x86_64-linux -ba $(RPMNAME).spec
 	rm -f $(RPMNAME)-$(VERSION)
 

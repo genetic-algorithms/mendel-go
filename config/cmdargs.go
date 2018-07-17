@@ -5,9 +5,11 @@ import (
 	"flag"
 	"os"
 	"fmt"
+	"strings"
 )
 
-const DEFAULT_INPUT_FILE = "mendel-defaults.ini"
+const DEFAULTS_INPUT_FILE = "mendel-defaults.ini"
+var DEFAULTS_INPUT_DIRS = []string{"/usr/local/share/mendel-go"}
 
 func Usage(exitCode int) {
 	usageStr1 := `Usage:
@@ -22,14 +24,14 @@ Options:
 	usageStr2 := `
 Examples:
   mendel -f /home/bob/mendel.in    # run with this input file
-  mendel -d     # run with all default parameters from `+DEFAULT_INPUT_FILE+`
+  mendel -d     # run with all default parameters from `+ DEFAULTS_INPUT_FILE +`
   mendel -c /home/bob/mendel.in    # create an input file primed with defaults, then you can edit it
 `
 
 	//if exitCode > 0 {
-	fmt.Fprintln(os.Stderr, usageStr1)		// send it to stderr
+	fmt.Fprintf(os.Stderr, usageStr1)		// send it to stderr
 	flag.PrintDefaults()
-	fmt.Fprintln(os.Stderr, usageStr2)		// send it to stderr
+	fmt.Fprintf(os.Stderr, usageStr2)		// send it to stderr
 	//} else {
 	//	fmt.Println(usageStr1)		// send it to stdout
 	//	flag.PrintDefaults()		// do not yet know how to get this to print to stdout
@@ -54,7 +56,7 @@ func ReadCmdArgs() {
 	CmdArgs = &CommandArgs{} 		// create and set the singleton config
 	var useDefaults bool
 	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file (backed by the defaults file)")
-	flag.StringVar(&CmdArgs.DefaultFile, "D", "", "Path to the defaults file. If not set, looks for "+DEFAULT_INPUT_FILE+" in the current directory or the directory of the executable")
+	flag.StringVar(&CmdArgs.DefaultFile, "D", "", "Path to the defaults file. If not set, looks for "+DEFAULTS_INPUT_FILE+" in the current directory, the directory of the executable, and "+strings.Join(DEFAULTS_INPUT_DIRS,", "))
 	flag.StringVar(&CmdArgs.InputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
 	flag.Usage = func() { Usage(0) }
