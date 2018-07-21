@@ -1,15 +1,19 @@
 # Description
 
-This is the golang version of [Mendel](https://en.wikipedia.org/wiki/Gregor_Mendel)'s Accountant, a genetic mutation tracking program used to simulate and study macroevolution.
+This is the golang version of [Mendel](https://en.wikipedia.org/wiki/Gregor_Mendel)'s Accountant, a genetic mutation tracking program used to simulate and study macroevolution in a biologically realistic way.
 It models genetic change over time by tracking each mutation that enters the simulated population from generation to generation
 to the end of the simulation.
 The software models each individual in the population, including their chromosomes, linkage blocks, and deleterious, favorable, and neutral mutations.
 It supports several different models for mutation rate, mutation fitness distribution, selection, chromosome crossover, and population growth that are used in the
 genetics field. The Mendel simulation also supports input parameters for many realistic genetic factors, including: reproduction rate, percentage of favorable,
 deleterious and near-neutral mutations, fitness magnitude of mutations, selection noise, genome size, population size, and number of generations.
-Mendel has been tuned to be able to simulate billions of mutations over 1000's of generations.
+Mendel has been optimized to be able to simulate billions of mutations over 1000's of generations.
 
-# Setup
+# Running mendel-go
+
+If you want to run mendel-go (w/o building it from source) see the [Mendel wiki page](https://github.com/genetic-algorithms/mendel-go/wiki).
+
+# Build mendel-go From Source
 
 - Install git, make
 - Install go, set GOROOT and GOPATH:
@@ -41,9 +45,9 @@ make mendel-go
 
 ```
 
-# Build and Run
+# Run mendel-go
 
-Build and run with test/input/mendel-case1.ini:
+Run (building if necessary) with test/input/mendel-case1.ini:
 
 ```
 make
