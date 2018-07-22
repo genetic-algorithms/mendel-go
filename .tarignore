@@ -1,6 +1,8 @@
 # This is used in the package build in: tar -X .gitignore ...
 .tarignore
 
+pkg/
+
 mendel-go
 vendor/
 
