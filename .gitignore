@@ -19,3 +19,6 @@ pprof/
 .idea/
 mendel-go.iml
 projectFilesBackup/
+
+# Mac Finder file
+.DS_Store

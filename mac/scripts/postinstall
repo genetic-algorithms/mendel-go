@@ -1,0 +1,12 @@
+#!/bin/sh
+# Create sym links from we where we install the mendel-go files to where they need to be under /usr/local
+# Note: this file must be given the executable permissions before giving it to pkgbuild
+
+SRCDIR=/Users/Shared
+DESTDIR=/usr/local
+
+mkdir -p $DESTDIR/bin $DESTDIR/share
+ln -sf $SRCDIR/mendel-go/bin/mendel-go $DESTDIR/bin
+ln -sf $SRCDIR/mendel-go/share/mendel-go $DESTDIR/share
+
+exit 0
