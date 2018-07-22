@@ -5,6 +5,8 @@ export RELEASE ?= 5
 # rpmbuild does not give us a good way to set topdir, so use the default location
 RPMROOT ?= $(HOME)/rpmbuild
 RPMNAME ?= mendel-go
+MAC_PKG_IDENTIFIER ?= com.github.genetic-algorithms.pkg.$(BINARY)
+MAC_PKG_INSTALL_DIR ?= /Users/Shared/$(BINARY)
 
 # Make will search this relative paths for input and target files
 VPATH=pprof
@@ -41,6 +43,18 @@ rpmbuild:
 	GOOS=linux rpmbuild --target x86_64-linux -ba pkg/rpm/$(RPMNAME).spec
 	rm -f $(RPMNAME)-$(VERSION)   # remove the sym link
 
+# Remember to up VERSION above.
+macpkg: $(BINARY)
+	pkg/mac/populate-pkg-files.sh pkg/mac/$(BINARY)
+	pkgbuild --root pkg/mac/$(BINARY) --scripts pkg/mac/scripts --identifier $(MAC_PKG_IDENTIFIER) --version $(VERSION) --install-location $(MAC_PKG_INSTALL_DIR) pkg/mac/build/$(BINARY).pkg
+
+macinstall: macpkg
+	sudo installer -pkg pkg/mac/build/$(BINARY).pkg -target '/Volumes/Macintosh HD'
+
+macpkginfo:
+	pkgutil --pkg-info $(MAC_PKG_IDENTIFIER)
+	pkgutil --only-files --files $(MAC_PKG_IDENTIFIER)
+
 test-main: mendel_test.go $(BINARY)
 	glide --quiet install
 	go test -v $<
@@ -52,4 +66,4 @@ test-pkgs:
 clean:
 	go clean
 
-.PHONY: default run prof run-defaults test-main test-pkgs clean
+.PHONY: default run prof run-defaults rpmbuild macpkg macinstall macpkginfo test-main test-pkgs clean

@@ -37,6 +37,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{prefix}/bin $RPM_BUILD_ROOT%{prefix}/share/mendel-go
 cp mendel-go $RPM_BUILD_ROOT%{prefix}/bin
 cp mendel-defaults.ini LICENSE COPYRIGHT $RPM_BUILD_ROOT%{prefix}/share/mendel-go
+cp test/input/mendel-short.ini $RPM_BUILD_ROOT%{prefix}/share/mendel-go
 
 %files
 #%defattr(-, root, root)
