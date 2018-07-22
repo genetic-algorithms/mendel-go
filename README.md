@@ -18,7 +18,7 @@ If you want to run mendel-go (w/o building it from source) see the [Mendel wiki 
 - Install git, make
 - Install go, set GOROOT and GOPATH:
 ```bash
-GO_LATEST_STABLE=1.9.2   # find at https://golang.org/dl/
+GO_LATEST_STABLE=1.10.3   # find at https://golang.org/dl/
 cd /usr/local
 sudo wget https://storage.googleapis.com/golang/go${GO_LATEST_STABLE}.linux-amd64.tar.gz
 sudo tar -xzf go${GO_LATEST_STABLE}.linux-amd64.tar.gz
