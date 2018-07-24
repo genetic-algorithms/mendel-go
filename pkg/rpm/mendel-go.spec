@@ -25,7 +25,7 @@ Mendel's Accountant performs biologically realistic genetic evolution simulation
 # Need to play some games to get our src dir under a GOPATH
 rm -f ../src; ln -s . ../src
 mkdir -p ../github.com/genetic-algorithms
-rm -f ../github.com/genetic-algorithms/mendel-go; ln -s ../../mendel-go-1.0.0 ../github.com/genetic-algorithms/mendel-go
+rm -f ../github.com/genetic-algorithms/mendel-go; ln -s ../../mendel-go-%{version} ../github.com/genetic-algorithms/mendel-go
 
 GOPATH=$RPM_BUILD_DIR make mendel-go
 

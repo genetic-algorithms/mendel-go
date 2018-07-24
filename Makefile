@@ -38,7 +38,9 @@ run-defaults: $(BINARY)
 rpmbuild:
 	mkdir -p $(RPMROOT)/{SOURCES,SRPMS,SRPMS}
 	rm -f $(RPMNAME)-$(VERSION); ln -s . $(RPMNAME)-$(VERSION)  # so the tar file files can have this prefix
+	rm -f $(RPMROOT)/SOURCES/$(RPMNAME)-*.tar.gz
 	tar --exclude '.git*' -X .tarignore -H -czf $(RPMROOT)/SOURCES/$(RPMNAME)-$(VERSION).tar.gz $(RPMNAME)-$(VERSION)
+	rm -rf $(RPMROOT)/BUILD/mendel-go-*
 	rm -f $(RPMROOT)/SRPMS/$(RPMNAME)*rpm $(RPMROOT)/RPMS/x86_64/$(RPMNAME)*rpm $(RPMROOT)/RPMS/x86_64/$(RPMNAME)*rpm.gz
 	GOOS=linux rpmbuild --target x86_64-linux -ba pkg/rpm/$(RPMNAME).spec
 	gzip --keep $(RPMROOT)/RPMS/x86_64/$(RPMNAME)-$(VERSION)-$(RELEASE).x86_64.rpm
