@@ -13,8 +13,9 @@ var DEFAULTS_INPUT_DIRS = []string{"/usr/local/share/mendel-go"}
 
 func Usage(exitCode int) {
 	usageStr1 := `Usage:
-  mendel {-c | -f} <filename> [-D <defaults-path>]
-  mendel -d [-D <defaults-path>]
+  mendel -f <filename> [-D <defaults-path>] [-u <SPC-username>]
+  mendel -d [-D <defaults-path>] [-u <SPC-username>]
+  mendel -c <filename> [-D <defaults-path>]
 
 Performs a mendel run...
 
@@ -42,7 +43,7 @@ Examples:
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
 type CommandArgs struct {
-	InputFile, InputFileToCreate, DefaultFile string
+	InputFile, InputFileToCreate, DefaultFile, SPCusername string
 }
 
 // CmdArgs is the singleton instance of CommandArgs that can be accessed throughout the mendel code.
@@ -57,6 +58,7 @@ func ReadCmdArgs() {
 	var useDefaults bool
 	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file (backed by the defaults file)")
 	flag.StringVar(&CmdArgs.DefaultFile, "D", "", "Path to the defaults file. If not set, looks for "+DEFAULTS_INPUT_FILE+" in the current directory, the directory of the executable, and "+strings.Join(DEFAULTS_INPUT_DIRS,", "))
+	flag.StringVar(&CmdArgs.SPCusername, "u", "", "Create a zip of the output for this SPC username, suitable for importing into SPC for data visualization.")
 	flag.StringVar(&CmdArgs.InputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
 	flag.Usage = func() { Usage(0) }

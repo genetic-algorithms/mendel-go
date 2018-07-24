@@ -7,13 +7,13 @@ import (
 	//"io/ioutil"
 	"log"
 	"errors"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"runtime"
 	"github.com/genetic-algorithms/mendel-go/utils"
+	"fmt"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
@@ -267,12 +267,16 @@ func FindDefaultFile() string {
 	return ""		// could not find it
 }
 
-/* toml.Marshal writes floats in a long exponent form not convenient, so we are not using it...
-func (c *Config) WriteToFile(filename string) error {
-	log.Printf("Writing %v...\n", filename)
-	buf, err := toml.Marshal(*c)
-	if err != nil { return err }
-	if err := ioutil.WriteFile(filename, buf, 0644); err != nil { return err }
+/* toml.Encode doesn't work out of the box for us, because the section and field names all start with uppercase...
+// WriteToFile writes the current config to a file descriptor. The caller is responsible to open the file,
+// log that it is being written, and close the file (so it can be used with files managed by FileMgr).
+func (c *Config) WriteToFile(file *os.File) error {
+	//Verbose(1, "Writing %v...\n", filename)
+	//buf, err := toml.Marshal(*c)
+	buf := new(bytes.Buffer)
+	if err := toml.NewEncoder(buf).Encode(c); err != nil { return err }
+	//if err := ioutil.WriteFile(filename, buf.Bytes(), 0644); err != nil { return err }
+	if _, err := file.Write(buf.Bytes()); err != nil { return err }
 	return nil
 }
 */

@@ -11,13 +11,15 @@ import (
 const (
 	HISTORY_FILENAME = "mendel.hst"
 	FITNESS_FILENAME = "mendel.fit"		// this one is faster to produce than mendel.hst
+	TOML_FILENAME = "mendel_go.toml"		// the input parameters
+	OUTPUT_FILENAME = "mendel_go.out"		//todo: figure out how we can get our own output into this file
 	ALLELE_BINS_DIRECTORY = "allele-bins/"
 	NORMALIZED_ALLELE_BINS_DIRECTORY = "normalized-allele-bins/"
 	DISTRIBUTION_DEL_DIRECTORY = "allele-distribution-del/"
 	DISTRIBUTION_FAV_DIRECTORY = "allele-distribution-fav/"
 )
 // Apparently this can't be a const because a map literal isn't a const in go
-var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
+var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, TOML_FILENAME: 1, OUTPUT_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
 
 // Not using buffered io because we need write to be flushed every generation to support restart
 //type FileElem struct {
@@ -27,9 +29,9 @@ var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, 
 
 // FileMgr is a simple object to manage all of the data files mendel writes.
 type FileMgr struct {
-	dataFilePath string 		// the directory in which output files should go
-	Files map[string]*os.File 		// key is filename, value is file descriptor (nil if not opened yet)
-	Dirs map[string]map[string]*os.File			// directories that hold a group of output files. Key is dir name, value is map in which key is filename, value is file descriptor (nil if not opened yet)
+	DataFilePath string                         // the directory in which output files should go
+	Files        map[string]*os.File            // key is filename, value is file descriptor (nil if not opened yet)
+	Dirs         map[string]map[string]*os.File // directories that hold a group of output files. Key is dir name, value is map in which key is filename, value is file descriptor (nil if not opened yet)
 }
 
 // FMgr is the singleton instance of FileMgr, created by FileMgrFactory.
@@ -38,7 +40,7 @@ var FMgr *FileMgr
 
 // FileMgrFactory creates FMgr and initializes it. filesToOutput comes from the input file.
 func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
-	FMgr = &FileMgr{dataFilePath: dataFilePath, Files: make(map[string]*os.File), Dirs: make(map[string]map[string]*os.File) }
+	FMgr = &FileMgr{DataFilePath: dataFilePath, Files: make(map[string]*os.File), Dirs: make(map[string]map[string]*os.File) }
 	if filesToOutput == "" { return FMgr }
 
 	// Open all of the files and put in the map
@@ -109,7 +111,7 @@ func (fMgr *FileMgr) GetDirFile(dirName, fileName string) *os.File {
 			return file
 		} else {
 			// Not there yet, create the entry
-			filePath := FMgr.dataFilePath + "/" + dirName + fileName		// dirName already has / at the end of it
+			filePath := FMgr.DataFilePath + "/" + dirName + fileName // dirName already has / at the end of it
 			file, err := os.Create(filePath)
 			if err != nil { log.Fatal(err) } 	// for now, if we can't open a file, just bail
 			dir[fileName] = file		// add it to our list so we can close it at the end
@@ -139,6 +141,20 @@ func (fMgr *FileMgr) CloseDirFile(dirName, fileName string) {
 }
 
 
+// CloseFile closes a file under FileMgr control.
+func (fMgr *FileMgr) CloseFile(fileName string) {
+	if file, ok := fMgr.Files[fileName]; ok && file != nil {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing %v: %v", fileName, err)
+		} else {
+			fMgr.Files[fileName] = nil
+		}
+	} else {
+		log.Printf("Error: file %v can not be closed because it is not open", fileName)
+	}
+}
+
+
 /* Not currently used...
 // GetFileBuffer returns a buffered file descriptor if we have it open
 func (fMgr *FileMgr) GetFileBuffer(fileName string) *bufio.Writer {
@@ -151,9 +167,10 @@ func (fMgr *FileMgr) GetFileBuffer(fileName string) *bufio.Writer {
 // CloseAllFiles closes all of the open files.
 func (fMgr *FileMgr) CloseAllFiles() {
 	// Close all of the open files in our Files map
-	for name, file := range fMgr.Files {
+	for fileName, file := range fMgr.Files {
 		if file != nil {
-			if err := file.Close(); err != nil { log.Printf("Error closing %v: %v", name, err) }
+			if err := file.Close(); err != nil { log.Printf("Error closing %v: %v", fileName, err) }
+			fMgr.Files[fileName] = nil		// in case CloseAllFiles() is called a 2nd time
 		}
 	}
 
@@ -162,6 +179,7 @@ func (fMgr *FileMgr) CloseAllFiles() {
 		for fileName, file := range dir {
 			if file != nil {
 				if err := file.Close(); err != nil { log.Printf("Error closing %v: %v", fileName, err) }
+				dir[fileName] = nil		// in case CloseAllFiles() is called a 2nd time
 			}
 		}
 	}

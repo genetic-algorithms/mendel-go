@@ -73,7 +73,13 @@ make test-pkgs
 
 # Run in SPC and View Plot Files
 
-[SPC](https://github.com/whbrewer/spc) is an open source platform for running scientific programs and visualization the output. You can download it to run your own instance of it, and install the [mendel-go SPC plugin](https://github.com/genetic-algorithms/mendel-go-spc), or you can do some small runs of mendel_go on the [public instance of SPC](http://ec2-52-43-51-28.us-west-2.compute.amazonaws.com:8580/myapps).
+[SPC](https://github.com/whbrewer/spc) is an open source platform for running scientific programs and visualization the output.
+You can download it to run your own instance of it, and install the [mendel-go SPC plugin](https://github.com/genetic-algorithms/mendel-go-spc),
+or you can do some small runs of mendel_go on the [public instance of SPC](http://ec2-52-43-51-28.us-west-2.compute.amazonaws.com:8580).
+
+Alternatively, if you run mendel-go with the flag `-u <spcUsername` on the machine that you built mendel-go (see above),
+that will produce a zip file suitable for importing into the [public instance of SPC](http://ec2-52-43-51-28.us-west-2.compute.amazonaws.com:8580).
+See [Viewing Mendel Plot Files](https://github.com/genetic-algorithms/mendel-go/wiki#viewing-mendel-plot-files) for details.
 
 # View godoc info of the project
 

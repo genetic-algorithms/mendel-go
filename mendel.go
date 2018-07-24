@@ -37,6 +37,9 @@ import (
 	"strings"
 	"runtime/debug"
 	"github.com/genetic-algorithms/mendel-go/random"
+	"fmt"
+	"path/filepath"
+	"io"
 )
 
 // Initialize initializes variables, objects, and settings.
@@ -56,12 +59,64 @@ func initialize() *rand.Rand {
 	dna.SetModels(config.Cfg)
 	pop.SetModels(config.Cfg)
 
+	// Write input params to the output dir
+	if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+		//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
+		if config.CmdArgs.InputFile != "" {
+			if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
+		} else {
+			if err := utils.CopyFromFileName2Writer(config.FindDefaultFile(), tomlWriter); err != nil { log.Fatalln(err) }
+		}
+	}
+
 	random.NextSeed = config.Cfg.Computation.Random_number_seed
 	return random.RandFactory()
 }
 
+// CreateZip zips up the output in a form suitable for importing into SPC for data visualization
+func CreateZip(spcUsername, randomSlug string) {
+	// The files in the zip need to have a path like: user_data/<spcUsername>/mendel_go/<randomSlug>/...
+	pathToZipUp := config.Cfg.Computation.Data_file_path	// e.g. test/output/short
+	zipFilePath := config.Cfg.Computation.Data_file_path+"/../"+config.Cfg.Basic.Case_id+".zip"	// e.g. test/output/short.zip
+	prefixToReplace := config.Cfg.Computation.Data_file_path
+	newPrefix := "user_data/"+spcUsername+"/mendel_go/"+randomSlug	// e.g. user_data/brucemp/mendel_go/z59e4c
+	config.Verbose(2, "Creating zip file: pathToZipUp=%s, zipFilePath=%s, prefixToReplace=%s, newPrefix=%s\n", pathToZipUp, zipFilePath, prefixToReplace, newPrefix)
+	if err := utils.CreatePrefixedZip(pathToZipUp, zipFilePath, prefixToReplace, newPrefix); err != nil {
+		log.Fatalf("Error creating zip of output data files: %v", err)
+	}
+	fmt.Printf("Zipped the output data files into %s for SPC username %s and job id %s\n", filepath.Clean(zipFilePath), spcUsername, randomSlug)
+
+	/* this was trying to play games with sym links to get the prefix correct, but the zip file creation functions don't follow sym links...
+	dataPath, err := filepath.Abs(config.Cfg.Computation.Data_file_path)	// the dataPath var will be referred to in another dir, so it needs to be absoluted
+	if err != nil { log.Fatalf("Error: could not make %s absolute: %v", config.Cfg.Computation.Data_file_path, err) }
+	zipDir := config.FMgr.DataFilePath + "/../.spclinks/" + config.Cfg.Basic.Case_id + "/user_data"
+	linkDir := zipDir + "/" + spcUsername + "/mendel_go"
+	//todo: if linkDir already exists, remove any previous sym links in it
+	if err := os.MkdirAll(linkDir, 0755); err != nil { log.Fatalf("Error creating link directory %s for zip file creation: %v", linkDir, err) }
+	link := linkDir + "/" + randomSlug
+	config.Verbose(1, "linking %s to %s", dataPath, link)
+	if err := os.Symlink(dataPath, link); err != nil { log.Fatalf("Error creating sym link from %s to %s: %v", dataPath, link, err) }
+	zipFile := config.FMgr.DataFilePath + "/../" + config.Cfg.Basic.Case_id + ".zip"	// this makes it a peer to the case dir
+	config.Verbose(1, "creating zip file %s of directory %s", zipFile, zipDir)
+	if err := archiver.Zip.Make(zipFile, []string{zipDir}); err != nil {
+		log.Printf("Error: failed to create output zip file %s of directory %s: %v", zipFile, zipDir, err)
+	} else {
+		log.Printf("Created zip file %s of directory %s", zipFile, zipDir)
+	}
+	*/
+}
+
 // Shutdown does all the stuff necessary at the end of the run.
 func shutdown() {
+	if config.CmdArgs.SPCusername != "" {
+		//todo: write real run output to OUTPUT_FILENAME
+		if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
+			outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOT or FILES below).\n"
+			if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
+		}
+		config.FMgr.CloseAllFiles()	// explicitly close all files so the zip file contains all data
+		CreateZip(config.CmdArgs.SPCusername, utils.RandomSlug())
+	}
 	config.Verbose(5, "Shutting down...\n")
 }
 
@@ -76,7 +131,7 @@ func main() {
 		if err := utils.CopyFile(config.FindDefaultFile(), config.CmdArgs.InputFileToCreate); err != nil { log.Fatalln(err) }
 		os.Exit(0)
 
-	} else if config.CmdArgs.InputFile != ""{
+	} else if config.CmdArgs.InputFile != "" {
 		if err := config.ReadFromFile(config.CmdArgs.InputFile); err != nil { log.Fatalln(err) }
 		config.Verbose(3, "Case_id: %v\n", config.Cfg.Basic.Case_id)
 
@@ -84,6 +139,7 @@ func main() {
 
 	// ReadFromFile() opened the output files, so arrange for them to be closed at the end
 	defer config.FMgr.CloseAllFiles()
+	if config.CmdArgs.SPCusername != "" && config.Cfg.Computation.Files_to_output != "*" { log.Fatalf("Error: if you specify the -u flag, the files_to_output value in the input file must be set to '*', so the produced zip file will have the proper content.") }
 
 	// Initialize profiling, if requested
 	switch strings.ToLower(config.Cfg.Computation.Performance_profile) {
