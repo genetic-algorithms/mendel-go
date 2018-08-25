@@ -41,8 +41,9 @@ type Population struct {
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
 	TargetSize uint32        // the target size of this population after selection
-	Num_offspring float64       // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
-	LBsPerChromosome uint32                                             // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
+	BottleNecks *Bottlenecks // the bottlenecks this pop should go thru
+	Num_offspring float64    // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
+	LBsPerChromosome uint32  // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
 
 	// Stats
 	ActualAvgOffspring float64       // The average number of offspring each individual from last generation actually had in this generation
@@ -73,6 +74,13 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 	p := &Population{
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
 		TargetSize: targetSize,
+	}
+	if PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model)) == MULTI_BOTTLENECK_POPULATON_GROWTH {
+		if prevPop != nil {
+			p.BottleNecks = prevPop.BottleNecks // pass the bottleneck list down from the prev pop
+		} else {
+			p.BottleNecks = ParseMultipleBottlenecks(config.Cfg.Population.Multiple_Bottlenecks)
+		}
 	}
 
 	fertility_factor := 1. - config.Cfg.Selection.Fraction_random_death
@@ -508,7 +516,7 @@ func CapacityPopulationGrowth(prevPop *Population, _ uint32) uint32 {
 	return newTargetSize
 }
 
-// FoundersPopulationGrowth increases the pop size exponentially until it reaches the carrying capacity
+// FoundersPopulationGrowth increases the pop size exponentially until it reaches the carrying capacity, and supports bottlenecks
 func FoundersPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
 	var newTargetSize uint32
 	if config.Cfg.Population.Bottleneck_generation == 0 || genNum < config.Cfg.Population.Bottleneck_generation {
@@ -523,6 +531,129 @@ func FoundersPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
 	}
 	newTargetSize = utils.MinUint32(newTargetSize, config.Cfg.Population.Carrying_capacity) 	// do not want it exceeding the carrying capacity
 	return newTargetSize
+}
+
+// MultiBottleneckPopulationGrowth is like founders, except supports an arbitrary number of bottlenecks
+func MultiBottleneckPopulationGrowth(prevPop *Population, genNum uint32) uint32 {
+	var newTargetSize uint32
+	pb := prevPop.BottleNecks
+	curPB := pb.CurrentBottleneck()
+
+	if curPB.BottleneckStart > 0  && genNum >= curPB.BottleneckStart + curPB.BottleneckGens {
+		// We just stepped past our current Bottleneck element, so move to the next one
+		curPB = pb.NextBottleneck()
+	}
+	config.Verbose(1, "Using bottleneck values: %v:%d:%d:%d:%d", curPB.GrowthRate, curPB.MaxPop, curPB.BottleneckStart, curPB.BottleneckPopSize, curPB.BottleneckGens)
+
+	if curPB.BottleneckStart == 0 || genNum < curPB.BottleneckStart {
+		// We are before the bottleneck so use our growth rate
+		newTargetSize = uint32(math.Ceil(curPB.GrowthRate * float64(prevPop.TargetSize)))
+	} else if genNum >= curPB.BottleneckStart && genNum < curPB.BottleneckStart + curPB.BottleneckGens {
+		// We are in the bottleneck range
+		newTargetSize = curPB.BottleneckPopSize
+	} else {
+		// We should never get here, because we handled this case above
+		log.Fatalf("Internal Error: in generation %d reached unreachable bottleneck code", genNum)
+	}
+	if curPB.MaxPop != 0 {
+		newTargetSize = utils.MinUint32(newTargetSize, curPB.MaxPop) // do not want it exceeding the max pop
+	}
+
+	return newTargetSize
+}
+
+type Bottlenecks struct {
+	Bottlenecks []Bottleneck
+	CurrentIndex uint32
+}
+
+type Bottleneck struct {
+	GrowthRate float64		// the pop growth rate before this bottleneck, 1.0 means no growth
+	MaxPop uint32			// the max pop size before this bottleneck, 0 means no max
+	BottleneckStart uint32		// the starting gen num, 0 means no more bottlenecks
+	BottleneckPopSize uint32	// the pop size during the bottleneck time period
+	BottleneckGens uint32		// the num gens the bottleneck will last, then we move on to the next Bottleneck element
+}
+
+// ParseMultipleBottlenecks parses the config value that is comma-separated 5-tuples growth-rate:max-pop:bottle-start:bottle-size:bottle-gens
+// It returns the Bottlenecks iterable
+func ParseMultipleBottlenecks(bottlenecksStr string) *Bottlenecks {
+	errorStr := fmt.Sprintf("Error: if pop_growth_model==%s, then multiple_bottlenecks must be like: growth-rate:max-pop:bottle-start:bottle-size:bottle-gens,...", string(MULTI_BOTTLENECK_POPULATON_GROWTH))
+	var bottlenecks Bottlenecks
+	if strings.TrimSpace(bottlenecksStr) == "" { log.Fatal(errorStr) }
+	tuples := strings.Split(bottlenecksStr, ",")
+	for i, t := range tuples {
+		parts := strings.Split(strings.TrimSpace(t), ":")	// get the 5 values of this tuple. Only the growth-rate is required, the rest can default if there are no more bottlenecks
+		if len(parts) < 1 || len(parts) > 5 { log.Fatal(errorStr) }
+		var bottle Bottleneck
+		var tmpInt64 int64
+		var err error
+		bottle.GrowthRate, err = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		if err != nil  { log.Fatalf("Error parsing growth-rate in element %d of multiple_bottlenecks: %v", i+1, err) }
+		if bottle.GrowthRate <= 0.0 { log.Fatalf("Error: growth-rate in multiple_bottlenecks must be > 0.0, not %v", bottle.GrowthRate) }
+
+		if len(parts) >= 2 {
+			tmpInt64, err = strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 32)
+			if err != nil {
+				log.Fatalf("Error parsing max-pop in element %d of multiple_bottlenecks: %v", i+1, err)
+			}
+			bottle.MaxPop = uint32(tmpInt64)
+			if bottle.MaxPop < 0 {
+				log.Fatalf("Error: max-pop in multiple_bottlenecks must be >= 0, not %d", bottle.MaxPop)
+			}
+		}
+
+		if len(parts) >= 3 {
+			tmpInt64, err = strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 32)
+			if err != nil {
+				log.Fatalf("Error parsing bottleneck-start in element %d of multiple_bottlenecks: %v", i+1, err)
+			}
+			bottle.BottleneckStart = uint32(tmpInt64)
+			if bottle.BottleneckStart < 0 {
+				log.Fatalf("Error: bottleneck-start in multiple_bottlenecks must be >= 0, not %d", bottle.BottleneckStart)
+			}
+		}
+
+		if len(parts) >= 4 {
+			tmpInt64, err = strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 32)
+			if err != nil {
+				log.Fatalf("Error parsing bottleneck-size in element %d of multiple_bottlenecks: %v", i+1, err)
+			}
+			bottle.BottleneckPopSize = uint32(tmpInt64)
+			if bottle.BottleneckPopSize < 0 {
+				log.Fatalf("Error: bottleneck-size in multiple_bottlenecks must be >= 0, not %d", bottle.BottleneckPopSize)
+			}
+		}
+
+		if len(parts) >= 5 {
+			tmpInt64, err = strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 32)
+			if err != nil {
+				log.Fatalf("Error parsing bottleneck-gens in element %d of multiple_bottlenecks: %v", i+1, err)
+			}
+			bottle.BottleneckGens = uint32(tmpInt64)
+			if bottle.BottleneckGens < 0 {
+				log.Fatalf("Error: bottleneck-gens in multiple_bottlenecks must be >= 0, not %d", bottle.BottleneckGens)
+			}
+		}
+
+		bottlenecks.Bottlenecks = append(bottlenecks.Bottlenecks, bottle)
+	}
+	return &bottlenecks
+}
+
+// CurrentBottleneck returns the current Bottleneck element.
+func (pb *Bottlenecks) CurrentBottleneck() Bottleneck {
+	return pb.Bottlenecks[pb.CurrentIndex]
+}
+
+// NextBottleneck returns the next Bottleneck element.
+func (pb *Bottlenecks) NextBottleneck() Bottleneck {
+	if pb.CurrentIndex >= uint32(len(pb.Bottlenecks)) {
+		// The index is past the end, return a manufactured bottleneck element that indicates there are no more bottlenecks
+		return Bottleneck{GrowthRate: 1.0} // the rest of the values being 0 indicate no more bottlenecks
+	}
+	pb.CurrentIndex++
+	return pb.Bottlenecks[pb.CurrentIndex]
 }
 
 // PreSelectFitnessStats returns the mean geno fitness and std deviation

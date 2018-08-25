@@ -35,6 +35,7 @@ const (
 	EXPONENTIAL_POPULATON_GROWTH PopulationGrowthModelType = "exponential"
 	CAPACITY_POPULATON_GROWTH PopulationGrowthModelType = "capacity"
 	FOUNDERS_POPULATON_GROWTH PopulationGrowthModelType = "founders"
+	MULTI_BOTTLENECK_POPULATON_GROWTH PopulationGrowthModelType = "multi-bottleneck"
 )
 
 type InitialAlleleModelType string
@@ -122,20 +123,30 @@ func SetModels(c *config.Config) {
 	case NO_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = NoPopulationGrowth
 		mdlNames = append(mdlNames, "NoPopulationGrowth")
+		if c.Population.Multiple_Bottlenecks != "" { log.Fatalln("multiple_Bottlenecks can only be specified for pop_growth_model==multi-bottlenecks") }
 	case EXPONENTIAL_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = ExponentialPopulationGrowth
 		mdlNames = append(mdlNames, "ExponentialPopulationGrowth")
 		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==exponential pop_growth_rate must be > 0.0") }
 		if c.Basic.Num_generations == 0 && c.Population.Max_pop_size == 0 { log.Fatalln("For pop_growth_model==exponential at least 1 of num_generations and max_pop_size must be non-zero") }
+		if c.Population.Multiple_Bottlenecks != "" { log.Fatalln("multiple_Bottlenecks can only be specified for pop_growth_model==multi-bottlenecks") }
 	case CAPACITY_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = CapacityPopulationGrowth
 		mdlNames = append(mdlNames, "CapacityPopulationGrowth")
 		if c.Population.Pop_growth_rate <= 0.0 { log.Fatalln("For pop_growth_model==capacity pop_growth_rate must be > 0.0") }
+		if c.Population.Multiple_Bottlenecks != "" { log.Fatalln("multiple_Bottlenecks can only be specified for pop_growth_model==multi-bottlenecks") }
 	case FOUNDERS_POPULATON_GROWTH:
 		Mdl.PopulationGrowth = FoundersPopulationGrowth
 		mdlNames = append(mdlNames, "FoundersPopulationGrowth")
 		if c.Population.Pop_growth_rate <= 0.0 || c.Population.Pop_growth_rate2 <= 0.0 { log.Fatalln("For pop_growth_model==founders pop_growth_rate and pop_growth_rate2 must be > 0.0") }
-		if c.Population.Bottleneck_generation > 0 && (c.Population.Bottleneck_pop_size == 0 | c.Population.Num_bottleneck_generations) { log.Fatalln("For pop_growth_model==founders and bottleneck_generation > then bottleneck_pop_size and num_bottleneck_generations must be > 0.0") }
+		if c.Population.Bottleneck_generation > 0 && (c.Population.Bottleneck_pop_size == 0 || c.Population.Num_bottleneck_generations == 0) { log.Fatalln("For pop_growth_model==founders and bottleneck_generation > 0 then bottleneck_pop_size and num_bottleneck_generations must be > 0.0") }
+		if c.Population.Multiple_Bottlenecks != "" { log.Fatalln("multiple_Bottlenecks can only be specified for pop_growth_model==multi-bottlenecks") }
+	case MULTI_BOTTLENECK_POPULATON_GROWTH:
+		Mdl.PopulationGrowth = MultiBottleneckPopulationGrowth
+		mdlNames = append(mdlNames, "MultiBottleneckPopulationGrowth")
+		if c.Population.Multiple_Bottlenecks == "" { log.Fatalln("For pop_growth_model==multi-bottlenecks multiple_Bottlenecks must be specified") }
+		// these older config values should not be used with this growth model
+		if c.Population.Pop_growth_rate != 0.0 || c.Population.Pop_growth_rate2 != 0.0 || c.Population.Max_pop_size != 0 || c.Population.Bottleneck_generation != 0 || c.Population.Bottleneck_pop_size != 0 { log.Fatalln("When pop_growth_model==multi-bottlenecks you can not use/specify: pop_growth_rate, pop_growth_rate2, max_pop_size, carrying_capacity, bottleneck_generation, bottleneck_pop_size, num_bottleneck_generations") }
 	default:
 		log.Fatalf("Error: unrecognized value for pop_growth_model: %v", c.Population.Pop_growth_model)
 	}

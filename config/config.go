@@ -76,7 +76,7 @@ type Config struct {
 		Pop_growth_rate2 float64
 		Max_pop_size uint32
 		Carrying_capacity uint32
-		//Bottleneck_yes bool
+		Multiple_Bottlenecks string
 		Bottleneck_generation uint32
 		Bottleneck_pop_size uint32
 		Num_bottleneck_generations uint32
