@@ -82,6 +82,11 @@ func TestMendelCase12(t *testing.T) {
 	mendelCaseBin(t, 12, 12, "00000100.json", true)
 }
 
+// Same as TestMendelCase11 except with multiple bottlenecks
+func TestMendelCase13(t *testing.T) {
+	mendelCase(t, 13, 13)
+}
+
 
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {

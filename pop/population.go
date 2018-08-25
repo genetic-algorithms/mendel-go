@@ -543,7 +543,7 @@ func MultiBottleneckPopulationGrowth(prevPop *Population, genNum uint32) uint32 
 		// We just stepped past our current Bottleneck element, so move to the next one
 		curPB = pb.NextBottleneck()
 	}
-	config.Verbose(1, "Using bottleneck values: %v:%d:%d:%d:%d", curPB.GrowthRate, curPB.MaxPop, curPB.BottleneckStart, curPB.BottleneckPopSize, curPB.BottleneckGens)
+	config.Verbose(2, "Using bottleneck values: %v:%d:%d:%d:%d", curPB.GrowthRate, curPB.MaxPop, curPB.BottleneckStart, curPB.BottleneckPopSize, curPB.BottleneckGens)
 
 	if curPB.BottleneckStart == 0 || genNum < curPB.BottleneckStart {
 		// We are before the bottleneck so use our growth rate
@@ -648,8 +648,8 @@ func (pb *Bottlenecks) CurrentBottleneck() Bottleneck {
 
 // NextBottleneck returns the next Bottleneck element.
 func (pb *Bottlenecks) NextBottleneck() Bottleneck {
-	if pb.CurrentIndex >= uint32(len(pb.Bottlenecks)) {
-		// The index is past the end, return a manufactured bottleneck element that indicates there are no more bottlenecks
+	if pb.CurrentIndex >= uint32(len(pb.Bottlenecks) - 1) {
+		// The index is already at the end, return a manufactured bottleneck element that indicates there are no more bottlenecks
 		return Bottleneck{GrowthRate: 1.0} // the rest of the values being 0 indicate no more bottlenecks
 	}
 	pb.CurrentIndex++
