@@ -30,6 +30,16 @@ func CopyFromFileName2Writer(fromFileName string, toFile *os.File) error {
 	return nil
 }
 
+func CanonicalPathsEqual(filePath1, filePath2 string) (isEqual bool, err error) {
+	var cPath1, cPath2 string
+	if cPath1, err = filepath.EvalSymlinks(filePath1); err != nil { return }
+	if cPath1, err = filepath.Abs(cPath1); err != nil { return }
+	if cPath2, err = filepath.EvalSymlinks(filePath2); err != nil { return }
+	if cPath2, err = filepath.Abs(cPath2); err != nil { return }
+	isEqual = cPath1 == cPath2
+	return
+}
+
 func MinInt(a, b int) int {
 	if a < b { return a }
 	return b

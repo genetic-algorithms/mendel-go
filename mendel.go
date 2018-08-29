@@ -60,12 +60,16 @@ func initialize() *rand.Rand {
 	pop.SetModels(config.Cfg)
 
 	// Write input params to the output dir
-	if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
-		//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
-		if config.CmdArgs.InputFile != "" {
-			if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
-		} else {
-			if err := utils.CopyFromFileName2Writer(config.FindDefaultFile(), tomlWriter); err != nil { log.Fatalln(err) }
+	if config.CmdArgs.SPCusername != "" {	// when running in the spc context we don't want to overwrite the toml file it has already written
+		if isEqual, err := utils.CanonicalPathsEqual(config.CmdArgs.InputFile, config.TOML_FILENAME); err != nil && !isEqual {
+			if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+				//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
+				if config.CmdArgs.InputFile != "" {
+					if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
+				} else {
+					if err := utils.CopyFromFileName2Writer(config.FindDefaultFile(), tomlWriter); err != nil { log.Fatalln(err) }
+				}
+			}
 		}
 	}
 
@@ -91,7 +95,7 @@ func CreateZip(spcUsername, randomSlug string) {
 	if err != nil { log.Fatalf("Error: could not make %s absolute: %v", config.Cfg.Computation.Data_file_path, err) }
 	zipDir := config.FMgr.DataFilePath + "/../.spclinks/" + config.Cfg.Basic.Case_id + "/user_data"
 	linkDir := zipDir + "/" + spcUsername + "/mendel_go"
-	//todo: if linkDir already exists, remove any previous sym links in it
+	// also: if linkDir already exists, remove any previous sym links in it
 	if err := os.MkdirAll(linkDir, 0755); err != nil { log.Fatalf("Error creating link directory %s for zip file creation: %v", linkDir, err) }
 	link := linkDir + "/" + randomSlug
 	config.Verbose(1, "linking %s to %s", dataPath, link)

@@ -18,8 +18,6 @@ const (
 	DISTRIBUTION_DEL_DIRECTORY = "allele-distribution-del/"
 	DISTRIBUTION_FAV_DIRECTORY = "allele-distribution-fav/"
 )
-// Apparently this can't be a const because a map literal isn't a const in go
-var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, TOML_FILENAME: 1, OUTPUT_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
 
 // Not using buffered io because we need write to be flushed every generation to support restart
 //type FileElem struct {
@@ -43,7 +41,13 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 	FMgr = &FileMgr{DataFilePath: dataFilePath, Files: make(map[string]*os.File), Dirs: make(map[string]map[string]*os.File) }
 	if filesToOutput == "" { return FMgr }
 
-	// Open all of the files and put in the map
+	// Get the proper list of file names
+	var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
+	if CmdArgs.SPCusername != "" {
+		// Add the files that are relevant only when -u is specified (and we aren't running in spc)
+		VALID_FILE_NAMES[TOML_FILENAME] = 1
+		VALID_FILE_NAMES[OUTPUT_FILENAME] = 1
+	}
 	var fileNames []string
 	if filesToOutput == "*" {
 		// They want all files/dirs output
@@ -55,6 +59,8 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 		// They gave us a list of file/dir names
 		fileNames = regexp.MustCompile(`,\s*`).Split(filesToOutput, -1)
 	}
+
+	// Open all of the files and put in the map
 	Verbose(5, "Opening files for writing: %v", fileNames)
 	if len(fileNames) > 0 {
 		// Make sure output directory exists
