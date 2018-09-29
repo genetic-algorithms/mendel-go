@@ -17,6 +17,8 @@ import (
 	"bytes"
 )
 
+const DATA_FILE_PATH_DEFAULT = "./user/output"
+
 // Config is the struct that gets filled in by TOML automatically from the input file.
 type Config struct {
 	Basic struct {
@@ -152,7 +154,11 @@ func ReadFromFile(filename string) error {
 	}
 
 	// Do this before validate, because we need to know what output files have been requested for some of the validation testing
-	if Cfg.Computation.Data_file_path == "" { Cfg.Computation.Data_file_path = "./test/output/" + Cfg.Basic.Case_id }
+	if CmdArgs.DataPath != "" {
+		Cfg.Computation.Data_file_path = CmdArgs.DataPath
+	} else if Cfg.Computation.Data_file_path == "" {
+		Cfg.Computation.Data_file_path = DATA_FILE_PATH_DEFAULT + "/" + Cfg.Basic.Case_id
+	}	// else use Cfg.Computation.Data_file_path as specified in the user config file or defaults file
 	FileMgrFactory(Cfg.Computation.Data_file_path, Cfg.Computation.Files_to_output)
 
 	if err := Cfg.validateAndAdjust(); err != nil { log.Fatalln(err) }

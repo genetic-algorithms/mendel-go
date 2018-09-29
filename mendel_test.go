@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	IN_FILE_BASE string = "test/input/mendel-testcase"
-	OUT_FILE_BASE string = "test/output/testcase"
-	EXP_FILE_BASE string = "test/expected/testcase"
-	//BIN_SUBDIR string = "/allele-bins/"
-	BIN_SUBDIR string = "/" + config.ALLELE_BINS_DIRECTORY
-	NORM_SUBDIR string = "/" + config.NORMALIZED_ALLELE_BINS_DIRECTORY
-	DIST_DEL_SUBDIR string = "/" + config.DISTRIBUTION_DEL_DIRECTORY
-	DIST_FAV_SUBDIR string = "/" + config.DISTRIBUTION_FAV_DIRECTORY
+	IN_FILE_BASE = "test/input/mendel-testcase"
+	OUT_FILE_BASE = "test/output/testcase"
+	EXP_FILE_BASE = "test/expected/testcase"
+	//BIN_SUBDIR = "/allele-bins/"
+	BIN_SUBDIR = "/" + config.ALLELE_BINS_DIRECTORY
+	NORM_SUBDIR = "/" + config.NORMALIZED_ALLELE_BINS_DIRECTORY
+	DIST_DEL_SUBDIR = "/" + config.DISTRIBUTION_DEL_DIRECTORY
+	DIST_FAV_SUBDIR = "/" + config.DISTRIBUTION_FAV_DIRECTORY
 )
 
 // Typical small run
@@ -97,7 +97,8 @@ func mendelCase(t *testing.T, num, expNum int) {
 	//expTestCase := "testcase" + strconv.Itoa(expNum)		// the number of the expected output file
 	//outFileDir := "test/output/" + testCase
 	inFileName := IN_FILE_BASE + numStr + ".ini"
-	outFileName := OUT_FILE_BASE + numStr + "/mendel"
+	dataPath := OUT_FILE_BASE + numStr		// we will set -O to this value
+	outFileName := dataPath + "/mendel"
 	expFileName := EXP_FILE_BASE + expNumStr + "/mendel"
 	if err := os.MkdirAll(OUT_FILE_BASE+numStr, 0755); err != nil {
 		t.Errorf("Error creating %v: %v", OUT_FILE_BASE+numStr, err)
@@ -106,7 +107,7 @@ func mendelCase(t *testing.T, num, expNum int) {
 
 	cmdString := "./mendel-go"
 	cmdFailed := false
-	stdoutBytes, stderrBytes, err := runCmd(t, cmdString, "-f", inFileName)
+	stdoutBytes, stderrBytes, err := runCmd(t, cmdString, "-f", inFileName, "-O", dataPath)
 	if err != nil {
 		t.Errorf("Error running command %v: %v", cmdString, err)
 		cmdFailed = true
@@ -152,7 +153,7 @@ func runCmd(t *testing.T, commandString string, args ...string) ([]byte, []byte,
 	// Create the command object with its args
 	cmd := exec.Command(commandString, args...)
 	if cmd == nil {
-		return nil, nil, errors.New("Did not return a command object, returned nil")
+		return nil, nil, errors.New("did not return a command object, returned nil")
 	}
 	// Create the stdout pipe to hold the output from the command
 	stdout, err := cmd.StdoutPipe()
