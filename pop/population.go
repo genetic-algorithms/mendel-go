@@ -72,7 +72,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 		targetSize = config.Cfg.Basic.Pop_size
 	}
 	p := &Population{
-		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended either in Initialize or as the population grows during mating
+		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended below
 		TargetSize: targetSize,
 	}
 	if PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model)) == MULTI_BOTTLENECK_POPULATON_GROWTH {

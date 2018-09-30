@@ -19,8 +19,8 @@ func SpeciesFactory() *Species {
 }
 
 // Initialize inits the populations for gen 0
-func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) {
-	for i, p := range s.Populations {
+func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) *Species {
+	for i := range s.Populations {
 		var newRandom *rand.Rand
 		if i == 0 {
 			// Let the 1st pop use the main uniformRandom generator so tribes=1 is the same as pre-tribes
@@ -28,10 +28,16 @@ func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) {
 		} else {
 			newRandom = random.RandFactory()
 		}
-		p = PopulationFactory(nil, 0) 		// genesis population
-		Mdl.GenerateInitialAlleles(p, newRandom)
-		p.ReportInitial(maxGenNum)
+		s.Populations[i] = PopulationFactory(nil, 0) 		// genesis population
+		Mdl.GenerateInitialAlleles(s.Populations[i], newRandom)
+		s.Populations[i].ReportInitial(maxGenNum)
 	}
+	return s 		// so we can chain calls
+}
+
+// GetNumPopulations returns the number of populations in this species
+func (s *Species) GetNumPopulations() uint32 {
+	return uint32(len(s.Populations))
 }
 
 // GetCurrentSize returns the sum of all of the pop sizes
@@ -44,7 +50,7 @@ func (s *Species) GetCurrentSize() (size uint32) {
 
 // GetNextGeneration prepares all of the populations for the next gen and returns them in a new Species object
 func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
-	random.NextSeed = config.Cfg.Computation.Random_number_seed		// reset the seed so tribes=1 is the same as pre-tribes
+	random.NextSeed = config.Cfg.Computation.Random_number_seed + 1		// reset the seed to 1 above our initial seed, so when we call RandFactory() in Mate() for additional threads it will work like it did before
 	childrenS = SpeciesFactory()
 	for i := range parentS.Populations {
 		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen)	// this creates the PopulationParts too
@@ -52,6 +58,7 @@ func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
 	return
 }
 
+// Mate mates all of the populations
 func (parentS *Species) Mate(childrenS *Species, uniformRandom *rand.Rand) {
 	for i := range parentS.Populations {
 		var newRandom *rand.Rand
@@ -65,6 +72,7 @@ func (parentS *Species) Mate(childrenS *Species, uniformRandom *rand.Rand) {
 	}
 }
 
+// Select does selection on all of the populations
 func (s *Species) Select(uniformRandom *rand.Rand) {
 	for i, p := range s.Populations {
 		var newRandom *rand.Rand
@@ -78,9 +86,28 @@ func (s *Species) Select(uniformRandom *rand.Rand) {
 	}
 }
 
+// ReportEachGen reports stats on each population
+func (s *Species) ReportEachGen(gen uint32, lastGen bool) {
+	for _, p := range s.Populations {
+		p.ReportEachGen(gen, lastGen)
+	}
+}
+
+// ReportEachGen reports stats on each population
+func (s *Species) GetAverageFitness() (averageFitness float64) {
+	if s.GetNumPopulations() == 0 { return }
+	for _, p := range s.Populations {
+		aveFit, _, _, _, _ := p.GetFitnessStats()
+		averageFitness += aveFit
+	}
+	return averageFitness / float64(s.GetNumPopulations())
+}
+
+/* don't think this is useful...
 func (parentS *Species) MoveToNextGeneration(childrenS *Species, gen uint32, lastGen bool) *Species {
 	for i := range parentS.Populations {
 		childrenS.Populations[i].ReportEachGen(gen, lastGen)
 	}
 	return childrenS
 }
+*/

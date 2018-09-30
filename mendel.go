@@ -196,9 +196,10 @@ func main() {
 	uniformRandom := initialize()
 
 	maxGenNum := config.Cfg.Basic.Num_generations
-	parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
-	pop.Mdl.GenerateInitialAlleles(parentPop, uniformRandom)
-	parentPop.ReportInitial(maxGenNum)
+	//parentPop := pop.PopulationFactory(nil, 0) 		// genesis population
+	//pop.Mdl.GenerateInitialAlleles(parentPop, uniformRandom)
+	//parentPop.ReportInitial(maxGenNum)
+	parentSpecies := pop.SpeciesFactory().Initialize(maxGenNum, uniformRandom)
 
 	popMaxIsSet := pop.PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==pop.EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
 	popMax := config.Cfg.Population.Max_pop_size
@@ -207,7 +208,8 @@ func main() {
 	zeroGens := maxGenNum == 0 && !popMaxIsSet
 	if config.Cfg.Population.Num_contrasting_alleles > 0 && (zeroGens || config.Cfg.Computation.Plot_allele_gens == 1) {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
-		parentPop.ReportEachGen(0, zeroGens)
+		//parentPop.ReportEachGen(0, zeroGens)
+		parentSpecies.ReportEachGen(0, zeroGens)
 		if zeroGens {
 			shutdown() // Finish up
 			os.Exit(0)
@@ -217,34 +219,43 @@ func main() {
 	// Main generation loop.
 	for gen := uint32(1); ; gen++ {
 		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
-		childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
-		random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed so tribes=1 is the same as pre-tribes
-		parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
+		//childrenPop := pop.PopulationFactory(parentPop, gen)	// this creates the PopulationParts too
+		//random.NextSeed = config.Cfg.Computation.Random_number_seed+1		// reset the seed to 1 above our initial seed, so when we call RandFactory() in Mate() for additional threads it will work like it did before
+		childrenSpecies := parentSpecies.GetNextGeneration(gen)	// this creates the PopulationParts too
+		//parentPop.Mate(childrenPop, uniformRandom)		// this fills in the next gen population object with the offspring
+		parentSpecies.Mate(childrenSpecies, uniformRandom)		// this fills in the next gen populations object with the offspring
 		utils.Measure.CheckAmountMemoryUsed()
-		parentPop = nil 	// give GC a chance to reclaim the previous generation
+		parentSpecies = nil 	// give GC a chance to reclaim the previous generation
 		if config.Cfg.Computation.Force_gc { utils.CollectGarbage() }
-		childrenPop.Select(uniformRandom)
+		//childrenPop.Select(uniformRandom)
+		childrenSpecies.Select(uniformRandom)
 
 		// Check if we should stop the run
 		lastGen := false
 		if maxGenNum != 0 && gen >= maxGenNum {
 			lastGen = true
-		} else if popMaxIsSet && childrenPop.GetCurrentSize() >= popMax {
-			log.Printf("Population has reached the max specified value of %d. Stopping simulation.", popMax)
+		//} else if popMaxIsSet && childrenPop.GetCurrentSize() >= popMax {
+		} else if popMaxIsSet && childrenSpecies.GetCurrentSize() >= popMax {
+			log.Printf("Species has reached the max specified value of %d. Stopping simulation.", popMax)
 			lastGen = true
-		} else if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
-			// Chcek if we don't have enough individuals to mate
-			log.Println("Population is extinct. Stopping simulation.")
+		//} else if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenPop.GetCurrentSize() < 2) || childrenPop.GetCurrentSize() == 0 {
+		} else if (pop.RecombinationType(config.Cfg.Population.Recombination_model) == pop.FULL_SEXUAL && childrenSpecies.GetCurrentSize() < 2) || childrenSpecies.GetCurrentSize() == 0 {
+			// Above chceks if we don't have enough individuals to mate
+			log.Println("Species is extinct. Stopping simulation.")
 			lastGen = true
-		} else if aveFit, _, _, _, _ := childrenPop.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
-			// Check if the pop fitness is below the threashold
+		//todo: check if all tribes are extinct
+		//} else if aveFit, _, _, _, _ := childrenPop.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
+		} else if childrenSpecies.GetAverageFitness() < config.Cfg.Computation.Extinction_threshold {
+			// Above checks if the all the pops fitness is below the threshold
 			log.Printf("Population fitness is below the extinction threshold of %.3f. Stopping simulation.", config.Cfg.Computation.Extinction_threshold)
 			lastGen = true
 		}
 
-		childrenPop.ReportEachGen(gen, lastGen)
+		//childrenPop.ReportEachGen(gen, lastGen)
+		childrenSpecies.ReportEachGen(gen, lastGen)
 		if lastGen { break }
-		parentPop = childrenPop        // for the next iteration
+		//parentPop = childrenPop        // for the next iteration
+		parentSpecies = childrenSpecies        // for the next iteration
 	}
 
 	shutdown()	// Finish up
