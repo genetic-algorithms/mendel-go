@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"log"
 	"strings"
+	"strconv"
 )
 
 // Supported file names. Do we need to make this a literal map to be able to check inputted file names??
@@ -60,31 +61,69 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 		fileNames = regexp.MustCompile(`,\s*`).Split(filesToOutput, -1)
 	}
 
+	// Check the input file name against our list of valid ones
+	for _, f := range fileNames {
+		if _, ok := VALID_FILE_NAMES[f]; !ok {
+			log.Fatalf("Error: %v specified in files_to_output is not an output file or directory name we support.", f)
+		}
+	}
+
 	// Open all of the files and put in the map
 	Verbose(5, "Opening files for writing: %v", fileNames)
+	FMgr.openFiles(dataFilePath, "", fileNames)		// this is either for the single pop, or a summary of all the tribes
+	if Cfg.Tribes.Num_tribes > 1 {
+		for i:=1; i<=int(Cfg.Tribes.Num_tribes); i++ {
+			FMgr.openFiles(dataFilePath, TribeDir(uint32(i)), fileNames)
+		}
+	}
+
+	return FMgr		// return the object created so we can chain other methods after this
+}
+
+func TribeDir(tribeNum uint32) string { return "tribe-"+strconv.Itoa(int(tribeNum)) }
+
+func TribePrefix(tribeNum uint32) string {
+	if Cfg.Tribes.Num_tribes <= 1 || tribeNum == 0 { return "" }
+	return TribeDir(tribeNum) + "/"
+}
+
+// openFiles opens the files and creates the dirs for the main pop (subdir=="") or a tribe.
+func (fMgr *FileMgr) openFiles(dataFilePath, subdir string, fileNames []string) {
+	dataFilePath = suffixDir(dataFilePath,subdir)		// this is usually a subdir for a tribe
 	if len(fileNames) > 0 {
 		// Make sure output directory exists
 		if err := os.MkdirAll(dataFilePath, 0755); err != nil { log.Fatalf("Error creating data_file_path %v: %v", dataFilePath, err) }
 	}
 	for _, f := range fileNames {
-		// Check the input file name against our list of valid ones
-		if _, ok := VALID_FILE_NAMES[f]; !ok { log.Fatalf("Error: %v specified in files_to_output is not an output file or directory name we support.", f) }
-
 		if strings.HasSuffix(f, "/") {
 			// f is really a directory name, make sure it exists and then add it to our Dirs map. The actual files under that will get created later when GetDirFile() is called.
-			dirPath := dataFilePath + "/" + f
+			fDir := f
+			dirPath := dataFilePath + "/" + fDir
 			if err := os.MkdirAll(dirPath, 0755); err != nil { log.Fatalf("Error creating output directory %v: %v", dirPath, err) }
-			FMgr.Dirs[f] = make(map[string]*os.File)
+			FMgr.Dirs[prefixDir(subdir,fDir)] = make(map[string]*os.File)	// the dir keys need to be unique so it should include the tribe
 		} else {
 			// f is a single file, open it
 			filePath := dataFilePath + "/" + f
 			file, err := os.Create(filePath)
 			if err != nil { log.Fatal(err) } 	// for now, if we can't open a file, just bail
 			//FMgr.Files[f] = FileElem{file, bufio.NewWriter(file)}
-			FMgr.Files[f] = file
+			FMgr.Files[prefixDir(subdir,f)] = file
 		}
 	}
-	return FMgr		// return the object created so we can chain other methods after this
+}
+
+func prefixDir(dir, fileName string) string {
+	if dir != "" {
+		return dir + "/" + fileName
+	}
+	return fileName
+}
+
+func suffixDir(dir1, dir2 string) string {
+	if dir2 != "" {
+		return dir1 + "/" + dir2
+	}
+	return dir1
 }
 
 
@@ -103,21 +142,21 @@ func (fMgr *FileMgr) IsDir(dirName string) bool {
 
 
 // GetFile returns the specified file descriptor if we have it open.
-func (fMgr *FileMgr) GetFile(fileName string) *os.File {
-	if file, ok := fMgr.Files[fileName]; ok && file != nil { return file }
+func (fMgr *FileMgr) GetFile(fileName string, tribeNum uint32) *os.File {
+	if file, ok := fMgr.Files[TribePrefix(tribeNum)+fileName]; ok && file != nil { return file }
 	return nil
 }
 
 
 // GetDirFile returns the specified file descriptor in the specified directory, creating/opening the file if necessary.
-func (fMgr *FileMgr) GetDirFile(dirName, fileName string) *os.File {
-	if dir, ok := fMgr.Dirs[dirName]; ok {
+func (fMgr *FileMgr) GetDirFile(dirName, fileName string, tribeNum uint32) *os.File {
+	if dir, ok := fMgr.Dirs[TribePrefix(tribeNum)+dirName]; ok {
 		// We have this dir entry, look for the file entry within it
 		if file, ok := dir[fileName]; ok && file != nil {
 			return file
 		} else {
 			// Not there yet, create the entry
-			filePath := FMgr.DataFilePath + "/" + dirName + fileName // dirName already has / at the end of it
+			filePath := FMgr.DataFilePath + "/" + TribePrefix(tribeNum)+dirName + fileName // dirName already has / at the end of it
 			file, err := os.Create(filePath)
 			if err != nil { log.Fatal(err) } 	// for now, if we can't open a file, just bail
 			dir[fileName] = file		// add it to our list so we can close it at the end
@@ -128,8 +167,24 @@ func (fMgr *FileMgr) GetDirFile(dirName, fileName string) *os.File {
 }
 
 
+// CloseFile closes a file under FileMgr control.
+func (fMgr *FileMgr) CloseFile(fileName string, tribeNum uint32) {
+	fileName = TribePrefix(tribeNum) + fileName
+	if file, ok := fMgr.Files[fileName]; ok && file != nil {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing %v: %v", fileName, err)
+		} else {
+			fMgr.Files[fileName] = nil
+		}
+	} else {
+		log.Printf("Error: file %v can not be closed because it is not open", fileName)
+	}
+}
+
+
 // CloseDirFile closes a file under a directory.
-func (fMgr *FileMgr) CloseDirFile(dirName, fileName string) {
+func (fMgr *FileMgr) CloseDirFile(dirName, fileName string, tribeNum uint32) {
+	dirName = TribePrefix(tribeNum) + dirName
 	if dir, ok := fMgr.Dirs[dirName]; ok {
 		// We have this dir entry, look for the file entry within it
 		if file, ok := dir[fileName]; ok && file != nil {
@@ -143,20 +198,6 @@ func (fMgr *FileMgr) CloseDirFile(dirName, fileName string) {
 		}
 	} else {
 		log.Printf("Error: file %v in directory %v can not be closed because %v output was never requested", fileName, dirName, dirName)
-	}
-}
-
-
-// CloseFile closes a file under FileMgr control.
-func (fMgr *FileMgr) CloseFile(fileName string) {
-	if file, ok := fMgr.Files[fileName]; ok && file != nil {
-		if err := file.Close(); err != nil {
-			log.Printf("Error closing %v: %v", fileName, err)
-		} else {
-			fMgr.Files[fileName] = nil
-		}
-	} else {
-		log.Printf("Error: file %v can not be closed because it is not open", fileName)
 	}
 }
 

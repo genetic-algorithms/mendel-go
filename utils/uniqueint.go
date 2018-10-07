@@ -17,6 +17,7 @@ var GlobalUniqueInt *UniqueInt
 
 
 // UniqueIntFactory creates the global instance of UniqueInt
+//todo: verify this is ok for multiple populations!!!!!!!!!!!!!!
 func GlobalUniqueIntFactory() {
 	GlobalUniqueInt = &UniqueInt{lastInt: MAXUINT64}
 }

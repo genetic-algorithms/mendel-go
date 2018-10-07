@@ -32,6 +32,7 @@ func MeasurerFactory(verbosity uint32) {
 
 // Start starts the time measuring of a section of code. Returns the Measurer instance to Start and Stop can be chained in a defer statement.
 func (m *Measurer) Start(codeName string) *Measurer {
+	//fmt.Printf("Measurer: starting %s\n", codeName)
 	if !m.Track { return m }
 	if !m.DeltaTime[codeName].IsZero() {
 		// We were in the middle of a measurement
@@ -56,6 +57,7 @@ func (m *Measurer) GetInterimTime(codeName string) float64 {
 
 // Stop stops the time measuring of a section of code and adds this amount to the total for the run
 func (m *Measurer) Stop(codeName string) (delta float64) {
+	//fmt.Printf("Measurer: stopping %s\n", codeName)
 	if !m.Track { return }
 	if m.DeltaTime[codeName].IsZero() {
 		// We did not start a measurement

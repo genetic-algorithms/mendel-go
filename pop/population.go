@@ -37,6 +37,7 @@ func (a ByFitness) Less(i, j int) bool { return a[i].Indiv.PhenoFitness < a[j].I
 
 // Population tracks the tribes and global info about the population. It also handles population-wide actions like mating and selection.
 type Population struct {
+	TribeNum uint32	// the tribe number
 	Parts []*PopulationPart		// Subsets of the pop that are mated in parallel. This contains the backing array for IndexRefs.
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
@@ -62,8 +63,8 @@ type Population struct {
 }
 
 
-// PopulationFactory creates a new population If genNum==0 it creates the special genesis population.
-func PopulationFactory(prevPop *Population, genNum uint32) *Population {
+// PopulationFactory creates a new population. If genNum==0 it creates the special genesis population.
+func PopulationFactory(prevPop *Population, genNum uint32, tribeNum uint32) *Population {
 	var targetSize uint32
 	if prevPop != nil {
 		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
@@ -72,6 +73,7 @@ func PopulationFactory(prevPop *Population, genNum uint32) *Population {
 		targetSize = config.Cfg.Basic.Pop_size
 	}
 	p := &Population{
+		TribeNum: tribeNum,
 		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended below
 		TargetSize: targetSize,
 	}
@@ -152,7 +154,6 @@ type GenerateInitialAllelesType func(p *Population, uniformRandom *rand.Rand)
 // GenerateAllUniqueInitialAlleles creates unique initial contrasting allele pairs (if specified by the config file) on indivs in the population
 func GenerateAllUniqueInitialAlleles(p *Population, uniformRandom *rand.Rand) {
 	if config.Cfg.Population.Num_contrasting_alleles == 0 || config.Cfg.Population.Initial_alleles_pop_frac <= 0.0 { return }	// nothing to do
-	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
 	// Loop thru individuals, and skipping or choosing individuals to maintain a ratio close to Initial_alleles_pop_frac
 	// Note: config.Validate() already confirms Initial_alleles_pop_frac is > 0 and <= 1.0
@@ -212,7 +213,6 @@ func GenerateVariableFreqInitialAlleles(p *Population, uniformRandom *rand.Rand)
 	// Parse the input parameter
 	freqList := ParseInitialAllelesFrequencies(config.Cfg.Population.Initial_alleles_frequencies)
 	config.Verbose(1, "Generating initial contrasting alleles for: %v", freqList)
-	defer utils.Measure.Start("GenerateInitialAlleles").Stop("GenerateInitialAlleles")
 
 	// Loop thru each fraction/fequency pair
 	for _, fracFreq := range freqList {
@@ -261,7 +261,6 @@ func GenerateVariableFreqInitialAlleles(p *Population, uniformRandom *rand.Rand)
 //   - add new mutations to random LBs
 //   - add offspring to new population
 func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
-	defer utils.Measure.Start("Mate").Stop("Mate")
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
@@ -326,7 +325,6 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 
 // Select removes the least fit individuals in the population
 func (p *Population) Select(uniformRandom *rand.Rand) {
-	defer utils.Measure.Start("Select").Stop("Select")
 	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.TargetSize, p.TargetSize)
 
 	// Calculate noise factor to get pheno fitness of each individual
@@ -790,8 +788,6 @@ func (p *Population) GetInitialAlleleStats() (float64, /*float64,*/ float64) {
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (p *Population) ReportInitial(maxGenNum uint32) {
-	config.Verbose(1, "Running with a population size of %d for %d generations with %d threads", p.GetCurrentSize(), maxGenNum, config.Cfg.Computation.Num_threads)
-
 	// Report initial alleles if there are any
 	initialVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
 	if config.Cfg.Population.Num_contrasting_alleles > 0 && config.IsVerbose(initialVerboseLevel) {
@@ -799,12 +795,12 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 		log.Printf(" Indiv initial allele detail means: deleterious: %v, favorable: %v", ad, af)
 	}
 
-	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
+	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME, p.TribeNum); histWriter != nil {
 		// Write header for this file
 		fmt.Fprintln(histWriter, "# Generation  Avg-deleterious Avg-neutral  Avg-favorable")
 	}
 
-	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
+	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME, p.TribeNum); fitWriter != nil {
 		// Write header for this file
 		fmt.Fprintln(fitWriter, "# Generation  Pop-size  Avg Offspring  Avg-fitness  Min-fitness  Max-fitness  Total Mutns  Mean Mutns  Noise")
 	}
@@ -812,8 +808,7 @@ func (p *Population) ReportInitial(maxGenNum uint32) {
 
 
 // Report prints out statistics of this population
-func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
-	utils.Measure.Start("ReportEachGen")
+func (p *Population) ReportEachGen(genNum uint32, lastGen bool, totalInterimTime, genTime float64, memUsed float32) {
 	perGenMinimalVerboseLevel := uint32(1)            // level at which we will print only the info that is very quick to gather
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
@@ -822,19 +817,17 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 	perGenIndDetailVerboseLevel := uint32(7)    // level at which we will print info about each individual each generation
 	finalIndDetailVerboseLevel := uint32(6)    // level at which we will print info about each individual at the end of the run
 	popSize := p.GetCurrentSize()
-	totalTime := utils.Measure.GetInterimTime("Total")
-	genTime := utils.Measure.Stop("Generations")
 
 	if config.IsVerbose(perGenVerboseLevel) || (lastGen && config.IsVerbose(finalVerboseLevel)) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()
-		log.Printf("Gen: %d, Run time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", genNum, totalTime, genTime, utils.Measure.GetAmountMemoryUsed(), popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
+		log.Printf("Tribe: %d, Gen: %d, Time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v, noise: %v", p.TribeNum, genNum, totalInterimTime, genTime, memUsed, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring, p.EnvironNoise)
 		if config.IsVerbose(perGenIndSumVerboseLevel) || (lastGen && config.IsVerbose(finalIndSumVerboseLevel)) {
 			d, n, f := p.GetMutationStats()
 			log.Printf(" Indiv mutation detail means: deleterious: %v, neutral: %v, favorable: %v, preselect fitness: %v, preselect fitness SD: %v", d, n, f, p.PreSelGenoFitnessMean, p.PreSelGenoFitnessStDev)
 		}
 	} else if config.IsVerbose(perGenMinimalVerboseLevel) {
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// this is much faster than p.GetMutationStats()
-		log.Printf("Gen: %d, Time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v", genNum, totalTime, genTime, utils.Measure.GetAmountMemoryUsed(), popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring)
+		log.Printf("Tribe: %d, Gen: %d, Time: %.4f, Gen time: %.4f, Mem: %.3f MB, Pop size: %v, Indiv mean fitness: %v, min fitness: %v, max fitness: %v, total num mutations: %v, mean num mutations: %v, Mean num offspring %v", p.TribeNum, genNum, totalInterimTime, genTime, memUsed, popSize, aveFit, minFit, maxFit, totalMutns, meanMutns, p.ActualAvgOffspring)
 	}
 	if config.IsVerbose(perGenIndDetailVerboseLevel) || (lastGen && config.IsVerbose(finalIndDetailVerboseLevel)) {
 		log.Println(" Individual Detail:")
@@ -844,7 +837,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		}
 	}
 
-	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME); histWriter != nil {
+	if histWriter := config.FMgr.GetFile(config.HISTORY_FILENAME, p.TribeNum); histWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.HISTORY_FILENAME)
 		d, n, f := p.GetMutationStats()		// GetMutationStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
@@ -855,7 +848,7 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 		}
 	}
 
-	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME); fitWriter != nil {
+	if fitWriter := config.FMgr.GetFile(config.FITNESS_FILENAME, p.TribeNum); fitWriter != nil {
 		config.Verbose(5, "Writing to file %v", config.FITNESS_FILENAME)
 		aveFit, minFit, maxFit, totalMutns, meanMutns := p.GetFitnessStats()		// GetFitnessStats() caches its values so it's ok to call it multiple times
 		// If you change this line, you must also change the header in ReportInitial()
@@ -865,21 +858,14 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool) {
 			//todo: put summary stats in comments at the end of the file?
 		}
 	}
+}
 
-	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
+func (p *Population) CountAlleles(genNum uint32, lastGen bool) {
 	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_DEL_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_FAV_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
-		utils.Measure.Start("allele-count")
+		popSize := p.GetCurrentSize()
 		alleles := p.getAlleles(genNum, popSize, lastGen)
 		p.outputAlleleBins(genNum, popSize, lastGen, alleles)
 		p.outputAlleleDistribution(genNum, popSize, lastGen, alleles)
-		utils.Measure.CheckAmountMemoryUsed()
-		utils.Measure.Stop("allele-count")
-	}
-
-	utils.Measure.Stop("ReportEachGen")
-	if lastGen {
-		utils.Measure.Stop("Total")
-		utils.Measure.LogSummary() 		// it checks the verbosity level itself
 	}
 }
 
@@ -933,7 +919,7 @@ func (p *Population) getAlleles(genNum, popSize uint32, lastGen bool) (alleles *
 		// Counting the alleles takes a lot of memory when there are a lot of mutations. We are concerned that after doing the whole
 		// run, we could blow the memory limit counting the alleles and lose all of the run results. So if this is the last gen
 		// we don't need the individuals after we have counted them, so nil the reference to them so GC can reclaim.
-		utils.Measure.CheckAmountMemoryUsed()
+		//utils.Measure.CheckAmountMemoryUsed()
 		if lastGen {
 			p.IndivRefs[i].Indiv = nil
 			if gcInterval > 0 && (i % int(gcInterval)) == 0 { utils.CollectGarbage() }
@@ -1023,19 +1009,19 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) {
 		newJson, err := json.Marshal(bucketJson)
 		if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err)	}
-		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
+		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum); alleleWriter != nil {
 			if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", fileName, err) }
-			config.FMgr.CloseDirFile(config.ALLELE_BINS_DIRECTORY, fileName)
+			config.FMgr.CloseDirFile(config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum)
 		}
 	}
 
 	if config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) {
-		outputNormalizedAlleleBins(bucketJson, bucketCount, genNum, fileName)
+		p.outputNormalizedAlleleBins(bucketJson, bucketCount, genNum, fileName)
 	}
 }
 
 // outputNormalizedAlleleBins uses the absolute data gathered in outputAlleleBins() and normalizes all of the bin counts (by dividing them by the total number of alleles)
-func outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
+func (p *Population) outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum uint32, fileName string) {
 	normalizedBucketCount := bucketCount / 2
 	omitStr := "including first bin"
 	if config.Cfg.Computation.Omit_first_allele_bin {
@@ -1095,9 +1081,9 @@ func outputNormalizedAlleleBins(bucketJson *Buckets, bucketCount uint32, genNum 
 	newJson, err := json.Marshal(normalizedBucketJson)
 	if err != nil { log.Fatalf("error marshaling normalized allele bins to json: %v", err) }
 
-	if alleleWriter := config.FMgr.GetDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName); alleleWriter != nil {
+	if alleleWriter := config.FMgr.GetDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName, p.TribeNum); alleleWriter != nil {
 		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", fileName, err) }
-		config.FMgr.CloseDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName)
+		config.FMgr.CloseDirFile(config.NORMALIZED_ALLELE_BINS_DIRECTORY, fileName, p.TribeNum)
 	}
 }
 
@@ -1359,8 +1345,8 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 	delFileName := fmt.Sprintf("%08d.json", genNum)
 	favFileName := fmt.Sprintf("%08d.json", genNum)
 	//config.Verbose(1, "Writing %v and %v", delFileName, favFileName)
-	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName); alleleWriter != nil {
-		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName)
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName, p.TribeNum); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_DEL_DIRECTORY, delFileName, p.TribeNum)
 		bucketJson := &DistributionBuckets{Generation:genNum}
 		bucketJson.BinMidpointFitness = make([]float64, 50)
 		bucketJson.Recessive = make([]float64, 50)
@@ -1377,8 +1363,8 @@ func (p *Population) outputAlleleDistribution(genNum, popSize uint32, lastGen bo
 		if err != nil { log.Fatalf("error marshaling allele distribution bins to json: %v", err)	}
 		if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", delFileName, err) }
 	}
-	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName); alleleWriter != nil {
-		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName)
+	if alleleWriter := config.FMgr.GetDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName, p.TribeNum); alleleWriter != nil {
+		defer config.FMgr.CloseDirFile(config.DISTRIBUTION_FAV_DIRECTORY, favFileName, p.TribeNum)
 		bucketJson := &DistributionBuckets{Generation:genNum}
 		bucketJson.BinMidpointFitness = make([]float64, 50)
 		bucketJson.Recessive = make([]float64, 50)

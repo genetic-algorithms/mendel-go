@@ -154,6 +154,8 @@ func shutdown() {
 	if config.CmdArgs.CreateZip {
 		CreateMendelUiZip(utils.RandomSlug(4))
 	}
+	utils.Measure.Stop("Total")
+	utils.Measure.LogSummary() 		// it checks the verbosity level itself
 	config.Verbose(5, "Shutting down...\n")
 }
 
@@ -207,9 +209,9 @@ func main() {
 	// If num gens is 0 and not exponential growth, only report on genesis pop and then exit
 	zeroGens := maxGenNum == 0 && !popMaxIsSet
 	if config.Cfg.Population.Num_contrasting_alleles > 0 && (zeroGens || config.Cfg.Computation.Plot_allele_gens == 1) {
-		utils.Measure.Start("Generations")		// this is stopped in ReportEachGen() so it can report each delta
+		totalInterimTime := utils.Measure.GetInterimTime("Total")
 		//parentPop.ReportEachGen(0, zeroGens)
-		parentSpecies.ReportEachGen(0, zeroGens)
+		parentSpecies.ReportEachGen(0, zeroGens, totalInterimTime, 0.0)
 		if zeroGens {
 			shutdown() // Finish up
 			os.Exit(0)
@@ -251,8 +253,10 @@ func main() {
 			lastGen = true
 		}
 
+		totalInterimTime := utils.Measure.GetInterimTime("Total")
+		genTime := utils.Measure.Stop("Generations")
 		//childrenPop.ReportEachGen(gen, lastGen)
-		childrenSpecies.ReportEachGen(gen, lastGen)
+		childrenSpecies.ReportEachGen(gen, lastGen, totalInterimTime, genTime)
 		if lastGen { break }
 		//parentPop = childrenPop        // for the next iteration
 		parentSpecies = childrenSpecies        // for the next iteration

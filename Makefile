@@ -79,4 +79,4 @@ test-pkgs:
 clean:
 	go clean
 
-.PHONY: default run prof run-defaults rpmbuild macpkg macinstall macpkginfo test-main test-pkgs clean
+.PHONY: default run runlong runshort prof run-defaults rpmbuild macpkg macinstall macpkginfo test-main test-pkgs clean

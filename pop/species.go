@@ -4,6 +4,7 @@ import (
 	"github.com/genetic-algorithms/mendel-go/config"
 	"github.com/genetic-algorithms/mendel-go/random"
 	"math/rand"
+	"github.com/genetic-algorithms/mendel-go/utils"
 )
 
 // Species tracks all of the populations (tribes) and holds attributes common to the whole species.
@@ -20,6 +21,8 @@ func SpeciesFactory() *Species {
 
 // Initialize inits the populations for gen 0
 func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) *Species {
+	defer utils.Measure.Start("InitializePopulations").Stop("InitializePopulations")
+	config.Verbose(1, "Running with %d population(s), each with a size of %d, for %d generations with %d total threads", s.GetNumPopulations(), config.Cfg.Basic.Pop_size, maxGenNum, config.Cfg.Computation.Num_threads)
 	for i := range s.Populations {
 		var newRandom *rand.Rand
 		if i == 0 {
@@ -28,8 +31,9 @@ func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) *Specie
 		} else {
 			newRandom = random.RandFactory()
 		}
-		s.Populations[i] = PopulationFactory(nil, 0) 		// genesis population
+		s.Populations[i] = PopulationFactory(nil, 0, uint32(i+1)) 		// genesis population
 		Mdl.GenerateInitialAlleles(s.Populations[i], newRandom)
+		//
 		s.Populations[i].ReportInitial(maxGenNum)
 	}
 	return s 		// so we can chain calls
@@ -53,13 +57,14 @@ func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
 	random.NextSeed = config.Cfg.Computation.Random_number_seed + 1		// reset the seed to 1 above our initial seed, so when we call RandFactory() in Mate() for additional threads it will work like it did before
 	childrenS = SpeciesFactory()
 	for i := range parentS.Populations {
-		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen)	// this creates the PopulationParts too
+		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen, uint32(i+1))	// this creates the PopulationParts too
 	}
 	return
 }
 
 // Mate mates all of the populations
 func (parentS *Species) Mate(childrenS *Species, uniformRandom *rand.Rand) {
+	defer utils.Measure.Start("Mate").Stop("Mate")
 	for i := range parentS.Populations {
 		var newRandom *rand.Rand
 		if i == 0 {
@@ -74,6 +79,7 @@ func (parentS *Species) Mate(childrenS *Species, uniformRandom *rand.Rand) {
 
 // Select does selection on all of the populations
 func (s *Species) Select(uniformRandom *rand.Rand) {
+	defer utils.Measure.Start("Select").Stop("Select")
 	for i, p := range s.Populations {
 		var newRandom *rand.Rand
 		if i == 0 {
@@ -87,9 +93,15 @@ func (s *Species) Select(uniformRandom *rand.Rand) {
 }
 
 // ReportEachGen reports stats on each population
-func (s *Species) ReportEachGen(gen uint32, lastGen bool) {
+func (s *Species) ReportEachGen(gen uint32, lastGen bool, totalInterimTime, genTime float64) {
+	defer utils.Measure.Start("ReportEachGen").Stop("ReportEachGen")
+	memUsed := utils.Measure.GetAmountMemoryUsed()
 	for _, p := range s.Populations {
-		p.ReportEachGen(gen, lastGen)
+		p.ReportEachGen(gen, lastGen, totalInterimTime, genTime, memUsed)
+		utils.Measure.Start("allele-count")
+		p.CountAlleles(gen, lastGen)	// This should come last if the lastGen because we free the individuals references to make memory room for the allele count
+		utils.Measure.CheckAmountMemoryUsed()
+		utils.Measure.Stop("allele-count")
 	}
 }
 
