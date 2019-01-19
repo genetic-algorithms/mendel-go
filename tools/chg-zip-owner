@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+usage() {
+	cat <<ENDUSAGE
+Usage: $0 zip-file spc-username
+
+Arguments:
+  zip-file:      the zip file to copy
+  spc-username:  your spc username
+
+Copies zip-file to a new zip file named <spcusername>-<spcapp>-<jobid>.zip in which the spc username (inside the zip) is set to the specified spc-username. This enables you to import it into SPC.
+ENDUSAGE
+	exit 1
+}
+
+# Check the exit status of the previously run command and exit if nonzero
+checkrc() {
+	if [[ $1 -ne 0 ]]; then
+		if [[ -n "$2" ]]; then
+			fromStr="from: $2"
+		else
+			fromStr="from the last command"
+		fi
+		echo "Error: exit code $1 $fromStr"
+		exit $1
+	fi
+}
+
+# Verify there is only 1 file in the current directory
+getTheOneFile() {
+	# this expands the list of files in the current dir into a bash array
+	filelist=(*)
+	if [[ ${#filelist[@]} -ne 1 ]]; then
+		echo "Expected 1 directory in $PWD, but found: ${#filelist[@]}."
+		exit 2
+	fi
+	echo "${filelist[0]}"
+}
+
+
+# ====== Main ======
+if [[ -z "$2" ]]; then usage; fi
+INPUT_ZIP="$1"
+SPC_USER="$2"
+
+# Unzip original file
+TMPDIR='/tmp/chg-zip-owner-dir'
+ORIGDIR="$PWD"
+mkdir -p $TMPDIR
+checkrc $? mkdir
+
+unzip -d $TMPDIR $INPUT_ZIP
+checkrc $? unzip
+
+# Change the directory name that indicates the spc username
+cd $TMPDIR/user_data
+checkrc $? "cd $TMPDIR/user_data"
+
+mv $(getTheOneFile) $SPC_USER   # we know there is only 1 dir name at this level
+checkrc $? mv
+
+# Get values for the output zip file name, from the directory names
+cd $SPC_USER
+APP=$(getTheOneFile)
+cd $APP
+checkrc $? "cd $APP"
+JOBID=$(getTheOneFile)
+OUTPUT_ZIP="${SPC_USER}-${APP}-$JOBID.zip"
+cd ../../..
+
+# Zip up the files with the modified directories
+zip -r -D $OUTPUT_ZIP user_data
+checkrc zip
+mv $OUTPUT_ZIP $ORIGDIR
+#rm -rf user_data     # clean up
+echo "Created $OUTPUT_ZIP"
+
+#cd $ORIGDIR    # not necessary

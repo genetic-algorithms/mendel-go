@@ -1,24 +1,21 @@
-# Note: we do not start any of these file/dir names with /, so we can also use this file in the package build in:
-#   tar -X .gitignore
-
 # Build artifacts
-mendel-go
-mendel-go-*.*.*
-vendor/
+/mendel-go
+#mendel-go-*.*.*
+/vendor/
 
-# User input files
-user/input/
+# User input and output files
+/user/
 
 # Test files
-test/output/
+/test/output/
 
 # Performance profiling output
-pprof/
+/pprof/
 
 # Intellij files
-.idea/
-mendel-go.iml
-projectFilesBackup/
+/.idea/
+/mendel-go.iml
+/projectFilesBackup/
 
 # Mac Finder file
 .DS_Store
