@@ -133,6 +133,7 @@ func RandomSlug(byteLen uint) string {
 */
 func CreatePrefixedZip(pathToZipUp, zipFilePath, prefixToReplace, newPrefix string) error {
 	cleanPrefixToReplace := filepath.Clean(prefixToReplace)
+	if newPrefix == "" { cleanPrefixToReplace = cleanPrefixToReplace+"/" }
 	//fmt.Printf("CreatePrefixedZip: pathToZipUp=%s, zipFilePath=%s, prefixToReplace=%s, cleanPrefixToReplace=%s, newPrefix=%s\n", pathToZipUp, zipFilePath, prefixToReplace, cleanPrefixToReplace, newPrefix)
 	zipFile, err := os.Create(zipFilePath)
 	if err != nil {	return err }
@@ -155,7 +156,7 @@ func CreatePrefixedZip(pathToZipUp, zipFilePath, prefixToReplace, newPrefix stri
 		_, err = io.Copy(zipFileWriter, fsFile)
 		if err != nil { return err }
 		return nil
-	})
+	})		// end of the anonymous func and end of Walk()
 	if err != nil {	return err }
 	err = myZip.Close()
 	if err != nil {	return err }
