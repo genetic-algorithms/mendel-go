@@ -59,26 +59,32 @@ func initialize() *rand.Rand {
 	dna.SetModels(config.Cfg)
 	pop.SetModels(config.Cfg)
 
-	// Write input params to the output dir
-	if config.CmdArgs.SPCusername != "" {	// when running in the spc context we don't want to overwrite the toml file it has already written
-		if isEqual, err := utils.CanonicalPathsEqual(config.CmdArgs.InputFile, config.TOML_FILENAME); err != nil && !isEqual {
-			if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
-				//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
-				if config.CmdArgs.InputFile != "" {
-					if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
-				} else {
-					if err := utils.CopyFromFileName2Writer(config.FindDefaultFile(), tomlWriter); err != nil { log.Fatalln(err) }
-				}
-			}
-		}
-	}
-
 	random.NextSeed = config.Cfg.Computation.Random_number_seed
 	return random.RandFactory()
 }
 
-// CreateZip zips up the output in a form suitable for importing into SPC for data visualization
-func CreateZip(spcUsername, randomSlug string) {
+// CreateSpcZip zips up the output in a form suitable for importing into SPC for data visualization
+func CreateSpcZip(spcUsername, randomSlug string) {
+	// Write input params to the output dir
+	// when running in the spc context we don't want to overwrite the toml file it has already written
+	if isEqual, err := utils.CanonicalPathsEqual(config.CmdArgs.InputFile, config.TOML_FILENAME); err != nil && !isEqual {
+		if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+			//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
+			if config.CmdArgs.InputFile != "" {
+				if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
+			} else {
+				if err := utils.CopyFromFileName2Writer(config.FindDefaultFile(), tomlWriter); err != nil { log.Fatalln(err) }
+			}
+		}
+	}
+
+	//todo: write real run output to OUTPUT_FILENAME
+	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
+		outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOT or FILES below).\n"
+		if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
+	}
+	config.FMgr.CloseAllFiles()	// explicitly close all files so the zip file contains all data
+
 	// The files in the zip need to have a path like: user_data/<spcUsername>/mendel_go/<randomSlug>/...
 	pathToZipUp := config.Cfg.Computation.Data_file_path	// e.g. test/output/short
 	zipFilePath := config.Cfg.Computation.Data_file_path+"/../"+config.Cfg.Basic.Case_id+".zip"	// e.g. test/output/short.zip
@@ -110,16 +116,43 @@ func CreateZip(spcUsername, randomSlug string) {
 	*/
 }
 
+// CreateMendelUiZip zips up the output in a form suitable for importing into the mendel web ui for data visualization
+func CreateMendelUiZip(randomSlug string) {
+	// Write input params to the output dir
+	// Mendel web ui will never use the -z flag so dont have to worry about overwriting the toml file it has already written
+	origCase_id := config.Cfg.Basic.Case_id
+	if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+		// insert job id into case_id param
+		config.Cfg.Basic.Case_id = randomSlug
+		if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalln(err) }
+	}
+
+
+	//todo: write real run output to OUTPUT_FILENAME, instead of just this msg
+	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
+		outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOTS or CONFIG below).\n"
+		if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
+	}
+	config.FMgr.CloseAllFiles()	// explicitly close all files so the zip file contains all data
+
+	pathToZipUp := config.Cfg.Computation.Data_file_path	// e.g. test/output/short
+	zipFilePath := config.Cfg.Computation.Data_file_path+"/../"+origCase_id+"-"+randomSlug+".zip"	// e.g. test/output/short.zip
+	prefixToReplace := config.Cfg.Computation.Data_file_path
+	newPrefix := ""
+	config.Verbose(2, "Creating zip file: pathToZipUp=%s, zipFilePath=%s, prefixToReplace=%s\n", pathToZipUp, zipFilePath, prefixToReplace)
+	if err := utils.CreatePrefixedZip(pathToZipUp, zipFilePath, prefixToReplace, newPrefix); err != nil {
+		log.Fatalf("Error creating zip of output data files: %v", err)
+	}
+	fmt.Printf("Zipped the output data files into %s for job id %s\n", filepath.Clean(zipFilePath), randomSlug)
+}
+
 // Shutdown does all the stuff necessary at the end of the run.
 func shutdown() {
 	if config.CmdArgs.SPCusername != "" {
-		//todo: write real run output to OUTPUT_FILENAME
-		if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
-			outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOT or FILES below).\n"
-			if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
-		}
-		config.FMgr.CloseAllFiles()	// explicitly close all files so the zip file contains all data
-		CreateZip(config.CmdArgs.SPCusername, utils.RandomSlug())
+		CreateSpcZip(config.CmdArgs.SPCusername, utils.RandomSlug(3))
+	}
+	if config.CmdArgs.CreateZip {
+		CreateMendelUiZip(utils.RandomSlug(4))
 	}
 	config.Verbose(5, "Shutting down...\n")
 }
@@ -144,6 +177,7 @@ func main() {
 	// ReadFromFile() opened the output files, so arrange for them to be closed at the end
 	defer config.FMgr.CloseAllFiles()
 	if config.CmdArgs.SPCusername != "" && config.Cfg.Computation.Files_to_output != "*" { log.Fatalf("Error: if you specify the -u flag, the files_to_output value in the input file must be set to '*', so the produced zip file will have the proper content.") }
+	if config.CmdArgs.CreateZip && config.Cfg.Computation.Files_to_output != "*" { log.Fatalf("Error: if you specify the -z flag, the files_to_output value in the input file must be set to '*', so the produced zip file will have the proper content.") }
 
 	// Initialize profiling, if requested
 	switch strings.ToLower(config.Cfg.Computation.Performance_profile) {

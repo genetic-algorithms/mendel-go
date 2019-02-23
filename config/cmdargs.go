@@ -13,8 +13,8 @@ var DEFAULTS_INPUT_DIRS = []string{"/usr/local/share/mendel-go"}
 
 func Usage(exitCode int) {
 	usageStr1 := `Usage:
-  mendel -f <filename> [-D <defaults-path>] [-u <SPC-username>]
-  mendel -d [-D <defaults-path>] [-u <SPC-username>]
+  mendel -f <filename> [-D <defaults-path>] [-z] [-u <SPC-username>]
+  mendel -d [-D <defaults-path>] [-z] [-u <SPC-username>]
   mendel -c <filename> [-D <defaults-path>]
 
 Performs a mendel run...
@@ -41,9 +41,9 @@ Examples:
 	os.Exit(exitCode)
 }
 
-// Config is the struct that gets filled in by TOML automatically from the input file.
 type CommandArgs struct {
 	InputFile, InputFileToCreate, DefaultFile, SPCusername string
+	CreateZip bool
 }
 
 // CmdArgs is the singleton instance of CommandArgs that can be accessed throughout the mendel code.
@@ -61,6 +61,7 @@ func ReadCmdArgs() {
 	flag.StringVar(&CmdArgs.SPCusername, "u", "", "Create a zip of the output for this SPC username, suitable for importing into SPC for data visualization.")
 	flag.StringVar(&CmdArgs.InputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
+	flag.BoolVar(&CmdArgs.CreateZip, "z", false, "Create a zip of the output, suitable for importing into the Mendel web UI for data visualization")
 	flag.Usage = func() { Usage(0) }
 	flag.Parse()
 	// can use this to get values anywhere in the program: flag.Lookup("name").Value.String()

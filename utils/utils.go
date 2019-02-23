@@ -116,8 +116,8 @@ func CollectGarbage() {
 
 
 // RandomSlug returns a random 6 char id
-func RandomSlug() string {
-	b := make([]byte, 3) // equals 6 characters
+func RandomSlug(byteLen uint) string {
+	b := make([]byte, byteLen) // equals 6 characters
 	//rand.Read(b)
 	rand.New(rand.NewSource(random.GetSeed())).Read(b)		// GetSeed() uses a truly random seed
 	return hex.EncodeToString(b)

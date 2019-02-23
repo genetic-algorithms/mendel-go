@@ -14,106 +14,109 @@ import (
 	"runtime"
 	"github.com/genetic-algorithms/mendel-go/utils"
 	"fmt"
+	"bytes"
 )
 
 // Config is the struct that gets filled in by TOML automatically from the input file.
 type Config struct {
 	Basic struct {
-		Case_id string
-		Pop_size uint32
-		Num_generations uint32
-	}
+		Case_id string  `toml:"case_id"`
+		Description string  `toml:"description"`
+		Pop_size uint32  `toml:"pop_size"`
+		Num_generations uint32  `toml:"num_generations"`
+	}  `toml:"basic"`
 	Mutations struct {
-		Mutn_rate float64
-		Mutn_rate_model string 		// toml does not know how to handle user-defined types like MutationRateModelType
-		Frac_fav_mutn float64
-		Fraction_neutral float64
-		Genome_size float64
-		High_impact_mutn_fraction float64
-		High_impact_mutn_threshold float64
-		Max_fav_fitness_gain float64
-		Uniform_fitness_effect_del float64
-		Uniform_fitness_effect_fav float64
-		Fitness_effect_model string
-		Fraction_recessive float64
-		Recessive_hetero_expression float64
-		Dominant_hetero_expression float64
-		Multiplicative_weighting float64
-		Synergistic_epistasis bool
-		Se_nonlinked_scaling float64
-		Se_linked_scaling float64
-		Upload_mutations bool
-		Allow_back_mutn bool
-		Polygenic_beneficials bool
-		Polygenic_init string
-		Polygenic_target string
-		Polygenic_effect float64
-	}
+		Mutn_rate float64  `toml:"mutn_rate"`
+		Mutn_rate_model string  `toml:"mutn_rate_model"`	// toml does not know how to handle user-defined types like MutationRateModelType
+		Frac_fav_mutn float64  `toml:"frac_fav_mutn"`
+		Fraction_neutral float64  `toml:"fraction_neutral"`
+		Genome_size float64  `toml:"genome_size"`
+		Fitness_effect_model string  `toml:"fitness_effect_model"`
+		Uniform_fitness_effect_del float64  `toml:"uniform_fitness_effect_del"`
+		Uniform_fitness_effect_fav float64  `toml:"uniform_fitness_effect_fav"`
+		High_impact_mutn_fraction float64  `toml:"high_impact_mutn_fraction"`
+		High_impact_mutn_threshold float64  `toml:"high_impact_mutn_threshold"`
+		Max_fav_fitness_gain float64  `toml:"max_fav_fitness_gain"`
+		Fraction_recessive float64  `toml:"fraction_recessive"`
+		Recessive_hetero_expression float64  `toml:"recessive_hetero_expression"`
+		Dominant_hetero_expression float64  `toml:"dominant_hetero_expression"`
+		Multiplicative_weighting float64  `toml:"multiplicative_weighting"`
+		Synergistic_epistasis bool  `toml:"synergistic_epistasis"`
+		Se_nonlinked_scaling float64  `toml:"se_nonlinked_scaling"`
+		Se_linked_scaling float64  `toml:"se_linked_scaling"`
+		Upload_mutations bool  `toml:"upload_mutations"`
+		Allow_back_mutn bool  `toml:"allow_back_mutn"`
+		Polygenic_beneficials bool  `polygenic_beneficials`
+		Polygenic_init string  `toml:"polygenic_init"`
+		Polygenic_target string  `toml:"polygenic_target"`
+		Polygenic_effect float64  `toml:"polygenic_effect"`
+	}  `toml:"mutations"`
 	Selection struct {
-		Fraction_random_death float64
-		Heritability float64
-		Non_scaling_noise float64
-		Fitness_dependent_fertility bool
-		Selection_model string
-		Partial_truncation_value float64
-	}
+		Fraction_random_death float64  `toml:"fraction_random_death"`
+		Fitness_dependent_fertility bool  `toml:"fitness_dependent_fertility"`
+		Selection_model string  `toml:"selection_model"`
+		Heritability float64  `toml:"heritability"`
+		Non_scaling_noise float64  `toml:"non_scaling_noise"`
+		Partial_truncation_value float64  `toml:"partial_truncation_value"`
+	}  `toml:"selection"`
 	Population struct {
-		Reproductive_rate float64
-		Num_offspring_model string
-		Recombination_model uint32
-		Fraction_self_fertilization float64
-		Num_contrasting_alleles uint32
-		Initial_allele_fitness_model string
-		Initial_alleles_pop_frac float64
-		Initial_alleles_frequencies string
-		Max_total_fitness_increase float64
-		Crossover_model string
-		Mean_num_crossovers uint32
-		Haploid_chromosome_number uint32
-		Num_linkage_subunits uint32
-		Pop_growth_model string
-		Pop_growth_rate float64
-		Pop_growth_rate2 float64
-		Max_pop_size uint32
-		Carrying_capacity uint32
-		Multiple_Bottlenecks string
-		Bottleneck_generation uint32
-		Bottleneck_pop_size uint32
-		Num_bottleneck_generations uint32
-	}
+		Reproductive_rate float64  `toml:"reproductive_rate"`
+		Num_offspring_model string  `toml:"num_offspring_model"`
+		Recombination_model uint32  `toml:"recombination_model"`
+		Fraction_self_fertilization float64  `toml:"fraction_self_fertilization"`
+		Crossover_model string  `toml:"crossover_model"`
+		Mean_num_crossovers uint32  `toml:"mean_num_crossovers"`
+		Haploid_chromosome_number uint32  `toml:"haploid_chromosome_number"`
+		Num_linkage_subunits uint32  `toml:"num_linkage_subunits"`
+		Num_contrasting_alleles uint32  `toml:"num_contrasting_alleles"`
+		Initial_allele_fitness_model string  `toml:"initial_allele_fitness_model"`
+		Initial_alleles_pop_frac float64  `toml:"initial_alleles_pop_frac"`
+		Initial_alleles_frequencies string  `toml:"initial_alleles_frequencies"`
+		Max_total_fitness_increase float64  `toml:"max_total_fitness_increase"`
+		Pop_growth_model string  `toml:"pop_growth_model"`
+		Pop_growth_rate float64  `toml:"pop_growth_rate"`
+		Pop_growth_rate2 float64  `toml:"pop_growth_rate2"`
+		Max_pop_size uint32  `toml:"max_pop_size"`
+		Carrying_capacity uint32  `toml:"carrying_capacity"`
+		Multiple_Bottlenecks string  `toml:"multiple_bottlenecks"`
+		Bottleneck_generation uint32  `toml:"bottleneck_generation"`
+		Bottleneck_pop_size uint32  `toml:"bottleneck_pop_size"`
+		Num_bottleneck_generations uint32  `toml:"num_bottleneck_generations"`
+	}  `toml:"population"`
 	Tribes struct {
-		Num_tribes uint32
-		Homogenous_tribes bool
-		Num_indiv_exchanged uint32
-		Migration_generations uint32
-		Migration_model int
-		Tribal_competition bool
-		Tribal_fission bool
-		Tc_scaling_factor float64
-		Group_heritability float64
-		Social_bonus_factor float64
-	}
+		Num_tribes uint32  `toml:"num_tribes"`
+		Homogenous_tribes bool  `toml:"homogenous_tribes"`
+		Num_indiv_exchanged uint32  `toml:"num_indiv_exchanged"`
+		Migration_generations uint32  `toml:"migration_generations"`
+		Migration_model int  `toml:"migration_model"`
+		Tribal_competition bool  `toml:"tribal_competition"`
+		Tribal_fission bool  `toml:"tribal_fission"`
+		Tc_scaling_factor float64  `toml:"tc_scaling_factor"`
+		Group_heritability float64  `toml:"group_heritability"`
+		Social_bonus_factor float64  `toml:"social_bonus_factor"`
+	}  `toml:"tribes"`
 	Computation struct {
-		Tracking_threshold float32
-		Extinction_threshold float64
-		Track_neutrals bool
-		Num_threads uint32
-		Random_number_seed int64
-		//Restart_case bool
-		//Restart_dump_number uint32
-		Plot_allele_gens uint32
-		Omit_first_allele_bin bool
-		Count_duplicate_alleles bool
-		Verbosity uint32
-		Data_file_path string
-		Files_to_output string
-		Performance_profile string
-		//Transfer_linkage_blocks bool
-		Force_gc bool
-		Allele_count_gc_interval uint32
-		//Reuse_populations bool
-		Perf_option int
-	}
+		Tracking_threshold float32  `toml:"tracking_threshold"`
+		Track_neutrals bool  `toml:"track_neutrals"`
+		Extinction_threshold float64  `toml:"extinction_threshold"`
+		Verbosity uint32  `toml:"verbosity"`
+		Data_file_path string  `toml:"data_file_path"`
+		Files_to_output string  `toml:"files_to_output"`
+		Plot_allele_gens uint32  `toml:"plot_allele_gens"`
+		Omit_first_allele_bin bool  `toml:"omit_first_allele_bin"`
+		//Restart_case bool  `toml:"restart_case"`
+		//Restart_dump_number uint32  `toml:"restart_dump_number"`
+		// Considered advanced options:
+		Num_threads uint32  `toml:"num_threads"`
+		Random_number_seed int64  `toml:"random_number_seed"`
+		Count_duplicate_alleles bool  `toml:"count_duplicate_alleles"`
+		Performance_profile string  `toml:"performance_profile"`
+		Force_gc bool  `toml:"force_gc"`
+		Allele_count_gc_interval uint32  `toml:"allele_count_gc_interval"`
+		Perf_option int  `toml:"perf_option"`
+		//Transfer_linkage_blocks bool  `toml:"transfer_linkage_blocks"`
+		//Reuse_populations bool  `toml:"reuse_populations"`
+	}  `toml:"computation"`
 }
 
 // Cfg is the singleton instance of Config that can be accessed throughout the mendel code.
@@ -267,19 +270,16 @@ func FindDefaultFile() string {
 	return ""		// could not find it
 }
 
-/* toml.Encode doesn't work out of the box for us, because the section and field names all start with uppercase...
 // WriteToFile writes the current config to a file descriptor. The caller is responsible to open the file,
 // log that it is being written, and close the file (so it can be used with files managed by FileMgr).
 func (c *Config) WriteToFile(file *os.File) error {
-	//Verbose(1, "Writing %v...\n", filename)
 	//buf, err := toml.Marshal(*c)
 	buf := new(bytes.Buffer)
+	// Note: for this to work properly, you must have struct tags on all of the fields specifying the name starting w/lowercase
 	if err := toml.NewEncoder(buf).Encode(c); err != nil { return err }
-	//if err := ioutil.WriteFile(filename, buf.Bytes(), 0644); err != nil { return err }
 	if _, err := file.Write(buf.Bytes()); err != nil { return err }
 	return nil
 }
-*/
 
 // These are here, instead of of in pkg utils, to avoid circular imports
 func Verbose(level uint32, msg string, args ...interface{}) {

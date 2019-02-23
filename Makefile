@@ -24,6 +24,9 @@ run: $(BINARY)
 runlong: $(BINARY)
 	time ./$? -f test/input/mendel-long.ini
 
+runshort: $(BINARY)
+	time ./$? -f test/input/mendel-short.ini
+
 cpu.pprof: run
 	go tool pprof -text ./$(BINARY) ./pprof/$@
 

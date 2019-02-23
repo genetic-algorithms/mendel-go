@@ -43,7 +43,7 @@ func FileMgrFactory(dataFilePath, filesToOutput string) *FileMgr {
 
 	// Get the proper list of file names
 	var VALID_FILE_NAMES = map[string]int{HISTORY_FILENAME: 1, FITNESS_FILENAME: 1, ALLELE_BINS_DIRECTORY: 1, NORMALIZED_ALLELE_BINS_DIRECTORY: 1, DISTRIBUTION_DEL_DIRECTORY: 1, DISTRIBUTION_FAV_DIRECTORY: 1,}
-	if CmdArgs.SPCusername != "" {
+	if CmdArgs.CreateZip || CmdArgs.SPCusername != "" {
 		// Add the files that are relevant only when -u is specified (and we aren't running in spc)
 		VALID_FILE_NAMES[TOML_FILENAME] = 1
 		VALID_FILE_NAMES[OUTPUT_FILENAME] = 1
