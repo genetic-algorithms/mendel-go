@@ -93,6 +93,12 @@ func RoundInt(f float64) int {
 }
 
 
+// RoundUpInt returns the nearest int that is >= f.
+func RoundUpInt(f float64) int {
+	return int(math.Ceil(f))
+}
+
+
 // RoundToEven returns the nearest even integer. Note: only works for positive numbers
 func RoundToEven(f float64) int {
 	remainder := math.Mod(f, 2.0)

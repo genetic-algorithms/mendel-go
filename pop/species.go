@@ -10,11 +10,13 @@ import (
 // Species tracks all of the populations (tribes) and holds attributes common to the whole species.
 type Species struct {
 	Populations []*Population		// the tribes that make up this species
+	PartsPerPop uint32 			// the number of population parts (threads) each population should have
 }
 
 func SpeciesFactory() *Species {
 	s := &Species{
 		Populations: make([]*Population, config.Cfg.Tribes.Num_tribes),
+		PartsPerPop: uint32(utils.RoundUpInt(float64(config.Cfg.Computation.Num_threads) / float64(config.Cfg.Tribes.Num_tribes))),  // we round up because its ok to have more go threads than system threads
 	}
 	return s
 }
@@ -31,7 +33,7 @@ func (s *Species) Initialize(maxGenNum uint32, uniformRandom *rand.Rand) *Specie
 		} else {
 			newRandom = random.RandFactory()
 		}
-		s.Populations[i] = PopulationFactory(nil, 0, uint32(i+1)) 		// genesis population
+		s.Populations[i] = PopulationFactory(nil, 0, uint32(i+1), s.PartsPerPop) 		// genesis population
 		Mdl.GenerateInitialAlleles(s.Populations[i], newRandom)
 		//
 		s.Populations[i].ReportInitial(maxGenNum)
@@ -57,7 +59,7 @@ func (parentS *Species) GetNextGeneration(gen uint32) (childrenS *Species) {
 	random.NextSeed = config.Cfg.Computation.Random_number_seed + 1		// reset the seed to 1 above our initial seed, so when we call RandFactory() in Mate() for additional threads it will work like it did before
 	childrenS = SpeciesFactory()
 	for i := range parentS.Populations {
-		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen, uint32(i+1))	// this creates the PopulationParts too
+		childrenS.Populations[i] = PopulationFactory(parentS.Populations[i], gen, uint32(i+1), parentS.PartsPerPop)	// this creates the PopulationParts too
 	}
 	return
 }

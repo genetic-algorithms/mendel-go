@@ -64,7 +64,7 @@ type Population struct {
 
 
 // PopulationFactory creates a new population. If genNum==0 it creates the special genesis population.
-func PopulationFactory(prevPop *Population, genNum uint32, tribeNum uint32) *Population {
+func PopulationFactory(prevPop *Population, genNum, tribeNum, partsPerPop uint32) *Population {
 	var targetSize uint32
 	if prevPop != nil {
 		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
@@ -74,7 +74,7 @@ func PopulationFactory(prevPop *Population, genNum uint32, tribeNum uint32) *Pop
 	}
 	p := &Population{
 		TribeNum: tribeNum,
-		Parts: make([]*PopulationPart, 0, config.Cfg.Computation.Num_threads), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended below
+		Parts: make([]*PopulationPart, 0, partsPerPop), 	// allocate the array for the ptrs to the parts. The actual part objects will be appended below
 		TargetSize: targetSize,
 	}
 	if PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model)) == MULTI_BOTTLENECK_POPULATON_GROWTH {
@@ -95,7 +95,7 @@ func PopulationFactory(prevPop *Population, genNum uint32, tribeNum uint32) *Pop
 		p.Parts = append(p.Parts, PopulationPartFactory(targetSize, p))    // for gen 0 we only need 1 part because that doesn't have offspring added to it during Mate()
 		p.makeAndFillIndivRefs()
 	} else {
-		for i:=uint32(1); i<= config.Cfg.Computation.Num_threads; i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
+		for i:=1; i<= cap(p.Parts); i++ { p.Parts = append(p.Parts, PopulationPartFactory(0, p)) }
 		// Mate() will populate PopulationPart with Individuals and run makeAndFillIndivRefs()
 	}
 

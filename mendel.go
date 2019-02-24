@@ -68,7 +68,7 @@ func CreateSpcZip(spcUsername, randomSlug string) {
 	// Write input params to the output dir
 	// when running in the spc context we don't want to overwrite the toml file it has already written
 	if isEqual, err := utils.CanonicalPathsEqual(config.CmdArgs.InputFile, config.TOML_FILENAME); err != nil && !isEqual {
-		if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+		if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME, 0); tomlWriter != nil {
 			//if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalf("Error writing %s: %v", config.TOML_FILENAME, err) }
 			if config.CmdArgs.InputFile != "" {
 				if err := utils.CopyFromFileName2Writer(config.CmdArgs.InputFile, tomlWriter); err != nil { log.Fatalln(err) }
@@ -79,7 +79,7 @@ func CreateSpcZip(spcUsername, randomSlug string) {
 	}
 
 	//todo: write real run output to OUTPUT_FILENAME
-	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
+	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME, 0); outputWriter != nil {
 		outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOT or FILES below).\n"
 		if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
 	}
@@ -121,7 +121,7 @@ func CreateMendelUiZip(randomSlug string) {
 	// Write input params to the output dir
 	// Mendel web ui will never use the -z flag so dont have to worry about overwriting the toml file it has already written
 	origCase_id := config.Cfg.Basic.Case_id
-	if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME); tomlWriter != nil {
+	if tomlWriter := config.FMgr.GetFile(config.TOML_FILENAME, 0); tomlWriter != nil {
 		// insert job id into case_id param
 		config.Cfg.Basic.Case_id = randomSlug
 		if err := config.Cfg.WriteToFile(tomlWriter); err != nil { log.Fatalln(err) }
@@ -129,7 +129,7 @@ func CreateMendelUiZip(randomSlug string) {
 
 
 	//todo: write real run output to OUTPUT_FILENAME, instead of just this msg
-	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME); outputWriter != nil {
+	if outputWriter := config.FMgr.GetFile(config.OUTPUT_FILENAME, 0); outputWriter != nil {
 		outputStr := "The run log entries are not available in this job.\nThe plot files and inputs ARE available (click PLOTS or CONFIG below).\n"
 		if _, err := io.WriteString(outputWriter, outputStr); err != nil { log.Fatalf("Error writing %s: %v", config.OUTPUT_FILENAME, err) }
 	}
