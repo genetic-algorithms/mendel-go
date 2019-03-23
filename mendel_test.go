@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"os"
 	"github.com/genetic-algorithms/mendel-go/config"
+	"strings"
 )
 
 const (
@@ -39,7 +40,7 @@ func TestMendelCase3(t *testing.T) {
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase4(t *testing.T) {
-	mendelCaseBin(t, 4, 4, "00000050.json", false)
+	mendelCaseBin(t, 4, 4, "00000050.json", false, "", "")
 }
 
 // Same as TestMendelCase3 except with selection_model=ups, and heritability and non_scaling_noise back to default
@@ -49,7 +50,7 @@ func TestMendelCase5(t *testing.T) {
 
 // Same as TestMendelCase5 except with selection_model=spps and omit_first_allele_bin=true
 func TestMendelCase6(t *testing.T) {
-	mendelCaseBin(t, 6, 6, "00000020.json", false)
+	mendelCaseBin(t, 6, 6, "00000020.json", false, "", "")
 }
 
 // Same as TestMendelCase5 except with selection_model=partialtrunc
@@ -59,7 +60,7 @@ func TestMendelCase7(t *testing.T) {
 
 // Same as TestMendelCase6 except with 4 threads
 func TestMendelCase8(t *testing.T) {
-	mendelCaseBin(t, 8, 8, "00000020.json", false)
+	mendelCaseBin(t, 8, 8, "00000020.json", false, "", "")
 }
 
 // Same as TestMendelCase8 except with exponential pop growth
@@ -69,7 +70,7 @@ func TestMendelCase9(t *testing.T) {
 
 // Same as TestMendelCase8 except with carrying capacity pop growth
 func TestMendelCase10(t *testing.T) {
-	mendelCaseBin(t, 10, 10, "00000010.json", false)
+	mendelCaseBin(t, 10, 10, "00000010.json", false, "", "")
 }
 
 // Same as TestMendelCase8 except with founders pop growth with bottleneck, and weibull
@@ -79,12 +80,17 @@ func TestMendelCase11(t *testing.T) {
 
 // Same as TestMendelCase3 except with initial alleles
 func TestMendelCase12(t *testing.T) {
-	mendelCaseBin(t, 12, 12, "00000100.json", true)
+	mendelCaseBin(t, 12, 12, "00000100.json", true, "", "")
 }
 
 // Same as TestMendelCase11 except with multiple bottlenecks
 func TestMendelCase13(t *testing.T) {
 	mendelCase(t, 13, 13)
+}
+
+// Same as TestMendelCase11 except with multiple bottlenecks
+func TestMendelCase14(t *testing.T) {
+	mendelCaseTribeBin(t, 14, 14, "00000050.json", true)
 }
 
 
@@ -98,8 +104,6 @@ func mendelCase(t *testing.T, num, expNum int) {
 	//outFileDir := "test/output/" + testCase
 	inFileName := IN_FILE_BASE + numStr + ".ini"
 	dataPath := OUT_FILE_BASE + numStr		// we will set -O to this value
-	outFileName := dataPath + "/mendel"
-	expFileName := EXP_FILE_BASE + expNumStr + "/mendel"
 	if err := os.MkdirAll(OUT_FILE_BASE+numStr, 0755); err != nil {
 		t.Errorf("Error creating %v: %v", OUT_FILE_BASE+numStr, err)
 		return
@@ -119,24 +123,50 @@ func mendelCase(t *testing.T, num, expNum int) {
 	}
 	if cmdFailed { return }
 
-	// Open the actual and expected the policy files
-	compareFiles(t, outFileName+".fit", expFileName+".fit")
-	compareFiles(t, outFileName+".hst", expFileName+".hst")
+	// Open the actual and expected the files
+	comparePlainFiles(t, numStr, expNumStr, "", "")
 }
 
 
-func mendelCaseBin(t *testing.T, num, expNum int, binFile string, andDistBins bool) {
+func comparePlainFiles(t *testing.T, numStr, expNumStr, outFileDir, expFileDir string) {
+	if outFileDir=="" { outFileDir = OUT_FILE_BASE + numStr }
+	if expFileDir=="" { expFileDir = EXP_FILE_BASE + expNumStr }
+	compareFiles(t, outFileDir+"/mendel.fit", expFileDir+"/mendel.fit")
+	compareFiles(t, outFileDir+"/mendel.hst", expFileDir+"/mendel.hst")
+}
+
+
+func mendelCaseBin(t *testing.T, num, expNum int, binFile string, andDistBins bool, outFileDir, expFileDir string) {
 	mendelCase(t, num, expNum)
 	// Also compare the allele-bins files
 	numStr := strconv.Itoa(num)
 	expNumStr := strconv.Itoa(expNum)
-	outFileDir := OUT_FILE_BASE + numStr
-	expFileDir := EXP_FILE_BASE + expNumStr
+	compareBinFiles(t, numStr, expNumStr, binFile, andDistBins, outFileDir, expFileDir)
+}
+
+
+func compareBinFiles(t *testing.T, numStr, expNumStr, binFile string, andDistBins bool, outFileDir, expFileDir string) {
+	if outFileDir=="" { outFileDir = OUT_FILE_BASE + numStr }
+	if expFileDir=="" { expFileDir = EXP_FILE_BASE + expNumStr }
 	compareFiles(t, outFileDir+BIN_SUBDIR+binFile, expFileDir+BIN_SUBDIR+binFile)
 	compareFiles(t, outFileDir+NORM_SUBDIR+binFile, expFileDir+NORM_SUBDIR+binFile)
 	if andDistBins {
 		compareFiles(t, outFileDir+DIST_DEL_SUBDIR+binFile, expFileDir+DIST_DEL_SUBDIR+binFile)
 		compareFiles(t, outFileDir+DIST_FAV_SUBDIR+binFile, expFileDir+DIST_FAV_SUBDIR+binFile)
+	}
+}
+
+
+func mendelCaseTribeBin(t *testing.T, num, expNum int, binFile string, andDistBins bool) {
+	mendelCase(t, num, expNum)		// compare the summary files in the top dir
+	numStr := strconv.Itoa(num)
+	expNumStr := strconv.Itoa(expNum)
+	// Go into each of the tribe dirs can compare everything in there
+	for _, tribeDir := range getTribeDirs(t, OUT_FILE_BASE+numStr) {
+		outFileDir := OUT_FILE_BASE+numStr+"/"+tribeDir
+		expFileDir := EXP_FILE_BASE+numStr+"/"+tribeDir
+		comparePlainFiles(t, numStr, expNumStr, outFileDir, expFileDir)
+		compareBinFiles(t, numStr, expNumStr, binFile, andDistBins, outFileDir, expFileDir)
 	}
 }
 
@@ -221,6 +251,18 @@ func compareFiles(t *testing.T, outputFilename, expectedFilename string) {
 			}
 		}
 	}
+}
+
+
+
+// Get the non-fully-qualified tribe dirs in the given dir
+func getTribeDirs(t *testing.T, dir string) (tribeDirs []string) {
+	dirEntries, err := ioutil.ReadDir(dir)
+	if err != nil { t.Errorf("Error reading dir %s: %v", dir, err) }
+	for _, d := range dirEntries {
+		if d.IsDir() && strings.HasPrefix(d.Name(), "tribe-") { tribeDirs = append(tribeDirs, d.Name()) }
+	}
+	return
 }
 
 

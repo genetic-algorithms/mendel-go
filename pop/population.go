@@ -725,10 +725,8 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float
 	for _, indRef := range p.IndivRefs {
 		ind := indRef.Indiv
 		p.MeanFitness += ind.GenoFitness
-		if ind.GenoFitness > p.MaxFitness { p.MaxFitness = ind.GenoFitness
-		}
-		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness
-		}
+		if ind.GenoFitness > p.MaxFitness { p.MaxFitness = ind.GenoFitness }
+		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness }
 		p.TotalNumMutations += uint64(ind.NumMutations)
 	}
 	popSize := p.GetCurrentSize()
@@ -787,7 +785,7 @@ func (p *Population) GetInitialAlleleStats() (float64, /*float64,*/ float64) {
 
 
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
-func (p *Population) ReportInitial(maxGenNum uint32) {
+func (p *Population) ReportInitial() {
 	// Report initial alleles if there are any
 	initialVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
 	if config.Cfg.Population.Num_contrasting_alleles > 0 && config.IsVerbose(initialVerboseLevel) {
