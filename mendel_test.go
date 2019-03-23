@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	IN_FILE_BASE = "test/input/mendel-testcase"
+	IN_FILE_BASE = "test/input/testcase"
 	OUT_FILE_BASE = "test/output/testcase"
 	EXP_FILE_BASE = "test/expected/testcase"
 	//BIN_SUBDIR = "/allele-bins/"

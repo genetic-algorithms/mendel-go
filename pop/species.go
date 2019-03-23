@@ -107,7 +107,7 @@ func (s *Species) ReportEachGen(gen uint32, lastGen bool, totalInterimTime, genT
 	}
 }
 
-// ReportEachGen reports stats on each population
+// GetAverageFitness gets the overall fitness of the species
 func (s *Species) GetAverageFitness() (averageFitness float64) {
 	if s.GetNumPopulations() == 0 { return }
 	for _, p := range s.Populations {

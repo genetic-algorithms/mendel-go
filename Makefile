@@ -27,6 +27,9 @@ runlong: $(BINARY)
 runshort: $(BINARY)
 	time ./$? -f test/input/mendel-short.ini
 
+runshorttribes: $(BINARY)
+	time ./$? -f test/input/short-tribes.ini
+
 cpu.pprof: run
 	go tool pprof -text ./$(BINARY) ./pprof/$@
 
@@ -68,7 +71,7 @@ upload-release:
 
 release: rpmbuild macpkg upload-release
 
-test-main: mendel_test.go $(BINARY)
+test: mendel_test.go $(BINARY)
 	glide --quiet install
 	go test -v $<
 
