@@ -12,4 +12,4 @@ fi
 mkdir -p $BUILD_ROOT/bin $BUILD_ROOT/share/mendel-go
 cp mendel-go $BUILD_ROOT/bin
 cp mendel-defaults.ini LICENSE COPYRIGHT $BUILD_ROOT/share/mendel-go
-cp test/input/mendel-short.ini $BUILD_ROOT/share/mendel-go
+cp test/input/short.ini $BUILD_ROOT/share/mendel-go

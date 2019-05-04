@@ -19,13 +19,13 @@ $(BINARY): mendel.go */*.go
 	go build -o $@
 
 run: $(BINARY)
-	time ./$? -f test/input/mendel-case1.ini
+	time ./$? -f test/input/case1.ini
 
 runlong: $(BINARY)
-	time ./$? -f test/input/mendel-long.ini
+	time ./$? -f test/input/long.ini
 
 runshort: $(BINARY)
-	time ./$? -f test/input/mendel-short.ini
+	time ./$? -f test/input/short.ini
 
 runshorttribes: $(BINARY)
 	time ./$? -f test/input/short-tribes.ini

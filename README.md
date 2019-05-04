@@ -47,7 +47,7 @@ make mendel-go
 
 # Run mendel-go
 
-Run (building if necessary) with test/input/mendel-case1.ini:
+Run (building if necessary) with test/input/case1.ini:
 
 ```
 make
