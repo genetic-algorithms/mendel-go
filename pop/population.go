@@ -898,6 +898,7 @@ type DistributionBuckets struct {
 
 // getAlleles gathers all of the alleles in this generation and returns them
 func (p *Population) getAlleles(genNum, popSize uint32, lastGen bool) (alleles *dna.AlleleCount) {
+	config.Verbose(1, "Counting alleles for tribe %d", p.TribeNum)
 	// Free up some memory, because this is going to take a lot
 	if lastGen && config.Cfg.Computation.Allele_count_gc_interval > 0 {
 		debug.SetGCPercent(-1) 		// if force_gc=false we didn't do this earlier
