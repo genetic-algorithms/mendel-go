@@ -1,3 +1,6 @@
+# Built on the fly version.go file
+/version.go
+
 # Build artifacts
 /mendel-go
 #mendel-go-*.*.*

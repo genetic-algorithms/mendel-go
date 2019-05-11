@@ -166,7 +166,11 @@ func main() {
 	config.ReadCmdArgs()    // Get/check cmd line options and load specified input file - flags are accessible in config.CmdArgs, config values in config.Cfg
 
 	// Handle the different input file choices
-	if config.CmdArgs.InputFileToCreate != "" {
+	if config.CmdArgs.Version {
+		fmt.Println(MENDEL_GO_VERSION)
+		os.Exit(0)
+
+	} else if config.CmdArgs.InputFileToCreate != "" {
 		if err := utils.CopyFile(config.FindDefaultFile(), config.CmdArgs.InputFileToCreate); err != nil { log.Fatalln(err) }
 		os.Exit(0)
 

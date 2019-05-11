@@ -1,6 +1,6 @@
 SHELL ?= /bin/bash -e
 BINARY ?= mendel-go
-export VERSION ?= 1.2.1
+export VERSION ?= 1.2.2
 export RELEASE ?= 1
 # rpmbuild does not give us a good way to set topdir, so use the default location
 RPMROOT ?= $(HOME)/rpmbuild
@@ -16,6 +16,7 @@ default: run
 $(BINARY): mendel.go */*.go
 	@echo GOOS=$$GOOS
 	glide --quiet install
+	echo 'package main; const MENDEL_GO_VERSION = "$(VERSION)-$(RELEASE)"' > version.go
 	go build -o $@
 
 run: $(BINARY)

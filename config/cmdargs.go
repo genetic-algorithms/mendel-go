@@ -13,9 +13,10 @@ var DEFAULTS_INPUT_DIRS = []string{"/usr/local/share/mendel-go"}
 
 func Usage(exitCode int) {
 	usageStr1 := `Usage:
-  mendel -f <filename> [-D <defaults-path>] [-O <data-path>] [-z] [-u <SPC-username>]
-  mendel -d [-D <defaults-path>] [-O <data-path>] [-z] [-u <SPC-username>]
-  mendel -c <filename> [-D <defaults-path>] [-O <data-path>]
+  mendel-go -f <filename> [-D <defaults-path>] [-O <data-path>] [-z] [-u <SPC-username>]
+  mendel-go -d [-D <defaults-path>] [-O <data-path>] [-z] [-u <SPC-username>]
+  mendel-go -c <filename> [-D <defaults-path>] [-O <data-path>]
+  mendel-go -V
 
 Performs a mendel run...
 
@@ -24,9 +25,9 @@ Options:
 
 	usageStr2 := `
 Examples:
-  mendel -f /home/bob/mendel.in    # run with this input file
-  mendel -d     # run with all default parameters from `+ DEFAULTS_INPUT_FILE +`
-  mendel -c /home/bob/mendel.in    # create an input file primed with defaults, then you can edit it
+  mendel-go -f /home/bob/mendel.in    # run with this input file
+  mendel-go -d     # run with all default parameters from `+ DEFAULTS_INPUT_FILE +`
+  mendel-go -c /home/bob/mendel.in    # create an input file primed with defaults, then you can edit it
 `
 
 	//if exitCode > 0 {
@@ -43,7 +44,7 @@ Examples:
 
 type CommandArgs struct {
 	InputFile, InputFileToCreate, DefaultFile, DataPath, SPCusername string
-	CreateZip bool
+	CreateZip, Version bool
 }
 
 // CmdArgs is the singleton instance of CommandArgs that can be accessed throughout the mendel code.
@@ -56,13 +57,14 @@ func ReadCmdArgs() {
 	//log.Println("Reading command line arguments and flags...") 	// can not use verbosity here because we have not read the config file yet
 	CmdArgs = &CommandArgs{} 		// create and set the singleton config
 	var useDefaults bool
-	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel with this input file (backed by the defaults file)")
+	flag.StringVar(&CmdArgs.InputFile, "f", "", "Run mendel-go with this input file (backed by the defaults file)")
 	flag.StringVar(&CmdArgs.DefaultFile, "D", "", "Path to the defaults file. If not set, looks for "+DEFAULTS_INPUT_FILE+" in the current directory, the directory of the executable, and "+strings.Join(DEFAULTS_INPUT_DIRS,", "))
 	flag.StringVar(&CmdArgs.DataPath, "O", "", "Path to put the output data files in. If not set, the data_file_path in the input config file or defaults file is used.")
 	flag.StringVar(&CmdArgs.SPCusername, "u", "", "Create a zip of the output for this SPC username, suitable for importing into SPC for data visualization.")
 	flag.StringVar(&CmdArgs.InputFileToCreate, "c", "", "Create a mendel input file (using default values) and then exit")
 	flag.BoolVar(&useDefaults, "d", false, "Run mendel with all default parameters")
 	flag.BoolVar(&CmdArgs.CreateZip, "z", false, "Create a zip of the output, suitable for importing into the Mendel web UI for data visualization")
+	flag.BoolVar(&CmdArgs.Version, "V", false, "Display version and exit")
 	flag.Usage = func() { Usage(0) }
 	flag.Parse()
 	// can use this to get values anywhere in the program: flag.Lookup("name").Value.String()
@@ -78,5 +80,5 @@ func ReadCmdArgs() {
 	} else if CmdArgs.InputFile != ""{
 		// We already verified inputFileToCreate or useDefaults was not specified with this
 
-	} else { Usage(0) }
+	} else if !CmdArgs.Version { Usage(0) }
 }
