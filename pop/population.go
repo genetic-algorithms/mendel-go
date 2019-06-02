@@ -578,8 +578,8 @@ func MultiBottleneckPopulationGrowth(prevPop *Population, genNum uint32) uint32 
 		// We are in the bottleneck range
 		newTargetSize = curPB.BottleneckPopSize
 	} else {
-		// We should never get here, because we handled this case above
-		log.Fatalf("Internal Error: in generation %d reached unreachable bottleneck code", genNum)
+		// The only way we can't get here is if this bottleneck gen range is <= previous bottleneck gen range
+		log.Fatalf("Error in bottleneck at generation %d: the current bottleneck gen range is <= previous bottleneck gen range", genNum)
 	}
 	if curPB.MaxPop != 0 {
 		newTargetSize = utils.MinUint32(newTargetSize, curPB.MaxPop) // do not want it exceeding the max pop

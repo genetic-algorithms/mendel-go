@@ -1,6 +1,6 @@
 SHELL ?= /bin/bash -e
 BINARY ?= mendel-go
-export VERSION ?= 1.2.3
+export VERSION ?= 1.2.4
 export RELEASE ?= 1
 # rpmbuild does not give us a good way to set topdir, so use the default location
 RPMROOT ?= $(HOME)/rpmbuild
