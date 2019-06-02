@@ -88,9 +88,14 @@ func TestMendelCase13(t *testing.T) {
 	mendelCase(t, 13, 13)
 }
 
-// Same as TestMendelCase11 except with multiple bottlenecks
+// Same as TestMendelCase12 except with multiple tribes
 func TestMendelCase14(t *testing.T) {
 	mendelCaseTribeBin(t, 14, 14, "00000050.json", true)
+}
+
+// Same as TestMendelCase12 except with multiple tribes
+func TestMendelCase15(t *testing.T) {
+	mendelCaseTribeBin(t, 15, 15, "00000017.json", true)
 }
 
 

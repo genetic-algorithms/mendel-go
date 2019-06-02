@@ -42,6 +42,7 @@ type Population struct {
 	IndivRefs []IndivRef	// References to individuals in the indivs array. This level of indirection allows us to sort this list, truncate it after selection, and refer to indivs in PopulationParts, all w/o copying Individual objects.
 
 	TargetSize uint32        // the target size of this population after selection
+	Done bool				 // true if went extinct or hit its pop max
 	BottleNecks *Bottlenecks // the bottlenecks this pop should go thru
 	Num_offspring float64    // Average number of offspring each individual should have (so need to multiple by 2 to get it for the mating pair). Calculated from config values Fraction_random_death and Reproductive_rate.
 	LBsPerChromosome uint32  // How many linkage blocks in each chromosome. For now the total number of LBs must be an exact multiple of the number of chromosomes
@@ -67,6 +68,7 @@ type Population struct {
 func PopulationFactory(prevPop *Population, genNum, tribeNum, partsPerPop uint32) *Population {
 	var targetSize uint32
 	if prevPop != nil {
+		if prevPop.Done { return prevPop }
 		targetSize = Mdl.PopulationGrowth(prevPop, genNum)
 	} else {
 		// This is the 1st generation, so set the size from the config param
@@ -105,6 +107,7 @@ func PopulationFactory(prevPop *Population, genNum, tribeNum, partsPerPop uint32
 
 // Not currently used, but kept here in case we want to reuse populations - Reinitialize recycles a population object for another generation. This saves freeing and reallocating a lot of objects
 func (p *Population) Reinitialize(prevPop *Population, genNum uint32) *Population {
+	if p.Done { return p }
 	// Reinitialize is never called on the genesis population
 	p.TargetSize = Mdl.PopulationGrowth(prevPop, genNum)
 
@@ -261,6 +264,7 @@ func GenerateVariableFreqInitialAlleles(p *Population, uniformRandom *rand.Rand)
 //   - add new mutations to random LBs
 //   - add offspring to new population
 func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
+	if p.Done { return }
 	config.Verbose(4, "Mating the population of %d individuals...\n", p.GetCurrentSize())
 
 	// To prepare for mating, create a shuffled slice of indices into the parent population
@@ -325,6 +329,7 @@ func (p *Population) Mate(newP *Population, uniformRandom *rand.Rand) {
 
 // Select removes the least fit individuals in the population
 func (p *Population) Select(uniformRandom *rand.Rand) {
+	if p.Done { return }
 	config.Verbose(4, "Select: eliminating %d individuals to try to maintain a population of %d...\n", p.GetCurrentSize()-p.TargetSize, p.TargetSize)
 
 	// Calculate noise factor to get pheno fitness of each individual
@@ -361,6 +366,26 @@ func (p *Population) Select(uniformRandom *rand.Rand) {
 	// and the indivs array will soon be GC'd or reused.
 
 	return
+}
+
+
+// Returns true if this pop has gone extinct or reached its pop max
+func (p *Population) IsDone(doLog bool) bool {
+	popMaxIsSet := PopulationGrowthModelType(strings.ToLower(config.Cfg.Population.Pop_growth_model))==EXPONENTIAL_POPULATON_GROWTH && config.Cfg.Population.Max_pop_size>0
+	popMax := config.Cfg.Population.Max_pop_size
+	if popMaxIsSet && p.GetCurrentSize() >= popMax {
+		if doLog { log.Printf("Tribe %d has reached the max specified value of %d. Stopping this tribe.", p.TribeNum, popMax) }
+		return true
+	} else if (RecombinationType(config.Cfg.Population.Recombination_model) == FULL_SEXUAL && p.GetCurrentSize() < 2) || p.GetCurrentSize() == 0 {
+		// Above checks if we don't have enough individuals to mate
+		if doLog { log.Printf("Tribe %d is extinct. Stopping this tribe.", p.TribeNum) }
+		return true
+	} else if aveFit, _, _, _, _ := p.GetFitnessStats(); aveFit < config.Cfg.Computation.Extinction_threshold {
+		// Above checks if the the tribe's fitness is below the threshold
+		if doLog { log.Printf("Tribe %d fitness is below the extinction threshold of %.3f. Stopping this tribe.", p.TribeNum, config.Cfg.Computation.Extinction_threshold) }
+		return true
+	}
+	return false
 }
 
 
@@ -460,7 +485,10 @@ func ApplyProportProbNoise(p *Population, envNoise float64, uniformRandom *rand.
 		maxFitness = utils.MaxFloat64(maxFitness, ind.PhenoFitness)
 	}
 	// Verify maxFitness is not zero so we can divide by it below
-	if maxFitness <= 0.0 { log.Fatalf("Max individual fitness is < 0 (%v), so whole population must be dead. Exiting.", maxFitness) }
+	if maxFitness <= 0.0 {
+		log.Fatalf("Max individual fitness is <= 0 (%v), so whole population must be dead. Exiting.", maxFitness)
+		return		// if maxFitness==0, the all ind's PhenoFitness<=0 so we don't have to normalize them
+	}
 
 	// Normalize the pheno fitness
 	for _, indRef := range p.IndivRefs {
@@ -702,8 +730,8 @@ func (p *Population) ReportDeadStats() {
 	}
 
 	// Calculate and print the elimination stats
-	avgFitness = avgFitness / float64(numDead)
 	if numDead > 0 {
+		avgFitness = avgFitness / float64(numDead)
 		avgDel = float64(numDel) / float64(numDead)
 		avgNeut = float64(numNeut) / float64(numDead)
 		avgFav = float64(numFav) / float64(numDead)
@@ -717,6 +745,8 @@ func (p *Population) ReportDeadStats() {
 func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float64) {
 	// See if we already calculated and cached the values
 	if p.MeanFitness > 0.0 { return p.MeanFitness, p.MinFitness, p.MaxFitness, p.TotalNumMutations, p.MeanNumMutations }
+	popSize := p.GetCurrentSize()
+	if popSize == 0 { return 0.0, 0.0, 0.0, 0, 0.0 }
 	p.MinFitness = 99.0
 	p.MaxFitness = -99.0
 	p.MeanFitness = 0.0
@@ -729,7 +759,6 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float
 		if ind.GenoFitness < p.MinFitness { p.MinFitness = ind.GenoFitness }
 		p.TotalNumMutations += uint64(ind.NumMutations)
 	}
-	popSize := p.GetCurrentSize()
 	p.MeanFitness = p.MeanFitness / float64(popSize)
 	p.MeanNumMutations = float64(p.TotalNumMutations) / float64(popSize)
 	return p.MeanFitness, p.MinFitness, p.MaxFitness, p.TotalNumMutations, p.MeanNumMutations
@@ -740,6 +769,8 @@ func (p *Population) GetFitnessStats() (float64, float64, float64, uint64, float
 func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64, float64*/) {
 	// See if we already calculated and cached the values. Note: we only check deleterious, because fav and neutral could be 0
 	if p.MeanNumDeleterious > 0 { return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable }
+	popSize := float64(p.GetCurrentSize())
+	if popSize == 0 { return 0.0, 0.0, 0.0 }
 	p.MeanNumDeleterious=0.0;  p.MeanNumNeutral=0.0;  p.MeanNumFavorable=0.0
 
 	// For each type of mutation, get the average fitness factor and number of mutation for every individual and combine them. Example: 20 @ .2 and 5 @ .4 = (20 * .2) + (5 * .4) / 25
@@ -751,12 +782,9 @@ func (p *Population) GetMutationStats() (float64, float64, float64 /*,  float64,
 		neut += uint64(n)
 		fav += uint64(f)
 	}
-	size := float64(p.GetCurrentSize())
-	if size > 0 {
-		p.MeanNumDeleterious = float64(delet) / size
-		p.MeanNumNeutral = float64(neut) / size
-		p.MeanNumFavorable = float64(fav) / size
-	}
+	p.MeanNumDeleterious = float64(delet) / popSize
+	p.MeanNumNeutral = float64(neut) / popSize
+	p.MeanNumFavorable = float64(fav) / popSize
 	return p.MeanNumDeleterious, p.MeanNumNeutral, p.MeanNumFavorable
 }
 
@@ -807,6 +835,7 @@ func (p *Population) ReportInitial() {
 
 // Report prints out statistics of this population
 func (p *Population) ReportEachGen(genNum uint32, lastGen bool, totalInterimTime, genTime float64, memUsed float32) {
+	if p.Done { return }
 	perGenMinimalVerboseLevel := uint32(1)            // level at which we will print only the info that is very quick to gather
 	perGenVerboseLevel := uint32(2)            // level at which we will print population summary info each generation
 	finalVerboseLevel := uint32(1)            // level at which we will print population summary info at the end of the run
@@ -856,11 +885,15 @@ func (p *Population) ReportEachGen(genNum uint32, lastGen bool, totalInterimTime
 			//todo: put summary stats in comments at the end of the file?
 		}
 	}
+
+	// Note: Species.ReportEachGen() runs Population.CountAlleles()
 }
 
 func (p *Population) CountAlleles(genNum uint32, lastGen bool) {
+	//if p.Done { return }  // even if a tribe went extinct, we might still be interested in its allele plots, as long as its pop > 0
 	if (config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.NORMALIZED_ALLELE_BINS_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_DEL_DIRECTORY) || config.FMgr.IsDir(config.DISTRIBUTION_FAV_DIRECTORY)) && (lastGen || (config.Cfg.Computation.Plot_allele_gens > 0 && (genNum % config.Cfg.Computation.Plot_allele_gens) == 0)) {
 		popSize := p.GetCurrentSize()
+		if popSize == 0 { return }
 		alleles := p.getAlleles(genNum, popSize, lastGen)
 		p.outputAlleleBins(genNum, popSize, lastGen, alleles)
 		p.outputAlleleDistribution(genNum, popSize, lastGen, alleles)
@@ -1008,7 +1041,9 @@ func (p *Population) outputAlleleBins(genNum, popSize uint32, lastGen bool, alle
 	if config.FMgr.IsDir(config.ALLELE_BINS_DIRECTORY) {
 		newJson, err := json.Marshal(bucketJson)
 		if err != nil { log.Fatalf("error marshaling allele bins to json: %v", err)	}
+		//log.Printf("=== writing to %s, %s, %v", config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum)
 		if alleleWriter := config.FMgr.GetDirFile(config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum); alleleWriter != nil {
+			//log.Printf("=== really writing to %s, %s, %v", config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum)
 			if _, err := alleleWriter.Write(newJson); err != nil { log.Fatalf("error writing alleles to %v: %v", fileName, err) }
 			config.FMgr.CloseDirFile(config.ALLELE_BINS_DIRECTORY, fileName, p.TribeNum)
 		}

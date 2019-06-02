@@ -94,6 +94,22 @@ func (s *Species) Select(uniformRandom *rand.Rand) {
 		p.Select(newRandom)
 	}
 }
+
+// Go thru all pops and see if they all have gone extinct or reached their pop max
+func (s *Species) AllPopsDone() bool {
+	for _, p := range s.Populations {
+		if !p.Done && !p.IsDone(false) { return false }
+	}
+	return true
+}
+
+// Go thru all pops and mark as done any that have gone extinct or reached its pop max
+func (s *Species) MarkDonePops() {
+	for _, p := range s.Populations {
+		if !p.Done && p.IsDone(true) { p.Done = true }
+	}
+}
+
 // ReportInitial prints out stuff at the beginning, usually headers for data files, or a summary of the run we are about to do
 func (s *Species) ReportInitial() {
 	for _, p := range s.Populations {
