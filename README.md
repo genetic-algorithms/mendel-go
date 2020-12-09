@@ -66,6 +66,17 @@ Test some of the packages:
 make test-pkgs
 ```
 
+# Build the mendel-go Packages
+
+To publish a new version of mendel-go, first build the RPM and macOS packages of it:
+
+```bash
+make rpmbuild
+make macpkg
+```
+
+Create a new release at https://github.com/genetic-algorithms/mendel-go/releases and upload the packages you just built.
+
 # Build and Run the Mendel Web UI
 
 See the [mendel-web-ui git repo](https://github.com/genetic-algorithms/mendel-web-ui) to build and run the Mendel web UI.

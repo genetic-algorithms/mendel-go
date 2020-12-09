@@ -57,8 +57,8 @@ rpmbuild:
 macpkg: $(BINARY)
 	pkg/mac/populate-pkg-files.sh pkg/mac/$(BINARY)
 	pkgbuild --root pkg/mac/$(BINARY) --scripts pkg/mac/scripts --identifier $(MAC_PKG_IDENTIFIER) --version $(VERSION) --install-location $(MAC_PKG_INSTALL_DIR) pkg/mac/build/$(BINARY)-$(VERSION).pkg
-	rm -f pkg/mac/build/$(BINARY)-$(VERSION).pkg.zip
-	cd pkg/mac/build; zip $(BINARY)-$(VERSION).pkg.zip $(BINARY)-$(VERSION).pkg; cd ../../..   # need to be in the same dir to zip
+	@#rm -f pkg/mac/build/$(BINARY)-$(VERSION).pkg.zip
+	@#cd pkg/mac/build; zip $(BINARY)-$(VERSION).pkg.zip $(BINARY)-$(VERSION).pkg; cd ../../..   # need to be in the same dir to zip
 
 macinstall: macpkg
 	sudo installer -pkg pkg/mac/build/$(BINARY)-$(VERSION).pkg -target '/Volumes/Macintosh HD'
@@ -83,4 +83,4 @@ test-pkgs:
 clean:
 	go clean
 
-.PHONY: default run runlong runshort prof run-defaults rpmbuild macpkg macinstall macpkginfo test-main test-pkgs clean
+.PHONY: default run runlong runshort prof run-defaults rpmbuild macpkg macinstall macpkginfo test test-pkgs clean
