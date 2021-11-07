@@ -15,7 +15,6 @@ default: run
 
 $(BINARY): mendel.go */*.go Makefile
 	@echo GOOS=$$GOOS
-	glide --quiet install
 	echo 'package main; const MENDEL_GO_VERSION = "$(VERSION)-$(RELEASE)"' > version.go
 	go build -o $@
 
@@ -74,11 +73,9 @@ upload-release:
 release: rpmbuild macpkg upload-release
 
 test: mendel_test.go $(BINARY)
-	glide --quiet install
 	go test -v $<
 
 test-pkgs:
-	glide --quiet install
 	go test ./random
 
 clean:

@@ -23,12 +23,6 @@ If you want to run mendel-go (w/o building it from source) see the [Mendel wiki 
   export PATH=$PATH:/usr/local/go/bin
   export GOPATH=$HOME
   ```
-
-- Install glide:
-
-  ```bash
-  curl https://glide.sh/get | sh
-  ```
  
 - Clone and build mendel-go:
 
