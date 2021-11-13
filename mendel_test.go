@@ -101,6 +101,11 @@ func TestMendelCase15(t *testing.T) {
 }
 */
 
+// Same as TestMendelCase4 except all initial alleles have 0 fitness effect
+func TestMendelCase16(t *testing.T) {
+	mendelCaseBin(t, 16, 16, "00000050.json", false, "", "")
+}
+
 // mendelCase runs a typical test case with an input file number and expected output file number.
 func mendelCase(t *testing.T, num, expNum int) {
 	numStr := strconv.Itoa(num)
