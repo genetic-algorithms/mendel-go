@@ -22,3 +22,6 @@
 
 # Mac Finder file
 .DS_Store
+
+# VSCode editor
+/.vscode/
